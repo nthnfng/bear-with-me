@@ -381,3 +381,7 @@ button:disabled {
   font-weight: 700;
   outline: 2px solid currentColor;
 }
+.header-pose {
+  display: inline-flex;
+  cursor: pointer;
+}

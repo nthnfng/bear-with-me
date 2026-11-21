@@ -1,6 +1,6 @@
 // Popup: draws src/popup/view.ts and sends PopupMessages. No behaviour here (ADR 0001).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { storage } from 'wxt/utils/storage';
 import { DEFAULT_TUNING, DEMO_TUNING, STORAGE_KEYS } from '@/src/contracts';
 import type { BarryState, DevCommand, ModeOverride, PopupMessage } from '@/src/contracts';
@@ -78,11 +78,17 @@ function App() {
   const activeTabId = useActiveTabId();
   const [clicks, setClicks] = useState(0);
   const [devOpen, setDevOpen] = useState(read);
+  const devRef = useRef<HTMLDivElement>(null);
+  const [justUnlocked, setJustUnlocked] = useState(false);
+  useEffect(() => {
+    if (justUnlocked) devRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [justUnlocked]);
 
   const onBarry = () => {
     if (devOpen) return;
     if (clicks + 1 >= 5) {
       setDevOpen(true);
+      setJustUnlocked(true);
       try {
         localStorage.setItem(UNLOCK_KEY, '1');
       } catch {
@@ -105,7 +111,11 @@ function App() {
           draggable={false}
           onClick={onBarry}
         />
-        {hb && <HeaderPose pose={hb.pose} poseSince={hb.poseSince} />}
+        {hb && (
+          <span className="header-pose" onClick={onBarry}>
+            <HeaderPose pose={hb.pose} poseSince={hb.poseSince} />
+          </span>
+        )}
       </div>
       {hb?.canGetUp && (
         <button className="getup" onClick={() => send({ type: 'gotUp' })}>
@@ -182,7 +192,11 @@ function App() {
 
           <SettingsSections state={state} now={now} send={send} />
 
-          {devOpen && <DevPanel state={state} onClose={() => setDevOpen(false)} />}
+          {devOpen && (
+            <div ref={devRef}>
+              <DevPanel state={state} onClose={() => setDevOpen(false)} />
+            </div>
+          )}
         </>
       )}
     </main>
