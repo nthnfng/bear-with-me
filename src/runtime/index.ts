@@ -32,7 +32,7 @@ import {
   refreshSchedule,
   shouldDispatchSchedule,
 } from '../schedule/fetcher';
-import { ensureOffscreen, playSoundOffscreen } from './offscreen';
+import { ensureOffscreen, playSoundOffscreen, stopChudSongOffscreen } from './offscreen';
 import { explosionSoundDelay } from './explosionSound';
 import { dropStaleEffects, isScriptableUrl, planTabSync, tabSlotFor } from './tabs';
 import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './todos';
@@ -145,6 +145,8 @@ export function startRuntime(brain: Brain) {
             browser.tabs.create({ windowId, active: true }).catch(() => {}),
           ),
         );
+        // Barry's done with those tabs: the chud song stops with them.
+        void stopChudSongOffscreen();
         // One call for every tab and window; closed tabs raise onRemoved -> tabClosed via the queue.
         try {
           await browser.tabs.remove(ids);
@@ -193,6 +195,10 @@ export function startRuntime(brain: Brain) {
     const { state } = result;
     // After sleep or a closed browser, episodes that ended meanwhile must not play out now.
     const effects = dropStaleEffects(event, before.lastNow, result.effects);
+    // Barry's episode is over (no Restricted tab open, or a break started): stop the chud song.
+    if (before.arrivedTabs.length > 0 && state.arrivedTabs.length === 0) {
+      void stopChudSongOffscreen();
+    }
     // Sounds first: they're the feedback for a click, and saving and pushing views takes a while.
     const sounds = effects.filter((e) => e.type === 'playSound');
     for (const effect of sounds) void runEffect(effect).catch(console.error);

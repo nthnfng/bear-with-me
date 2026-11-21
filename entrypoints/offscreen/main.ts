@@ -6,7 +6,7 @@
 // Audio, so a click's chomp starts at once instead of after loading an <audio> element.
 import type { AssetManifest, SoundId } from '@/src/contracts';
 import manifestJson from '@/public/assets/manifest.json';
-import { isOffscreenSound } from '@/src/runtime/offscreen';
+import { isOffscreenSound, isOffscreenStop } from '@/src/runtime/offscreen';
 
 const manifest = manifestJson as unknown as AssetManifest;
 let chudAudio: HTMLAudioElement | null = null;
@@ -47,6 +47,11 @@ async function play(file: string) {
 }
 
 browser.runtime.onMessage.addListener((msg: unknown) => {
+  if (isOffscreenStop(msg)) {
+    chudAudio?.pause();
+    chudAudio = null;
+    return;
+  }
   if (!isOffscreenSound(msg)) return;
   const variants = manifest.sounds[msg.sound];
   const file = variants[Math.floor(Math.random() * variants.length)]!;
