@@ -37,7 +37,7 @@ import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './to
 
 const TICK_ALARM = 'barry-tick';
 const ICS_ALARM = 'barry-ics-refresh';
-const EXPLODE_MS = 1000;
+const EXPLODE_MS = 1300; // the overlay's explosion animation is 1000ms; leave room for it to finish
 const ICS_FETCH_TIMEOUT_MS = 15_000;
 const REINJECT_COOLDOWN_MS = 15_000;
 const CONTENT_SCRIPT_FILE = '/content-scripts/content.js'; // WXT output path for entrypoints/content.ts
