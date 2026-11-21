@@ -1,0 +1,9 @@
+{
+  "sounds": {
+    "chomp": ["sounds/roblox-eating-sound.mp3"],
+    "punch": ["sounds/slap.mp3"],
+    "ow": ["sounds/oof.mp3"],
+    "chudSong": ["sounds/im-a-chud.mp3"],
+    "burst": ["sounds/rahhh.mp3"]
+  }
+}
