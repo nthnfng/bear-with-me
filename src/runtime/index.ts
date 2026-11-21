@@ -190,7 +190,7 @@ export function startRuntime(brain: Brain) {
     scheduleDeadline(state);
     applyIdleThreshold(state.tuning.idleAfterSec);
     // The explosion sound is runtime-originated, so the brain's muted filter does not cover it.
-    const explosionDelay = explosionSoundDelay(effects, state.muted);
+    const explosionDelay = explosionSoundDelay(event, effects, state.muted);
     if (explosionDelay !== null) {
       setTimeout(() => void playSoundOffscreen('explosion').catch(console.error), explosionDelay);
     }
