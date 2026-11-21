@@ -7,12 +7,15 @@ import type {
   CalendarBlock,
   Millis,
   Mode,
+  PoseId,
+  PoseSprite,
+  TabId,
   ModeOverride,
   Tuning,
 } from '../contracts';
 import { DEFAULT_TUNING, DEMO_TUNING } from '../contracts';
 import { currentBlock, resolveMode } from '../brain/helpers';
-import { caveAllowed } from '../brain';
+import { brain, caveAllowed } from '../brain';
 
 export interface Countdown {
   label: string;
@@ -248,4 +251,70 @@ export function formatAgo(ms: number): string {
   if (m < 60) return `${m} min ago`;
   const h = Math.floor(m / 60);
   return h < 24 ? `${h} h ago` : `${Math.floor(h / 24)} d ago`;
+}
+
+// ---- header Barry (pixel art of the current pose) -----------------------------------------
+
+export interface HeaderBarry {
+  pose: PoseId;
+  /** Restarts the flipbook when the same pose begins again. 0 for the calm fallback. */
+  poseSince: Millis;
+  canGetUp: boolean;
+}
+
+/**
+ * Which pose the popup shows and whether Get up is offered. Asks the brain what the active
+ * tab shows; if that tab hides Barry (or is unknown), uses the first other open tab that shows
+ * him, so a Confrontation or Snooze in another tab still appears. With nobody visible, Barry
+ * is calm: Chill sips, Lock In studies. Get up shows if any tab's view offers it.
+ */
+export function headerBarry(
+  state: BarryState,
+  now: Millis,
+  activeTabId: TabId | null,
+): HeaderBarry {
+  const ids = Object.keys(state.openTabs).map(Number);
+  const ordered =
+    activeTabId !== null && ids.includes(activeTabId)
+      ? [activeTabId, ...ids.filter((id) => id !== activeTabId)]
+      : ids;
+  const views = ordered.map((id) => brain.viewFor(state, id, now));
+  const shown = views.find((v) => v.visible);
+  const canGetUp = views.some((v) => v.canGetUp);
+  if (shown) return { pose: shown.pose, poseSince: shown.poseSince, canGetUp };
+  const calm = resolveMode(state, now) === 'chill' ? 'chill-mug' : 'studious';
+  return { pose: calm, poseSince: 0, canGetUp };
+}
+
+/** Which frame of a strip shows `elapsed` ms after the pose began (still images stay on 0). */
+export function frameAt(sprite: Pick<PoseSprite, 'frames' | 'frameMs'>, elapsed: number): number {
+  if (sprite.frames <= 1 || !sprite.frameMs) return 0;
+  return Math.floor(Math.max(0, elapsed) / sprite.frameMs) % sprite.frames;
+}
+
+/** Pixel-crisp CSS box for one frame of a strip at an integer scale. */
+export function spriteBox(sprite: Pick<PoseSprite, 'w' | 'h' | 'frames'>, scale: number, frame = 0) {
+  return {
+    width: sprite.w * scale,
+    height: sprite.h * scale,
+    backgroundSize: `${sprite.w * sprite.frames * scale}px ${sprite.h * scale}px`,
+    backgroundPosition: `${-frame * sprite.w * scale}px 0px`,
+  };
+}
+
+// ---- chud bar (35x5 art px outline, fill drawn in code) -----------------------------------
+
+export const CHUD_STEPS = 10;
+/** Inner fill area of chud-bar.png in art px, from the demo: 33 x 3 at (1, 1). */
+export const CHUD_FILL = { x: 1, y: 1, w: 33, h: 3 } as const;
+
+/** Chud meter 0..1 as whole steps 0..10. */
+export function chudSteps(meter: number): number {
+  const m = Number.isFinite(meter) ? Math.min(1, Math.max(0, meter)) : 0;
+  return Math.round(m * CHUD_STEPS);
+}
+
+/** Fill width in art px for a meter value. */
+export function chudFillWidth(meter: number): number {
+  return Math.round((chudSteps(meter) / CHUD_STEPS) * CHUD_FILL.w);
 }

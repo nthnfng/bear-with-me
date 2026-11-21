@@ -33,6 +33,7 @@ import {
   shouldDispatchSchedule,
 } from '../schedule/fetcher';
 import { playSoundOffscreen } from './offscreen';
+import { explosionSoundDelay } from './explosionSound';
 import { dropStaleEffects, isScriptableUrl, planTabSync, tabSlotFor } from './tabs';
 import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './todos';
 
@@ -188,6 +189,11 @@ export function startRuntime(brain: Brain) {
     await pushViews(state, Object.keys(state.openTabs).map(Number));
     scheduleDeadline(state);
     applyIdleThreshold(state.tuning.idleAfterSec);
+    // The explosion sound is runtime-originated, so the brain's muted filter does not cover it.
+    const explosionDelay = explosionSoundDelay(effects, state.muted);
+    if (explosionDelay !== null) {
+      setTimeout(() => void playSoundOffscreen('explosion').catch(console.error), explosionDelay);
+    }
     // Not awaited: explodeAndClose waits ~1s and must not stall the queue.
     for (const effect of effects) void runEffect(effect).catch(console.error);
   }

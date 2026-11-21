@@ -7,6 +7,7 @@ import type { BarryState, DevCommand, ModeOverride, PopupMessage } from '@/src/c
 import {
   SLACK_PRESETS_MIN,
   formatClock,
+  headerBarry,
   formatCountdown,
   popupView,
   speedPreset,
@@ -14,6 +15,7 @@ import {
   tuningSeconds,
 } from '@/src/popup/view';
 import { ChudMeter, SettingsSections } from './Settings';
+import { HeaderPose } from './Pixel';
 
 const send = (msg: PopupMessage) => {
   browser.runtime.sendMessage(msg).catch(() => {});
@@ -32,6 +34,17 @@ function useBarryState() {
     };
   }, []);
   return state;
+}
+
+function useActiveTabId() {
+  const [id, setId] = useState<number | null>(null);
+  useEffect(() => {
+    browser.tabs
+      .query({ active: true, currentWindow: true })
+      .then((t) => setId(t[0]?.id ?? null))
+      .catch(() => {});
+  }, []);
+  return id;
 }
 
 function useNow() {
@@ -61,6 +74,7 @@ const MODES: { value: ModeOverride; label: string }[] = [
 function App() {
   const state = useBarryState();
   const now = useNow();
+  const activeTabId = useActiveTabId();
   const [clicks, setClicks] = useState(0);
   const [devOpen, setDevOpen] = useState(read);
 
@@ -78,16 +92,25 @@ function App() {
   };
 
   const v = state ? popupView(state, now) : null;
+  const hb = state ? headerBarry(state, now, activeTabId) : null;
 
   return (
     <main>
-      <img
-        className="barry"
-        src={browser.runtime.getURL('/assets/barry-home.png' as any)}
-        alt="Barry"
-        draggable={false}
-        onClick={onBarry}
-      />
+      <div className="hero">
+        <img
+          className="barry"
+          src={browser.runtime.getURL('/assets/barry-home.png' as any)}
+          alt="Barry"
+          draggable={false}
+          onClick={onBarry}
+        />
+        {hb && <HeaderPose pose={hb.pose} poseSince={hb.poseSince} />}
+      </div>
+      {hb?.canGetUp && (
+        <button className="getup" onClick={() => send({ type: 'gotUp' })}>
+          Get up
+        </button>
+      )}
       {!v || !state ? (
         <p className="headline">Barry is waking up...</p>
       ) : (
