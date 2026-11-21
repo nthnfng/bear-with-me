@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ScheduleStatus } from '../contracts';
-import { normalizeIcsUrl, refreshSchedule, scheduleWindow } from './fetcher';
+import {
+  isScheduleFresh,
+  normalizeIcsUrl,
+  refreshSchedule,
+  scheduleWindow,
+  shouldDispatchSchedule,
+} from './fetcher';
 
 const NOW = Date.parse('2025-01-15T12:00:00Z');
 const ICS =
@@ -66,5 +72,29 @@ describe('helpers', () => {
     expect(normalizeIcsUrl(' webcal://a.com/x.ics ')).toBe('https://a.com/x.ics');
     expect(normalizeIcsUrl('javascript:alert(1)')).toBeNull();
     expect(normalizeIcsUrl('nope')).toBeNull();
+  });
+});
+
+describe('shouldDispatchSchedule', () => {
+  const empty: ScheduleStatus = { blocks: [], fetchedAt: null, error: null };
+  it('treats no URL as a known empty schedule', () => {
+    expect(shouldDispatchSchedule(null, empty)).toBe(true);
+  });
+  it('stays silent when the first fetch fails', () => {
+    expect(shouldDispatchSchedule('https://x/y.ics', { ...empty, error: 'nope' })).toBe(false);
+  });
+  it('dispatches successes and failures that kept earlier blocks', () => {
+    expect(shouldDispatchSchedule('https://x/y.ics', { ...prev })).toBe(true);
+    expect(shouldDispatchSchedule('https://x/y.ics', { ...prev, error: 'nope' })).toBe(true);
+  });
+});
+
+describe('isScheduleFresh', () => {
+  it('is fresh only for a recent error-free fetch', () => {
+    const s: ScheduleStatus = { blocks: [], fetchedAt: 1000, error: null };
+    expect(isScheduleFresh(s, 1500, 1000)).toBe(true);
+    expect(isScheduleFresh(s, 2500, 1000)).toBe(false);
+    expect(isScheduleFresh({ ...s, error: 'x' }, 1500, 1000)).toBe(false);
+    expect(isScheduleFresh({ ...s, fetchedAt: null }, 1500, 1000)).toBe(false);
   });
 });

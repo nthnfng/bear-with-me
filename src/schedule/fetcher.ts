@@ -58,3 +58,17 @@ export async function refreshSchedule(
     return fail("Couldn't read the calendar feed");
   }
 }
+
+/**
+ * Whether the brain should hear about this refresh result. A failed fetch with no earlier good
+ * result tells it nothing (the schedule stays unknown); no URL at all is a known empty schedule.
+ */
+export function shouldDispatchSchedule(url: string | null, status: ScheduleStatus): boolean {
+  if (!url) return true;
+  return !(status.error !== null && status.fetchedAt === null);
+}
+
+/** On worker start, skip the network if the stored result is still fresh (the worker wakes often). */
+export function isScheduleFresh(status: ScheduleStatus, now: Millis, maxAgeMs: number): boolean {
+  return status.fetchedAt !== null && status.error === null && now - status.fetchedAt < maxAgeMs;
+}

@@ -25,12 +25,21 @@ import {
 } from '../contracts';
 import { contentMessageToEvent, isPopupMessage, popupMessageToEvent } from './messageToEvent';
 import { createSerialQueue } from './serialQueue';
-import { EMPTY_STATUS, normalizeIcsUrl, refreshSchedule } from '../schedule/fetcher';
+import {
+  EMPTY_STATUS,
+  isScheduleFresh,
+  normalizeIcsUrl,
+  refreshSchedule,
+  shouldDispatchSchedule,
+} from '../schedule/fetcher';
+import { dropStaleEffects, isScriptableUrl, planTabSync, tabSlotFor } from './tabs';
 import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './todos';
 
 const TICK_ALARM = 'barry-tick';
 const ICS_ALARM = 'barry-ics-refresh';
 const EXPLODE_MS = 1000;
+const ICS_FETCH_TIMEOUT_MS = 15_000;
+const REINJECT_COOLDOWN_MS = 15_000;
 const CONTENT_SCRIPT_FILE = '/content-scripts/content.js'; // WXT output path for entrypoints/content.ts
 
 export function startRuntime(brain: Brain) {
@@ -66,13 +75,56 @@ export function startRuntime(brain: Brain) {
     );
   }
 
+  /** Last time we tried to inject the content script into a tab that should show Barry. */
+  const reinjectedAt = new Map<TabId, number>();
+
+  /**
+   * A tab that should show Barry but has no listener (opened before install, content script lost):
+   * inject once in a while. The injected script says hello, which pushes the view again.
+   */
+  async function reinjectIfNeeded(tabId: TabId) {
+    const last = reinjectedAt.get(tabId) ?? 0;
+    if (Date.now() - last < REINJECT_COOLDOWN_MS) return;
+    reinjectedAt.set(tabId, Date.now());
+    try {
+      const tab = await browser.tabs.get(tabId);
+      if (!isScriptableUrl(tab.url) || tab.discarded || tab.status !== 'complete') return;
+      await browser.scripting.executeScript({
+        target: { tabId, allFrames: true },
+        files: [CONTENT_SCRIPT_FILE],
+      });
+    } catch {
+      // Not injectable after all.
+    }
+  }
+
   async function pushViews(state: BarryState, tabIds: TabId[]) {
     const now = Date.now();
+    const targets = tabIds.filter((id) => !closing.has(id));
+    const views = targets.map((id) => ({ id, view: brain.viewFor(state, id, now) }));
+    // The Arm needs each tab's place in its tab strip; only look it up while a Reach is on screen.
+    if (views.some((v) => v.view.reach !== null)) {
+      const tabs = await browser.tabs.query({}).catch(() => []);
+      for (const v of views) if (v.view.reach) v.view.tabSlot = tabSlotFor(tabs, v.id);
+    }
     await Promise.all(
-      tabIds
-        .filter((id) => !closing.has(id))
-        .map((id) => sendToTab(id, { type: 'view', view: brain.viewFor(state, id, now) })),
+      views.map(async ({ id, view }) => {
+        const delivered = await browser.tabs.sendMessage(id, { type: 'view', view }).then(
+          () => true,
+          () => false,
+        );
+        if (!delivered && view.visible) void reinjectIfNeeded(id);
+      }),
     );
+  }
+
+  /** While a Reach is on screen, tab moves, opens, closes and pin changes shift where the Arm aims. */
+  function repushWhileReaching() {
+    void queue.enqueue(async () => {
+      const state = await loadState();
+      if (state.reachStartedAt !== null)
+        await pushViews(state, Object.keys(state.openTabs).map(Number));
+    });
   }
 
   // ---- effects --------------------------------------------------------------------------
@@ -124,7 +176,11 @@ export function startRuntime(brain: Brain) {
 
   /** load → reduce → save → push views → run effects. Call only from inside the queue. */
   async function handle(event: BarryEvent) {
-    const { state, effects } = brain.reduce(await loadState(), event);
+    const before = await loadState();
+    const result = brain.reduce(before, event);
+    const { state } = result;
+    // After sleep or a closed browser, episodes that ended meanwhile must not play out now.
+    const effects = dropStaleEffects(event, before.lastNow, result.effects);
     await storage.setItem(STORAGE_KEYS.state, state);
     await pushViews(state, Object.keys(state.openTabs).map(Number));
     scheduleDeadline(state);
@@ -161,12 +217,15 @@ export function startRuntime(brain: Brain) {
       const previous =
         (await storage.getItem<ScheduleStatus>(STORAGE_KEYS.schedule)) ?? EMPTY_STATUS;
       const status = await refreshSchedule(settings?.icsUrl ?? null, previous, {
-        fetchText: (url) => fetch(url),
+        fetchText: (url) =>
+          fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(ICS_FETCH_TIMEOUT_MS) }),
         now: Date.now(),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       await storage.setItem(STORAGE_KEYS.schedule, status);
-      void dispatch({ type: 'scheduleUpdated', now: Date.now(), blocks: status.blocks });
+      if (shouldDispatchSchedule(settings?.icsUrl ?? null, status)) {
+        void dispatch({ type: 'scheduleUpdated', now: Date.now(), blocks: status.blocks });
+      }
     })()
       .catch(() => console.error('[barry] schedule refresh failed'))
       .finally(() => {
@@ -190,7 +249,13 @@ export function startRuntime(brain: Brain) {
           });
           return false;
         }
-        await saveSettings({ ...(await loadSettings()), icsUrl: url });
+        const settings = await loadSettings();
+        if (settings.icsUrl !== url) {
+          // A different calendar: the old calendar's blocks must not linger if the new fetch fails.
+          await storage.setItem(STORAGE_KEYS.schedule, EMPTY_STATUS);
+          await handle({ type: 'scheduleUpdated', now: Date.now(), blocks: [] });
+        }
+        await saveSettings({ ...settings, icsUrl: url });
         return true;
       })
       .then(async (saved) => {
@@ -217,46 +282,86 @@ export function startRuntime(brain: Brain) {
 
   // ---- tab tracking ---------------------------------------------------------------------
 
-  async function activeTabOfFocusedWindow(): Promise<TabId | null> {
-    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
-    return tab?.id ?? null;
-  }
-
-  async function seedOpenTabs() {
-    const now = Date.now();
-    for (const tab of await browser.tabs.query({})) {
-      if (tab.id !== undefined && tab.url) {
-        await dispatch({ type: 'tabNavigated', now, tabId: tab.id, url: tab.url });
-      }
+  /**
+   * The active tab of the last focused normal window. Popup and DevTools windows are skipped, and
+   * focus in another app keeps the last Chrome window (it is still on screen).
+   */
+  async function focusedActiveTab(): Promise<{ tabId: TabId; windowId: number } | null> {
+    try {
+      const win = await browser.windows.getLastFocused({ populate: true, windowTypes: ['normal'] });
+      const tab = win.tabs?.find((t) => t.active);
+      return tab?.id !== undefined && win.id !== undefined
+        ? { tabId: tab.id, windowId: win.id }
+        : null;
+    } catch {
+      return null;
     }
-    await dispatch({
-      type: 'tabActivated',
-      now: Date.now(),
-      tabId: await activeTabOfFocusedWindow(),
-    });
+  }
+  const activeTabOfFocusedWindow = async () => (await focusedActiveTab())?.tabId ?? null;
+
+  /**
+   * Make the brain's tab list match the browser's: forget tabs that vanished while the worker was
+   * not listening (browser restart, crash), learn unknown ones, then settle the active tab.
+   */
+  async function syncTabs() {
+    const live = await browser.tabs.query({});
+    const state = await queue.enqueue(loadState);
+    if (!state) return;
+    const plan = planTabSync(state.openTabs, live);
+    for (const tabId of plan.close) await dispatch({ type: 'tabClosed', now: Date.now(), tabId });
+    for (const { tabId, url } of plan.navigate) {
+      await dispatch({ type: 'tabNavigated', now: Date.now(), tabId, url });
+    }
+    const active = await activeTabOfFocusedWindow();
+    if (active !== null && active !== state.activeTabId) {
+      await dispatch({ type: 'tabActivated', now: Date.now(), tabId: active });
+    }
   }
 
   async function injectIntoOpenTabs() {
     for (const tab of await browser.tabs.query({ url: ['http://*/*', 'https://*/*'] })) {
-      if (tab.id === undefined) continue;
+      if (tab.id === undefined || tab.discarded) continue;
       await browser.scripting
-        .executeScript({ target: { tabId: tab.id }, files: [CONTENT_SCRIPT_FILE] })
+        .executeScript({ target: { tabId: tab.id, allFrames: true }, files: [CONTENT_SCRIPT_FILE] })
         .catch(() => {}); // restricted pages (web store etc.)
     }
   }
 
-  browser.tabs.onActivated.addListener(({ tabId }) => {
+  browser.tabs.onActivated.addListener(async ({ tabId, windowId }) => {
+    // A tab switching in a window that is not the focused one is not what the user is looking at.
+    const focused = await focusedActiveTab();
+    if (focused && focused.windowId !== windowId) return;
     dispatch({ type: 'tabActivated', now: Date.now(), tabId });
   });
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    // SPAs (YouTube) change url via history.pushState: no reload, but onUpdated still reports it.
     if (changeInfo.url) {
       dispatch({ type: 'tabNavigated', now: Date.now(), tabId, url: changeInfo.url });
     }
+    if (changeInfo.pinned !== undefined) repushWhileReaching();
   });
   browser.tabs.onRemoved.addListener((tabId) => {
     closing.delete(tabId);
+    reinjectedAt.delete(tabId);
     dispatch({ type: 'tabClosed', now: Date.now(), tabId });
   });
+  // Prerendered or instant-search tabs swap in under a new id.
+  browser.tabs.onReplaced.addListener(async (addedTabId, removedTabId) => {
+    closing.delete(removedTabId);
+    await dispatch({ type: 'tabClosed', now: Date.now(), tabId: removedTabId });
+    try {
+      const tab = await browser.tabs.get(addedTabId);
+      const url = tab.url || tab.pendingUrl;
+      if (url) await dispatch({ type: 'tabNavigated', now: Date.now(), tabId: addedTabId, url });
+      if (tab.active) await dispatch({ type: 'tabActivated', now: Date.now(), tabId: addedTabId });
+    } catch {
+      // gone again
+    }
+  });
+  browser.tabs.onCreated.addListener(repushWhileReaching);
+  browser.tabs.onMoved.addListener(repushWhileReaching);
+  browser.tabs.onAttached.addListener(repushWhileReaching);
+  browser.tabs.onDetached.addListener(repushWhileReaching);
   // Focus leaving Chrome (another app, or a DevTools window) keeps the last real tab active:
   // it's still on screen, and dev commands typed in the worker console need a tab to target.
   browser.windows.onFocusChanged.addListener(async (windowId) => {
@@ -266,11 +371,11 @@ export function startRuntime(brain: Brain) {
   });
 
   browser.runtime.onInstalled.addListener(async () => {
-    await seedOpenTabs();
+    await syncTabs();
     await injectIntoOpenTabs();
   });
   browser.runtime.onStartup.addListener(() => {
-    void seedOpenTabs();
+    void syncTabs();
   });
 
   // ---- worker (re)start -----------------------------------------------------------------
@@ -278,6 +383,8 @@ export function startRuntime(brain: Brain) {
   // the real `now` recomputes the phase, re-pushes views to all known open tabs (the overlay
   // derives arm progress from reachStartedAt) and re-arms the deadline timer.
   void dispatch({ type: 'tick', now: Date.now() });
+  // Tab ids don't survive a browser restart, and events may have been missed: reconcile.
+  void syncTabs().catch(() => console.error('[barry] tab sync failed'));
   // Sync idle state (a worker restart or browser start may have missed a change).
   void queue.enqueue(async () => {
     const state = await loadState();
@@ -320,7 +427,16 @@ export function startRuntime(brain: Brain) {
     if (tabId === undefined) return;
     if (msg.type === 'hello') {
       // Make sure the brain knows this tab, then push its view.
-      queue.enqueue(async () => pushViews(await loadState(), [tabId]));
+      // Learn the tab first if its navigation event hasn't been processed yet (or was missed).
+      const url = sender.tab?.url;
+      void queue.enqueue(async () => {
+        const state = await loadState();
+        if (url && state.openTabs[tabId] !== url) {
+          await handle({ type: 'tabNavigated', now: Date.now(), tabId, url });
+        } else {
+          await pushViews(state, [tabId]);
+        }
+      });
       return;
     }
     if (msg.type === 'pickerSaved') {
@@ -349,14 +465,33 @@ export function startRuntime(brain: Brain) {
   // ---- clock ----------------------------------------------------------------------------
 
   // Chrome's minimum alarm period is 30s (0.5 min), which equals TICK_ALARM_SECONDS.
-  browser.alarms.create(TICK_ALARM, { periodInMinutes: TICK_ALARM_SECONDS / 60 });
-  browser.alarms.create(ICS_ALARM, { periodInMinutes: ICS_REFRESH_MINUTES });
+  // Only create missing alarms: re-creating one on every worker start restarts its period, and
+  // the worker starts every ~30s, so the slower ICS alarm would never get to fire.
+  async function ensureAlarm(name: string, periodInMinutes: number) {
+    if (!(await browser.alarms.get(name))) browser.alarms.create(name, { periodInMinutes });
+  }
+  void ensureAlarm(TICK_ALARM, TICK_ALARM_SECONDS / 60);
+  void ensureAlarm(ICS_ALARM, ICS_REFRESH_MINUTES);
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === TICK_ALARM) dispatch({ type: 'tick', now: Date.now() });
     if (alarm.name === ICS_ALARM) void refreshScheduleNow();
   });
-  // Refresh on worker start too (the alarm only fires after its first period).
-  void refreshScheduleNow();
+  // Worker start: refresh, unless the last fetch is fresh (then just tell the brain about it).
+  void (async () => {
+    const [settings, status] = await Promise.all([
+      queue.enqueue(loadSettings),
+      storage.getItem<ScheduleStatus>(STORAGE_KEYS.schedule),
+    ]);
+    if (
+      settings?.icsUrl &&
+      status &&
+      isScheduleFresh(status, Date.now(), ICS_REFRESH_MINUTES * 60_000)
+    ) {
+      void dispatch({ type: 'scheduleUpdated', now: Date.now(), blocks: status.blocks });
+    } else {
+      await refreshScheduleNow();
+    }
+  })().catch(() => console.error('[barry] schedule start failed'));
 
   // ---- temporary dev hook: run `barry.injectBlock()` in the service worker's DevTools -----
 

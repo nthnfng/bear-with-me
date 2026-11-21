@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { storage } from 'wxt/utils/storage';
-import { STORAGE_KEYS } from '@/src/contracts';
+import { DEFAULT_TUNING, DEMO_TUNING, STORAGE_KEYS } from '@/src/contracts';
 import type { BarryState, DevCommand, ModeOverride, PopupMessage } from '@/src/contracts';
 import {
   SLACK_PRESETS_MIN,
   formatClock,
   formatCountdown,
   popupView,
+  speedPreset,
   secondsToMs,
   tuningSeconds,
 } from '@/src/popup/view';
@@ -168,6 +169,7 @@ function DevPanel({ state, onClose }: { state: BarryState; onClose: () => void }
   const [title, setTitle] = useState('Dev block');
   const [minutes, setMinutes] = useState('30');
   const secs = tuningSeconds(state.tuning);
+  const preset = speedPreset(state.tuning);
   const [fat, setFat] = useState(String(state.fatness));
   const [chud, setChud] = useState(String(state.chudMeter));
 
@@ -204,6 +206,21 @@ function DevPanel({ state, onClose }: { state: BarryState; onClose: () => void }
           }}
         >
           Inject
+        </button>
+      </div>
+      <div className="row">
+        <span>Speed: {preset}</span>
+        <button
+          aria-pressed={preset === 'demo'}
+          onClick={() => dev({ kind: 'setTuning', tuning: DEMO_TUNING })}
+        >
+          Demo speed
+        </button>
+        <button
+          aria-pressed={preset === 'normal'}
+          onClick={() => dev({ kind: 'setTuning', tuning: DEFAULT_TUNING })}
+        >
+          Normal speed
         </button>
       </div>
       {tuningFields.map(([key, label]) => (

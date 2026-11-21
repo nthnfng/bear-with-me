@@ -304,3 +304,8 @@ button:disabled {
   flex-direction: column;
   gap: 2px;
 }
+
+.dev button[aria-pressed='true'] {
+  font-weight: 700;
+  outline: 2px solid currentColor;
+}

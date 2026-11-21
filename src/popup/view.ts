@@ -10,6 +10,7 @@ import type {
   ModeOverride,
   Tuning,
 } from '../contracts';
+import { DEFAULT_TUNING, DEMO_TUNING } from '../contracts';
 import { currentBlock, resolveMode } from '../brain/helpers';
 import { caveAllowed } from '../brain';
 
@@ -144,6 +145,15 @@ export function tuningSeconds(t: Tuning) {
     reachMs: t.reachMs / 1000,
     snoozeMs: t.snoozeMs / 1000,
   };
+}
+
+/** Which speed preset the tuning is on: Demo if every Demo value is applied, Normal if all defaults. */
+export function speedPreset(t: Tuning): 'demo' | 'normal' | 'custom' {
+  const matches = (preset: Partial<Tuning>) =>
+    (Object.keys(preset) as (keyof Tuning)[]).every((k) => t[k] === preset[k]);
+  if (matches(DEFAULT_TUNING)) return 'normal';
+  if (matches(DEMO_TUNING)) return 'demo';
+  return 'custom';
 }
 
 export const SLACK_PRESETS_MIN = [1, 5, 10, 15] as const;
