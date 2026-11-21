@@ -10,7 +10,13 @@ describe('parseDocsExport', () => {
   });
   it('reads list items, skipping struck/checked ones', () => {
     const c = parseDocsExport(SAMPLE);
-    expect(normalizeItems(c)).toEqual(['Buy milk', 'Write half struck', 'Outer', 'Inner <b>']);
+    expect(normalizeItems(c)).toEqual([
+      'Buy milk',
+      'Write half struck',
+      'Outer',
+      'Inner <b>',
+      'Buy milk',
+    ]);
     expect(c.find((x) => x.text === 'Email prof')?.checked).toBe(true);
   });
   it('falls back to paragraphs without lists', () => {

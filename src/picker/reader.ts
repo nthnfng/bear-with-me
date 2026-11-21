@@ -53,7 +53,10 @@ export function readSource(source: TodoSource, root: ParentNode = document): str
   } catch {
     return []; // bad selector saved earlier
   }
-  return normalizeItems(collectCandidates(els.map(asNode)));
+  // A selector can match a list and something inside it; read only the outermost matches so
+  // no element is counted twice (repeated text in separate items is kept).
+  const outer = els.filter((el) => !els.some((o) => o !== el && o.contains(el)));
+  return normalizeItems(collectCandidates(outer.map(asNode)));
 }
 
 export const DOCS_POLL_MS = 60_000;

@@ -20,7 +20,7 @@ const node = (
 });
 
 describe('normalizeItems', () => {
-  it('skips checked, empty, and duplicates; keeps first line', () => {
+  it('skips checked and empty, keeps repeated text and the first line', () => {
     expect(
       normalizeItems([
         { text: ' Buy milk \nDue today', checked: false },
@@ -29,7 +29,7 @@ describe('normalizeItems', () => {
         { text: 'Buy milk', checked: false },
         { text: 'Lab report', checked: false },
       ]),
-    ).toEqual(['Buy milk', 'Lab report']);
+    ).toEqual(['Buy milk', 'Buy milk', 'Lab report']);
   });
   it('cleans whitespace', () => expect(cleanText('\n  a \t b  \n')).toBe('a b'));
 });

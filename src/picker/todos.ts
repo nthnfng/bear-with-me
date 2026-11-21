@@ -21,15 +21,13 @@ export function cleanText(raw: string | null | undefined): string {
   return (line ?? '').slice(0, MAX_TEXT);
 }
 
-/** Drop checked and empty items, dedupe in order, cap the count. */
+/** Drop checked and empty items and cap the count. Repeated text is kept: two todos can match. */
 export function normalizeItems(candidates: Candidate[]): string[] {
-  const seen = new Set<string>();
   const out: string[] = [];
   for (const c of candidates) {
     if (c.checked) continue;
     const text = cleanText(c.text);
-    if (!text || seen.has(text)) continue;
-    seen.add(text);
+    if (!text) continue;
     out.push(text);
     if (out.length >= MAX_ITEMS) break;
   }
