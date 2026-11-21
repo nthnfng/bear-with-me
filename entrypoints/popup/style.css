@@ -36,9 +36,14 @@ main {
   align-items: stretch;
   text-align: center;
 }
+.hero {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 12px;
+}
 .barry {
-  width: 120px;
-  align-self: center;
+  width: 96px;
   user-select: none;
   cursor: pointer;
 }
@@ -189,17 +194,84 @@ button:disabled {
   font-size: 12px;
   color: var(--dim);
 }
-.chud .bar {
-  flex: 1;
-  height: 8px;
-  background: var(--card);
-  border-radius: 4px;
-  overflow: hidden;
+.sprite {
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
 }
-.chud .fill {
-  height: 100%;
-  background: var(--lock);
-  transition: width 0.3s;
+.chudbar {
+  position: relative;
+  flex: none;
+}
+.chudbar > * {
+  position: absolute;
+}
+.chudbar .outline {
+  inset: 0;
+}
+.chudbar .track {
+  background: #86b04a;
+}
+.chudbar .fill {
+  background: #d88a4a;
+  transition: width 0.3s steps(10);
+}
+.getup {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.cavebox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cavescene {
+  position: relative;
+  height: 90px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #3a3340;
+  background-size: auto 100%;
+  background-position: right center;
+  background-repeat: no-repeat;
+}
+.cavebarry {
+  position: absolute;
+  bottom: 4px;
+  left: 10px;
+}
+.cavebarry.in {
+  left: 190px;
+  opacity: 0;
+  scale: 0.5;
+}
+.cavebarry.entering {
+  animation: cave-in 1.8s linear forwards;
+}
+.cavebarry.leaving {
+  animation: cave-out 1.4s linear forwards;
+}
+@keyframes cave-in {
+  0% { left: 10px; opacity: 1; scale: 1; }
+  78% { left: 190px; opacity: 1; scale: 1; }
+  100% { left: 190px; opacity: 0; scale: 0.5; }
+}
+@keyframes cave-out {
+  0% { left: 190px; opacity: 1; scale: 1; }
+  100% { left: 10px; opacity: 1; scale: 1; }
+}
+.hop {
+  animation: hop 0.3s steps(2) infinite;
+}
+@keyframes hop {
+  50% { translate: 0 -10px; }
+}
+.zzz {
+  position: absolute;
+  right: 20px;
+  top: 8px;
+  color: #cfd8dc;
+  font-size: 12px;
 }
 .chud .pct {
   width: 32px;
@@ -303,4 +375,13 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.dev button[aria-pressed='true'] {
+  font-weight: 700;
+  outline: 2px solid currentColor;
+}
+.header-pose {
+  display: inline-flex;
+  cursor: pointer;
 }

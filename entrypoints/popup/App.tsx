@@ -1,18 +1,22 @@
 // Popup: draws src/popup/view.ts and sends PopupMessages. No behaviour here (ADR 0001).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { storage } from 'wxt/utils/storage';
-import { STORAGE_KEYS } from '@/src/contracts';
+import { DEFAULT_TUNING, DEMO_TUNING, STORAGE_KEYS } from '@/src/contracts';
 import type { BarryState, DevCommand, ModeOverride, PopupMessage } from '@/src/contracts';
 import {
   SLACK_PRESETS_MIN,
   formatClock,
+  headerBarry,
   formatCountdown,
   popupView,
+  speedPreset,
   secondsToMs,
   tuningSeconds,
+  withStateDefaults,
 } from '@/src/popup/view';
 import { ChudMeter, SettingsSections } from './Settings';
+import { HeaderPose } from './Pixel';
 
 const send = (msg: PopupMessage) => {
   browser.runtime.sendMessage(msg).catch(() => {});
@@ -23,14 +27,25 @@ function useBarryState() {
   const [state, setState] = useState<BarryState | null>(null);
   useEffect(() => {
     let alive = true;
-    storage.getItem<BarryState>(STORAGE_KEYS.state).then((s) => alive && setState(s));
-    const unwatch = storage.watch<BarryState>(STORAGE_KEYS.state, (s) => setState(s));
+    storage.getItem<BarryState>(STORAGE_KEYS.state).then((s) => alive && setState(withStateDefaults(s)));
+    const unwatch = storage.watch<BarryState>(STORAGE_KEYS.state, (s) => setState(withStateDefaults(s)));
     return () => {
       alive = false;
       unwatch();
     };
   }, []);
   return state;
+}
+
+function useActiveTabId() {
+  const [id, setId] = useState<number | null>(null);
+  useEffect(() => {
+    browser.tabs
+      .query({ active: true, currentWindow: true })
+      .then((t) => setId(t[0]?.id ?? null))
+      .catch(() => {});
+  }, []);
+  return id;
 }
 
 function useNow() {
@@ -60,13 +75,20 @@ const MODES: { value: ModeOverride; label: string }[] = [
 function App() {
   const state = useBarryState();
   const now = useNow();
+  const activeTabId = useActiveTabId();
   const [clicks, setClicks] = useState(0);
   const [devOpen, setDevOpen] = useState(read);
+  const devRef = useRef<HTMLDivElement>(null);
+  const [justUnlocked, setJustUnlocked] = useState(false);
+  useEffect(() => {
+    if (justUnlocked) devRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [justUnlocked]);
 
   const onBarry = () => {
     if (devOpen) return;
     if (clicks + 1 >= 5) {
       setDevOpen(true);
+      setJustUnlocked(true);
       try {
         localStorage.setItem(UNLOCK_KEY, '1');
       } catch {
@@ -77,16 +99,29 @@ function App() {
   };
 
   const v = state ? popupView(state, now) : null;
+  const hb = state ? headerBarry(state, now, activeTabId) : null;
 
   return (
     <main>
-      <img
-        className="barry"
-        src={browser.runtime.getURL('/assets/barry-home.png' as any)}
-        alt="Barry"
-        draggable={false}
-        onClick={onBarry}
-      />
+      <div className="hero">
+        <img
+          className="barry"
+          src={browser.runtime.getURL('/assets/barry-home.png' as any)}
+          alt="Barry"
+          draggable={false}
+          onClick={onBarry}
+        />
+        {hb && (
+          <span className="header-pose" onClick={onBarry}>
+            <HeaderPose pose={hb.pose} poseSince={hb.poseSince} />
+          </span>
+        )}
+      </div>
+      {hb?.canGetUp && (
+        <button className="getup" onClick={() => send({ type: 'gotUp' })}>
+          Get up
+        </button>
+      )}
       {!v || !state ? (
         <p className="headline">Barry is waking up...</p>
       ) : (
@@ -157,7 +192,11 @@ function App() {
 
           <SettingsSections state={state} now={now} send={send} />
 
-          {devOpen && <DevPanel state={state} onClose={() => setDevOpen(false)} />}
+          {devOpen && (
+            <div ref={devRef}>
+              <DevPanel state={state} onClose={() => setDevOpen(false)} />
+            </div>
+          )}
         </>
       )}
     </main>
@@ -168,6 +207,7 @@ function DevPanel({ state, onClose }: { state: BarryState; onClose: () => void }
   const [title, setTitle] = useState('Dev block');
   const [minutes, setMinutes] = useState('30');
   const secs = tuningSeconds(state.tuning);
+  const preset = speedPreset(state.tuning);
   const [fat, setFat] = useState(String(state.fatness));
   const [chud, setChud] = useState(String(state.chudMeter));
 
@@ -204,6 +244,21 @@ function DevPanel({ state, onClose }: { state: BarryState; onClose: () => void }
           }}
         >
           Inject
+        </button>
+      </div>
+      <div className="row">
+        <span>Speed: {preset}</span>
+        <button
+          aria-pressed={preset === 'demo'}
+          onClick={() => dev({ kind: 'setTuning', tuning: DEMO_TUNING })}
+        >
+          Demo speed
+        </button>
+        <button
+          aria-pressed={preset === 'normal'}
+          onClick={() => dev({ kind: 'setTuning', tuning: DEFAULT_TUNING })}
+        >
+          Normal speed
         </button>
       </div>
       {tuningFields.map(([key, label]) => (

@@ -37,11 +37,11 @@ Barry in the user's face on a Restricted tab during Lock In, naming the planned 
 _Avoid_: Intervention, popup, nudge
 
 **Eat**:
-What Barry does to the user's clicks, scrolls, key presses and unpauses during a Confrontation. An eaten interaction never reaches the page and makes Barry fatter.
+What Barry does to the user's clicks and unpauses during a Confrontation. An eaten interaction never reaches the page and makes Barry fatter. Key presses are blocked without being eaten (no chomp, no Fatness); scrolling passes through.
 _Avoid_: Block, swallow, intercept
 
 **Fatness**:
-How big Barry has grown from eaten interactions. It lasts until no Restricted tab is open anywhere, or until a Slack pass starts, and then returns to slim.
+How big Barry has grown from eaten interactions, shown as sprite tiers rather than scaling: no eats is suspicious Barry, 1–4 eats are fat-1 to fat-4, and 5 or more is chud Barry. It lasts until no Restricted tab is open anywhere, or until a Slack pass starts, and then returns to slim.
 _Avoid_: Weight, size, chudness
 
 **Studying**:
@@ -63,8 +63,12 @@ A break the user deliberately starts from the popup, during which Barry leaves R
 _Avoid_: Slack time, chosen slack pass, break
 
 **Snooze**:
-The 5-minute break the user earns by beating Barry in an Arm fight. Unlike a Slack pass, it fills the Chud meter.
+The 5-minute break the user earns by beating Barry in an Arm fight. Unlike a Slack pass, it fills the Chud meter. Barry is knocked down, gets up, says "ow" and "my arm hurts", then sits tired in the corner.
 _Avoid_: Extended slack pass, beaten snooze, extended slacking
+
+**Get up**:
+Clicking tired Barry during a Snooze (or the popup's button) to end the Snooze early. He does one happy jump and the Arm fight resumes. The Chud meter only counts the Snooze time actually used.
+_Avoid_: Skip snooze, wake up
 
 ### The Arm fight
 

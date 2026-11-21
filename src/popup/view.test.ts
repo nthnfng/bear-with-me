@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TUNING } from '../contracts';
+import { DEFAULT_TUNING, DEMO_TUNING } from '../contracts';
 import type { BarryState, CalendarBlock } from '../contracts';
 import {
+  speedPreset,
   countdownFor,
   formatCountdown,
   headlineFor,
@@ -9,7 +10,9 @@ import {
   popupView,
   secondsToMs,
   slackPassStatus,
+  withStateDefaults,
 } from './view';
+import { brain } from '../brain';
 
 const block = (id: string, start: number, end: number, allDay = false): CalendarBlock => ({
   id,
@@ -139,7 +142,10 @@ describe('settings display', () => {
       expect(caveStatus(base({ ...lockIn, phase }), 0).disabled).toBe(true);
     }
     expect(caveStatus(base({ ...lockIn, phase: 'confronting' }), 0).reason).toBeTruthy();
-    expect(caveStatus(base({ ...lockIn, phase: 'clear' }), 0)).toEqual({ disabled: false, reason: null });
+    expect(caveStatus(base({ ...lockIn, phase: 'clear' }), 0)).toEqual({
+      disabled: false,
+      reason: null,
+    });
     expect(caveStatus(base({ modeOverride: 'chill', phase: 'snoozing' }), 0).disabled).toBe(false);
   });
   it('chud percent clamps', () => {
@@ -158,5 +164,29 @@ describe('settings display', () => {
     const err = scheduleStatusLine({ fetchedAt: 0, error: 'Nope', blocks: [] }, true, 120_000);
     expect(err.isError).toBe(true);
     expect(err.text).toContain('Last good fetch 2 min ago');
+  });
+});
+
+describe('speedPreset', () => {
+  it('recognises the presets', () => {
+    expect(speedPreset(DEFAULT_TUNING)).toBe('normal');
+    expect(speedPreset({ ...DEFAULT_TUNING, ...DEMO_TUNING })).toBe('demo');
+    expect(speedPreset({ ...DEFAULT_TUNING, snoozeMs: 1234 })).toBe('custom');
+  });
+});
+
+describe('withStateDefaults', () => {
+  it('returns null for nothing saved', () => {
+    expect(withStateDefaults(null)).toBeNull();
+  });
+  it('fills fields and tuning missing from an old saved state', () => {
+    const init = brain.initialState();
+    const { gotUpAt, snoozeStartedAt, ...old } = init as any;
+    const merged = withStateDefaults({ ...old, tuning: { reachMs: 1234 } } as any)!;
+    expect(merged.gotUpAt).toBe(init.gotUpAt);
+    expect(merged.gotUpAt).not.toBeUndefined();
+    expect(merged.snoozeStartedAt).not.toBeUndefined();
+    expect(merged.tuning.reachMs).toBe(1234);
+    expect(merged.tuning.snoozeMs).toBe(init.tuning.snoozeMs);
   });
 });

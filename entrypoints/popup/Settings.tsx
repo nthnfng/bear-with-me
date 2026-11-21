@@ -1,5 +1,6 @@
 // Compact collapsible settings under the main popup screen. Draws src/popup/view.ts only.
 
+import { CaveScene, ChudBar } from './Pixel';
 import { useEffect, useState } from 'react';
 import { storage } from 'wxt/utils/storage';
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '@/src/contracts';
@@ -43,9 +44,7 @@ export function ChudMeter({ meter }: { meter: number }) {
   return (
     <div className="chud" title="Fills while Barry is snoozed; resets after 10 minutes of studying">
       <span className="label">Chud meter</span>
-      <div className="bar" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
-        <div className="fill" style={{ width: `${pct}%` }} />
-      </div>
+      <ChudBar meter={meter} />
       <span className="pct">{pct}%</span>
     </div>
   );
@@ -204,15 +203,11 @@ export function SettingsSections({
             ))}
           </div>
         </div>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={state.cave}
-            disabled={cave.disabled}
-            onChange={(e) => send({ type: 'setCave', cave: e.target.checked })}
-          />
-          Cave (hide Barry when he's calm)
-        </label>
+        <CaveScene
+          cave={state.cave}
+          disabled={cave.disabled}
+          onToggle={(c) => send({ type: 'setCave', cave: c })}
+        />
         {cave.reason && <p className="hint">{cave.reason}</p>}
         <label className="check">
           <input

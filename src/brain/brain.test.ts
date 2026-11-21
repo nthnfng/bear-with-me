@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BarryEvent, BarryState, TabId } from '../contracts';
-import { OKAY_MS, brain, initialState } from '.';
+import { DEFAULT_TUNING } from '../contracts';
+import { OKAY_MS, SNOOZE_KNOCKED_MS, brain, initialState } from '.';
 
 const YT = 'https://www.youtube.com/watch?v=1';
 const DOCS = 'https://docs.google.com/';
@@ -100,12 +101,11 @@ describe('Confrontation arrival', () => {
     expect(brain.viewFor(s, 1, T0)).toMatchObject({
       visible: true,
       placement: 'face',
-      pose: 'confrontation',
+      pose: 'suspicious',
       line: "You planned ETF prep ,':/",
       showBackToIt: true,
       eatInput: true,
       pauseMedia: true,
-      scale: 1,
     });
   });
 
@@ -117,7 +117,7 @@ describe('Confrontation arrival', () => {
       act(1),
     ).state;
     const v = brain.viewFor(s, 1, T0);
-    expect(v.pose).toBe('confrontation');
+    expect(v.pose).toBe('suspicious');
     expect(v.line).toBeTruthy();
     expect(v.line).not.toContain('undefined');
   });
@@ -136,13 +136,11 @@ describe('eating', () => {
     const r = run(s, eat(1));
     expect(r.state.fatness).toBe(1);
     expect(r.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'chomp' }]);
-    expect(brain.viewFor(r.state, 1, T0).scale).toBeCloseTo(1.06);
     s = run(r.state, {
       type: 'dev',
       now: T0,
       command: { kind: 'setFatness', fatness: 1000 },
     }).state;
-    expect(brain.viewFor(s, 1, T0).scale).toBe(2);
   });
 
   it('only counts while confronting on that tab', () => {
@@ -168,7 +166,6 @@ describe('fatness lifetime', () => {
     s = run(s, nav(2, 'https://reddit.com/'), act(2)).state;
     expect(s.phase).toBe('confronting');
     expect(s.fatness).toBe(3);
-    expect(brain.viewFor(s, 2, T0).scale).toBeGreaterThan(1.1);
   });
 
   it('persists on a non-Restricted tab while a Restricted tab is open, view goes calm', () => {
@@ -178,7 +175,6 @@ describe('fatness lifetime', () => {
     expect(brain.viewFor(s, 2, T0)).toMatchObject({
       placement: 'corner',
       pose: 'studious',
-      scale: 1,
     });
     s = run(s, act(1)).state;
     expect(s.phase).toBe('confronting');
@@ -225,14 +221,14 @@ describe('clear view', () => {
     const chill = run(initialState(), nav(1, DOCS), act(1)).state;
     expect(brain.viewFor(chill, 1, T0)).toMatchObject({
       visible: true,
-      pose: 'chill',
+      pose: 'chill-mug',
       position: 'right',
     });
   });
 
   it('Chill on a Restricted site is just chill Barry', () => {
     const s = run(initialState(), nav(1, YT), act(1)).state;
-    expect(brain.viewFor(s, 1, T0)).toMatchObject({ pose: 'chill', placement: 'corner' });
+    expect(brain.viewFor(s, 1, T0)).toMatchObject({ pose: 'chill-mug', placement: 'corner' });
   });
 
   it('cave hides calm Barry but never a Confrontation', () => {
@@ -414,31 +410,29 @@ describe('Slack pass', () => {
     expect(brain.viewFor(s, 1, T0 + 5)).toMatchObject({
       visible: true,
       placement: 'corner',
-      pose: 'okay',
+      pose: 'suspicious',
       line: 'Okay... -_-',
       eatInput: false,
       pauseMedia: false,
-      chudMeter: 0,
       breakEndsAt: T0 + 5 + SLACK,
       reach: null,
-      scale: 1,
     });
     // eating does nothing now
     expect(run(s, eat(1)).state.fatness).toBe(0);
   });
 
-  it('okay lingers OKAY_MS on the interrupted tab only, then studious', () => {
+  it('okay lingers OKAY_MS on the interrupted tab only, then chill', () => {
     const s = run(lockedIn(), slack(SLACK)).state;
-    expect(brain.viewFor(s, 1, T0 + OKAY_MS - 1).pose).toBe('okay');
+    expect(brain.viewFor(s, 1, T0 + OKAY_MS - 1).pose).toBe('suspicious');
     const later = brain.viewFor(s, 1, T0 + OKAY_MS);
-    expect(later).toMatchObject({ pose: 'studious', line: null, breakEndsAt: T0 + SLACK });
-    expect(brain.viewFor(s, 2, T0).pose).toBe('studious');
+    expect(later).toMatchObject({ pose: 'chill', line: null, breakEndsAt: T0 + SLACK });
+    expect(brain.viewFor(s, 2, T0)).toMatchObject({ pose: 'chill', line: null });
   });
 
-  it('from clear (no Confrontation) is studious, no okay line', () => {
+  it('from clear (no Confrontation) is chill on the Restricted tab, no okay line', () => {
     const s = run(lockedIn(), act(null), slack(SLACK)).state;
     expect(s.phase).toBe('slackPass');
-    expect(brain.viewFor(s, 1, T0)).toMatchObject({ pose: 'studious', line: null });
+    expect(brain.viewFor(s, 1, T0)).toMatchObject({ pose: 'chill', line: null });
   });
 
   it('opening/activating a Restricted tab does not confront; shows chud meter', () => {
@@ -453,7 +447,6 @@ describe('Slack pass', () => {
       placement: 'corner',
       eatInput: false,
       pauseMedia: false,
-      chudMeter: 0.2,
     });
   });
 
@@ -462,7 +455,6 @@ describe('Slack pass', () => {
     expect(brain.viewFor(s, 3, T0)).toMatchObject({
       pose: 'studious',
       breakEndsAt: null,
-      chudMeter: null,
       reach: null,
     });
   });
@@ -475,7 +467,7 @@ describe('warning and Reach', () => {
     expect(s.warningEndsAt).toBe(T0 + SLACK + WARN);
     expect(s.slackPassEndsAt).toBeNull();
     expect(brain.viewFor(s, 1, T0 + SLACK + 1000)).toMatchObject({
-      line: 'Wrapping up?',
+      line: 'Wrap it up!',
       breakEndsAt: T0 + SLACK + WARN,
       eatInput: false,
       pauseMedia: false,
@@ -501,7 +493,7 @@ describe('warning and Reach', () => {
     const s = run(reaching(), nav(3, DOCS)).state;
     const start = T0 + SLACK + WARN;
     const want = {
-      pose: 'studious',
+      pose: 'close-tab',
       placement: 'corner',
       line: 'Closing restricted tabs 💣',
       reach: { startedAt: start, durationMs: REACH },
@@ -631,24 +623,14 @@ describe('Snooze', () => {
     expect(r.state).toMatchObject({ phase: 'snoozing', pushes: 0, snoozeEndsAt: now + SNOOZE });
     expect(brain.viewFor(r.state, 2, now)).toMatchObject({
       placement: 'corner',
-      pose: 'beaten',
-      line: "Ow... T-T my hand hurts so I'll leave you alone for 5 minutes...",
+      pose: 'got-owned',
+      line: null,
       breakEndsAt: now + SNOOZE,
-      chudMeter: 0,
       reach: null,
       eatInput: false,
     });
     // opening a Restricted tab during the Snooze does not confront
     expect(run(r.state, nav(3, YT), act(3)).state.phase).toBe('snoozing');
-  });
-
-  it('line uses the tuned length', () => {
-    const s = run(
-      reaching(),
-      tune({ snoozeMs: 10_000, maxPushes: 1 }),
-      push(1, T0 + SLACK + WARN + 1),
-    ).state;
-    expect(brain.viewFor(s, 1, T0).line).toContain('10 seconds');
   });
 
   it('Snooze end restarts the Reach immediately, no warning, from the deadline', () => {
@@ -714,18 +696,21 @@ describe('Lock In ending mid-break', () => {
 describe('nextDeadline (Phase 2)', () => {
   it('tracks slack pass, warning, reach and snooze ends', () => {
     let s = run(lockedIn(), slack(SLACK)).state;
+    expect(brain.nextDeadline(s)).toBe(T0 + OKAY_MS); // the okay pose ends first
+    s = run(s, tickAt(T0 + OKAY_MS)).state;
     expect(brain.nextDeadline(s)).toBe(T0 + SLACK);
     s = run(s, tickAt(T0 + SLACK)).state;
     expect(brain.nextDeadline(s)).toBe(T0 + SLACK + WARN);
     s = run(s, tickAt(T0 + SLACK + WARN)).state;
     expect(brain.nextDeadline(s)).toBe(T0 + SLACK + WARN + REACH);
     s = run(s, tune({ maxPushes: 1 }), push(1, T0 + SLACK + WARN + 5)).state;
-    expect(brain.nextDeadline(s)).toBe(T0 + SLACK + WARN + 5 + SNOOZE);
+    expect(brain.nextDeadline(s)).toBe(T0 + SLACK + WARN + 5 + SNOOZE_KNOCKED_MS); // first Snooze stage boundary
   });
 
   it('is the earlier of a break deadline and a block boundary', () => {
     const s = run(initialState(), inject(), nav(1, YT), act(1), slack(100_000)).state;
-    expect(brain.nextDeadline(s)).toBe(T0 + 60_000); // block ends first
+    expect(brain.nextDeadline(s)).toBe(T0 + OKAY_MS); // okay ends first
+    expect(brain.nextDeadline(run(s, tickAt(T0 + OKAY_MS)).state)).toBe(T0 + 60_000); // then the block
   });
 });
 
