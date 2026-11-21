@@ -51,11 +51,16 @@ export function ChudMeter({ meter }: { meter: number }) {
   );
 }
 
-function sourceStatus(s: { id: string; origin: string }, todos: { sourceId: string }[]): string {
+function sourceStatus(
+  s: { id: string; origin: string; selector: string },
+  todos: { sourceId: string }[],
+): string {
   const n = todos.filter((t) => t.sourceId === s.id).length;
-  if (n > 0) return `${n} item${n === 1 ? '' : 's'} read`;
-  if (s.origin === 'https://docs.google.com')
-    return 'Saved, but no items found. In Docs turn on Tools > Accessibility > screen reader support, then reload.';
+  const docs = s.selector === '@gdocs';
+  if (n > 0)
+    return `${n} item${n === 1 ? '' : 's'} read${docs ? " (reads the doc's checklist; checked items are skipped)" : ''}`;
+  if (docs || s.origin === 'https://docs.google.com')
+    return "Reads the doc's checklist (checked items are skipped). Saved, but no items found yet. Make sure the doc has a bulleted or checklist and you are signed in.";
   return 'Saved, but no items found yet. Open that page and make sure the list is visible.';
 }
 
@@ -234,8 +239,8 @@ export function SettingsSections({
           Point Barry at my task list
         </button>
         <p className="hint">
-          The popup closes. Hover your list on the page, Up/Down to grow or shrink the box, click
-          to save.
+          The popup closes. Hover your list on the page, Up/Down to grow or shrink the box, click to
+          save.
         </p>
         {state.todos.length > 0 ? (
           <ul className="list">

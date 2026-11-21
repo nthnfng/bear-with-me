@@ -1,6 +1,8 @@
 // Pure selector building for the element picker. Works on a minimal element shape so it can be
 // tested without a DOM. Prefers stable attributes over positional paths.
 
+import { GDOCS_SELECTOR, isDocsPage } from './docs';
+
 export interface ElLike {
   tagName: string;
   id: string;
@@ -110,12 +112,11 @@ export function buildSelector(el: ElLike, count: (selector: string) => number): 
 }
 
 /**
- * Sites whose DOM we cannot pick from by pointing. Google Docs paints text on a canvas, so the
- * click lands on a canvas tile; the readable text (when present) lives in .kix-paragraphrenderer.
+ * Sites whose DOM we cannot pick from by pointing. Google Docs paints text on a canvas, so any
+ * click saves the '@gdocs' marker and the reader uses the doc's HTML export instead.
  */
 export function pageSpecificSelector(host: string, path: string): string | null {
-  if (host === 'docs.google.com' && path.startsWith('/document/')) return '.kix-paragraphrenderer';
-  return null;
+  return isDocsPage(host, path) ? GDOCS_SELECTOR : null;
 }
 
 export function makeSourceId(): string {

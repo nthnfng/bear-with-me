@@ -21,8 +21,26 @@ export function isListContainer<E extends TreeEl<E>>(el: E): boolean {
 
 /** Inline tags never count as rows: a paragraph with a few spans or links is not a list. */
 const INLINE = new Set([
-  'span', 'a', 'b', 'i', 'em', 'strong', 'u', 's', 'code', 'br', 'img', 'svg', 'path', 'small',
-  'sup', 'sub', 'mark', 'label', 'input', 'button',
+  'span',
+  'a',
+  'b',
+  'i',
+  'em',
+  'strong',
+  'u',
+  's',
+  'code',
+  'br',
+  'img',
+  'svg',
+  'path',
+  'small',
+  'sup',
+  'sub',
+  'mark',
+  'label',
+  'input',
+  'button',
 ]);
 const MIN_ROWS = 3;
 

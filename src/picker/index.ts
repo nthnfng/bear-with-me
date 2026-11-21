@@ -1,6 +1,7 @@
 // Element picker: highlight under the cursor in a shadow-root overlay, click saves, Esc cancels.
 
 import type { ContentMessage, TodoSource } from '../contracts';
+import { docPathPrefix, isDocsPage } from './docs';
 import { composedParent, deepElementFromPoint, joinDeep } from './deep';
 import {
   buildSelector,
@@ -91,6 +92,9 @@ export function startPicker(opts: PickerOptions): void {
       background: #222; color: #fff; font: 600 14px system-ui, sans-serif; padding: 8px 14px;
       border-radius: 999px; pointer-events: none; }
   </style><div class="box"></div><div class="tip">Click your task list. Up/Down (or Shift + wheel) grows or shrinks the box. Esc cancels.</div>`;
+  const onDocs = isDocsPage(location.hostname, location.pathname);
+  if (onDocs)
+    shadow.querySelector('.tip')!.textContent = 'Click anywhere in the doc to use its checklist';
   const box = shadow.querySelector('.box') as HTMLElement;
   if (window !== window.top) shadow.querySelector('.tip')?.remove(); // one tip, in the top frame
   document.documentElement.appendChild(host);
@@ -165,14 +169,14 @@ export function startPicker(opts: PickerOptions): void {
     const m = e as MouseEvent;
     if (!keepsTarget(m.clientX, m.clientY)) setDeepest(pick(m.clientX, m.clientY) ?? deepest);
     const el = target;
-    if (!el) return;
-    const selector =
-      pageSpecificSelector(location.hostname, location.pathname) ?? deepSelectorFor(el, deepest);
+    // Docs: any click saves the marker (the text is read from the export, not the DOM).
+    const marker = pageSpecificSelector(location.hostname, location.pathname);
+    if (!el && !marker) return;
     const source: TodoSource = {
       id: makeSourceId(),
       origin: location.origin,
-      path: location.pathname,
-      selector,
+      path: (marker && docPathPrefix(location.pathname)) || location.pathname,
+      selector: marker ?? deepSelectorFor(el!, deepest),
     };
     stop();
     opts.send({ type: 'pickerSaved', source });

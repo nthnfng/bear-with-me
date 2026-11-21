@@ -74,7 +74,7 @@ describe('buildSelector', () => {
 import { pageSpecificSelector } from './selector';
 describe('pageSpecificSelector', () => {
   it('handles Google Docs only', () => {
-    expect(pageSpecificSelector('docs.google.com', '/document/d/x/edit')).toBe('.kix-paragraphrenderer');
+    expect(pageSpecificSelector('docs.google.com', '/document/d/x/edit')).toBe('@gdocs');
     expect(pageSpecificSelector('docs.google.com', '/spreadsheets/d/x')).toBeNull();
     expect(pageSpecificSelector('example.com', '/document/')).toBeNull();
   });

@@ -4,7 +4,10 @@
 export const SHADOW_SEP = ' >>> ';
 
 export function splitDeep(selector: string): string[] {
-  return selector.split('>>>').map((s) => s.trim()).filter(Boolean);
+  return selector
+    .split('>>>')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function joinDeep(segments: string[]): string {
@@ -33,8 +36,7 @@ export function queryDeep(root: ParentNode, selector: string): Element[] {
   let found: Element[] = [];
   segs.forEach((seg, i) => {
     found = scopes.flatMap((sc) => Array.from(sc.querySelectorAll(seg)));
-    if (i < segs.length - 1)
-      scopes = found.flatMap((e) => (e.shadowRoot ? [e.shadowRoot] : []));
+    if (i < segs.length - 1) scopes = found.flatMap((e) => (e.shadowRoot ? [e.shadowRoot] : []));
   });
   return found;
 }

@@ -1,6 +1,7 @@
 // Pure todo-extraction helpers plus a thin DOM walker over a minimal element shape.
 
 import type { TodoSource } from '../contracts';
+import { pathMatches } from './docs';
 
 export interface Candidate {
   text: string;
@@ -39,9 +40,9 @@ export function sameItems(a: string[] | undefined, b: string[]): boolean {
   return !!a && a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
-/** Sources saved for the page we're on (exact origin and path). */
+/** Sources saved for the page we're on (exact origin and path; Docs match by doc-path prefix). */
 export function matchSources(sources: TodoSource[], origin: string, path: string): TodoSource[] {
-  return sources.filter((s) => s.origin === origin && s.path === path);
+  return sources.filter((s) => s.origin === origin && pathMatches(s, path));
 }
 
 /** Remembers what was last sent per source so unchanged reads stay quiet. */
