@@ -4,6 +4,8 @@
 import { browser } from 'wxt/browser';
 import type { AssetManifest, BarryEffect, ContentMessage, SoundId, TabView } from '../contracts';
 import manifestJson from '../../public/assets/manifest.json';
+import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
+import { clamp01, formatCountdown, pushesLabel } from './hud';
 import { createInputEater } from './input-eater';
 import { createMediaPauser } from './media-pauser';
 import { CSS } from './styles';
@@ -45,8 +47,14 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   const shadow = host.attachShadow({ mode: 'closed' });
   shadow.innerHTML = `<style>${CSS}</style>
     <div class="root" hidden>
+      <div class="arm" hidden><div class="armbody"></div><div class="fist"></div></div>
       <div class="barry corner right">
         <div class="bubble" hidden></div>
+        <div class="hud">
+          <div class="pill pushes" hidden></div>
+          <div class="pill countdown" hidden></div>
+          <div class="meter" hidden><div class="meterfill"></div></div>
+        </div>
         <div class="sprite"></div>
         <button class="btn" hidden>Back to it?</button>
       </div>
@@ -56,6 +64,13 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   const bubble = shadow.querySelector('.bubble') as HTMLElement;
   const sprite = shadow.querySelector('.sprite') as HTMLElement;
   const button = shadow.querySelector('.btn') as HTMLButtonElement;
+  const arm = shadow.querySelector('.arm') as HTMLElement;
+  const armBody = shadow.querySelector('.armbody') as HTMLElement;
+  const fist = shadow.querySelector('.fist') as HTMLElement;
+  const pushesEl = shadow.querySelector('.pushes') as HTMLElement;
+  const countdownEl = shadow.querySelector('.countdown') as HTMLElement;
+  const meterEl = shadow.querySelector('.meter') as HTMLElement;
+  const meterFill = shadow.querySelector('.meterfill') as HTMLElement;
   button.addEventListener('click', () => send({ type: 'backToIt' }));
   document.documentElement.appendChild(host);
 
@@ -73,11 +88,116 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   });
 
   let spriteKey = '';
+  let prev: TabView | null = null;
+  let current: TabView | null = null;
+
+  // The Reach: Push = click on the arm, the fist, or Barry himself (only clickable while reaching).
+  const push = (e: Event) => {
+    e.stopPropagation();
+    send({ type: 'pushed' });
+  };
+  arm.addEventListener('click', push);
+  sprite.addEventListener('click', push);
+
+  armBody.style.backgroundImage = `url("${assetUrl(manifest.arm.segment)}")`;
+  fist.style.backgroundImage = `url("${assetUrl(manifest.arm.fist)}")`;
+  const ARM_H = 40;
+  const FIST_PX = 80;
+  armBody.style.height = `${ARM_H}px`;
+  armBody.style.top = `${-ARM_H / 2}px`;
+  fist.style.width = fist.style.height = `${FIST_PX}px`;
+  fist.style.top = `${-FIST_PX / 2}px`;
+
+  const landing = createLandingGate();
+  let rafId = 0;
+  let armProgress = 0;
+
+  function drawArm() {
+    const view = current;
+    if (!view || !view.visible || !view.reach) return;
+    const progress = reachProgress(Date.now(), view.reach);
+    armProgress = progress;
+    const [fw, fh] = manifest.frameSize;
+    const rect = sprite.getBoundingClientRect();
+    const handAnchor = manifest.poses.studious.anchors.hand ?? [fw * 0.9, fh * 0.55];
+    const hand = anchorToViewport(rect, handAnchor, [fw, fh]);
+    const { length, angleDeg } = armVector(
+      hand,
+      reachTarget(window.innerWidth, window.innerHeight),
+    );
+    const len = length * progress;
+    arm.style.left = `${hand.x}px`;
+    arm.style.top = `${hand.y}px`;
+    arm.style.transform = `rotate(${angleDeg}deg)`;
+    armBody.style.width = `${Math.max(0, len - FIST_PX * 0.4)}px`;
+    fist.style.left = `${len - FIST_PX * 0.8}px`;
+    if (landing.check(progress, view.reach.startedAt))
+      send({ type: 'reachLanded', reachStartedAt: view.reach.startedAt });
+  }
+  function frame() {
+    rafId = 0;
+    drawArm();
+    // Stop once landed; a hidden tab pauses rAF by itself and resumes at the right progress.
+    if (current?.reach && armProgress < 1) rafId = requestAnimationFrame(frame);
+  }
+  function syncArm(view: TabView) {
+    const active = view.visible && view.reach !== null;
+    arm.hidden = !active;
+    if (!active) {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = 0;
+      return;
+    }
+    if (rafId) cancelAnimationFrame(rafId);
+    drawArm();
+    if (armProgress < 1) rafId = requestAnimationFrame(frame);
+  }
+  const onResize = () => drawArm();
+  window.addEventListener('resize', onResize);
+
+  let countdownTimer: ReturnType<typeof setInterval> | undefined;
+  function syncCountdown(view: TabView) {
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = undefined;
+    const end = view.visible ? view.breakEndsAt : null;
+    countdownEl.hidden = end === null;
+    if (end === null) return;
+    const tick = () => (countdownEl.textContent = `⏱ ${formatCountdown(end - Date.now())}`);
+    tick();
+    countdownTimer = setInterval(tick, 250);
+  }
+
+  /** FLIP: the confrontation face shrinks into the corner instead of snapping. */
+  function shrinkFrom(first: DOMRect) {
+    const last = sprite.getBoundingClientRect();
+    if (!last.width || !first.width) return;
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    const s = first.width / last.width;
+    sprite.animate(
+      [
+        { transformOrigin: '0 0', translate: `${dx}px ${dy}px`, scale: String(s) },
+        { transformOrigin: '0 0', translate: '0 0', scale: '1' },
+      ],
+      { duration: 600, easing: 'cubic-bezier(.3,.9,.3,1)' },
+    );
+  }
 
   function render(view: TabView) {
+    const shrinking =
+      prev !== null &&
+      view.visible &&
+      prev.visible &&
+      prev.placement === 'face' &&
+      prev.pose === 'confrontation' &&
+      view.placement === 'corner' &&
+      view.pose === 'okay';
+    const firstRect = shrinking ? sprite.getBoundingClientRect() : null;
+    prev = current = view;
     root.hidden = !view.visible;
 
-    barry.className = `barry ${view.placement} ${view.position}`;
+    barry.className = `barry ${view.placement} ${view.position}${view.reach ? ' fighting' : ''}`;
+    sprite.classList.toggle('beaten', view.pose === 'beaten');
     const px = view.placement === 'face' ? FACE_PX : CORNER_PX;
     const pose = manifest.poses[view.pose];
     const [fw, fh] = manifest.frameSize;
@@ -104,8 +224,17 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     if (view.line !== null) bubble.textContent = view.line;
     button.hidden = !view.showBackToIt;
 
-    // TODO(Phase 2): view.reach (arm + 'reachLanded'), pushesLeft, breakEndsAt countdown.
-    // TODO(Phase 3): view.chudMeter widget, view.singChud song.
+    if (firstRect) shrinkFrom(firstRect);
+
+    const showPushes = view.visible && view.pushesLeft !== null;
+    pushesEl.hidden = !showPushes;
+    if (showPushes) pushesEl.textContent = pushesLabel(view.pushesLeft!);
+    const showMeter = view.visible && view.chudMeter !== null;
+    meterEl.hidden = !showMeter;
+    if (showMeter) meterFill.style.width = `${clamp01(view.chudMeter!) * 100}%`;
+    syncCountdown(view);
+    syncArm(view);
+    // TODO(Phase 3): fancy chud meter, view.singChud song.
 
     eater.set(view.visible && view.eatInput);
     media.set(view.visible && view.pauseMedia);
@@ -159,6 +288,9 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       }
     },
     destroy() {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (countdownTimer) clearInterval(countdownTimer);
+      window.removeEventListener('resize', onResize);
       eater.set(false);
       media.set(false);
       host.remove();

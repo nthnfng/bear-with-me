@@ -22,7 +22,24 @@ export const CSS = `
   font-weight: 700; padding: 10px 22px; border-radius: 999px; border: 3px solid #222;
   background: #ffeb3b; color: #222; }
 .btn:hover { background: #fff176; }
-/* TODO(Phase 2): .arm (segment tiled + fist), .pushes, chud meter, countdown. */
+/* Reach arm: positioned at the hand, rotated toward the top-right; tiled body + fist. */
+.arm { position: fixed; width: 0; height: 0; transform-origin: 0 0; pointer-events: none; }
+.arm[hidden] { display: none; }
+.armbody { position: absolute; left: 0; background-repeat: repeat-x; background-size: auto 100%;
+  pointer-events: auto; cursor: pointer; }
+.fist { position: absolute; background-size: 100% 100%; background-repeat: no-repeat;
+  pointer-events: auto; cursor: pointer; }
+.fighting .sprite { pointer-events: auto; cursor: pointer; }
+.sprite.beaten { animation: wobble 500ms ease-in-out infinite; transform-origin: center bottom; }
+@keyframes wobble { 0%, 100% { rotate: -4deg; } 50% { rotate: 4deg; } }
+.hud { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 4px; }
+.pill { background: #222; color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 13px;
+  font-weight: 700; font-variant-numeric: tabular-nums; }
+.pushes { background: #d32f2f; }
+.pill[hidden], .meter[hidden] { display: none; }
+.meter { width: 90px; height: 10px; border: 2px solid #222; border-radius: 6px; background: #fff;
+  overflow: hidden; }
+.meterfill { height: 100%; background: #8d6e63; }
 .flash { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
   font-size: 72px; font-weight: 900; color: #ff5722; -webkit-text-stroke: 3px #222;
   animation: flash 700ms ease-out forwards; pointer-events: none; }
