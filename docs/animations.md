@@ -11,8 +11,8 @@ Every animation and trigger for **Barry**, the pixel-art bear in the *Bear It* C
 This folder is the **animation layer only**. It is not a working extension yet.
 
 ### ✅ Built
-- **Sprites:** every PNG in `assets/sprites/`, rebuildable from `source/` with `tools/build_sprites.py`.
-- **Animation sequences:** each trigger function in `src/triggers.js` plays its whole sequence. For example, `gotOwned()` runs fall → get up → "ow" → "my arm hurts" → sit tired. `burstIn()` pops Barry in with the bubble + "Back to it?" button.
+- **Sprites:** every PNG in `public/assets/sprites/`, rebuildable from `source/` with `tools/build_sprites.py`. (`source/` and `tools/` live with the art team, outside this repo.)
+- **Animation sequences:** each trigger function in `demo/barry/triggers.js` plays its whole sequence. For example, `gotOwned()` runs fall → get up → "ow" → "my arm hurts" → sit tired. `burstIn()` pops Barry in with the bubble + "Back to it?" button.
 - **In-page reactions:** eating clicks/scrolls/keys (`chomp`), punching the arm (`punch`), clicking tired Barry to get up (`getUp`), and the chud meter filling (`setChud`) all work, because the page itself detects them.
 
 ### ❌ Not built yet
@@ -36,31 +36,21 @@ This folder is the **animation layer only**. It is not a working extension yet.
 ## Folder structure
 
 ```
-barry-animations/
-├── ANIMATIONS.md            ← you are here: map, triggers, conventions
-├── CLAUDE.md                ← short rules for AI assistants working in this folder
-│                              (no extension code yet: see "Status" below)
-├── README.md                ← points here
-│
-├── assets/
-│   └── sprites/             ← final PNGs used by the code (generated, don't hand-edit)
-│
-├── src/                     ← the code to reuse in the extension
-│   ├── sprites.js           ← sprite list: size, frame count, speed, paw positions
-│   ├── engine.js            ← helpers: setSprite, playAnim, say, moveTo, wait, setChud…
-│   ├── triggers.js          ← one function per trigger (chillIdle, burstIn, gotOwned…)
-│   └── barry.css            ← Barry's styles + every animation class (pop, chomp, squash…)
-│
-├── demo/                    ← fake browser to try everything (demo only)
-│   ├── index.html
-│   └── demo.css
-│
-├── source/                  ← original art (edit these)
-│   ├── aseprite/            ← .aseprite files from Aseprite
-│   └── images/              ← non-Aseprite art (pointing-hand.png photo)
-│
-└── tools/
-    └── build_sprites.py     ← rebuilds assets/sprites/ from source/
+bear-with-me/
+├── demo/                    ← the team's plain-JS animation demo (art reference, not extension code)
+│   ├── index.html           ← open this in Chrome (double-click works)
+│   ├── demo.css             ← fake browser window + control panel
+│   └── barry/
+│       ├── sprites.js       ← sprite list: size, frame count, speed, paw positions
+│       ├── engine.js        ← helpers: setSprite, playAnim, say, moveTo, wait, setChud…
+│       ├── triggers.js      ← one function per trigger (chillIdle, burstIn, gotOwned…)
+│       └── barry.css        ← Barry's styles + every animation class (pop, chomp, squash…)
+├── public/assets/sprites/   ← final PNGs used by the demo and the extension (generated, don't hand-edit)
+├── src/overlay/             ← the extension's TypeScript port of the demo (see implementation-plan.md, Phase 5)
+└── (art team, outside this repo)
+    ├── source/aseprite/     ← .aseprite files
+    ├── source/images/       ← non-Aseprite art (pointing-hand.png photo)
+    └── tools/build_sprites.py ← rebuilds public/assets/sprites/ from source/
 ```
 
 **Load order** (plain `<script>` tags, no build step): `sprites.js` → `engine.js` → `triggers.js`.
@@ -69,7 +59,7 @@ barry-animations/
 
 ## Triggers
 
-Each trigger is a function in `src/triggers.js`. In the demo, a button calls it. In the extension, the service worker ("Barry Brain") decides when it fires.
+Each trigger is a function in `demo/barry/triggers.js`. In the demo, a button calls it. In the extension, the service worker ("Barry Brain") decides when it fires.
 
 ```markdown
 chill-idle (outside a calendar block)                          chillIdle()
@@ -150,7 +140,7 @@ cave (extension popup, 🐻 toolbar button)                      sendBarryBack()
 
 ## Sprites
 
-All in `assets/sprites/`. Sizes are **art pixels** (1 frame). The code scales by `S = 4`.
+All in `public/assets/sprites/`. Sizes are **art pixels** (1 frame). The code scales by `S = 4`.
 
 | Sprite | Size | Frames | Used for |
 |---|---|---|---|
@@ -181,7 +171,7 @@ All in `assets/sprites/`. Sizes are **art pixels** (1 frame). The code scales by
 
 ## How the code works
 
-Every trigger is built from a few helpers in `src/engine.js`:
+Every trigger is built from a few helpers in `demo/barry/engine.js`:
 
 ```js
 setSprite(body, "barry-suspicious", { anim: "pop" });  // swap picture (+ flips strips) + play a CSS animation
@@ -192,15 +182,15 @@ await wait(1000);                                      // sequence steps
 
 - **Two kinds of animation:**
   - **Swap the picture:** `setSprite`. Strips flip automatically using `frameMs`.
-  - **Move or stretch the picture:** CSS classes in `barry.css`, played with `playAnim`.
+  - **Move or stretch the picture:** CSS classes in `demo/barry/barry.css`, played with `playAnim`.
 - **Pose changes that bounce:** `playAnim(body, "squash")`, wait 150 ms, then `setSprite(body, next, { anim: "unsquash" })`. The swap happens while he's squashed flat, so it looks smooth.
 - **Sprite strips:** each sprite is a `div` with the PNG as its background. Frame *i* is shown with `background-position: -i × w × S px 0`.
 
 ### Adding a new animation
 1. Draw it in Aseprite and save the `.aseprite` file to `source/aseprite/`.
-2. Export it to `assets/sprites/<name>.png`. Either add it to `tools/build_sprites.py` and run that, or export a PNG from Aseprite: transparent background, **1× size**, horizontal strip for multiple frames.
-3. Add a line to `ASSETS` in `src/sprites.js`: `w`, `h` (one frame), `frames`, and `frameMs` if it's a strip.
-4. Use it in a trigger in `src/triggers.js` with `setSprite`.
+2. Export it to `public/assets/sprites/<name>.png`. Either add it to `tools/build_sprites.py` and run that, or export a PNG from Aseprite: transparent background, **1× size**, horizontal strip for multiple frames.
+3. Add a line to `ASSETS` in `demo/barry/sprites.js`: `w`, `h` (one frame), `frames`, and `frameMs` if it's a strip.
+4. Use it in a trigger in `demo/barry/triggers.js` with `setSprite`.
 5. Add a line for it to the trigger list in this file.
 
 ---
@@ -213,7 +203,7 @@ await wait(1000);                                      // sequence steps
 - **Feet on the bottom row, horizontally centred**, so swapping sprites doesn't make him jump.
 - **Names:** `barry-<pose>.png`, kebab-case. Other art uses plain names (`chud-bar.png`).
 - **Exception, `barry-chud-point.png` is saved at 4×** (200×200) so the photo hand stays sharp. `sprites.js` still lists it as 50×50. If you change `S`, rebuild it at the new scale (`scale=` in `build_sprites.py`).
-- **Edit art in `source/`, never in `assets/sprites/`.** That folder gets overwritten by `tools/build_sprites.py`.
+- **Edit art in `source/`, never in `public/assets/sprites/`.** That folder gets overwritten by `tools/build_sprites.py`.
 
 ### Rebuild sprites
 ```bash
@@ -231,7 +221,7 @@ Every trigger is already its own function. In the extension, nothing calls them 
 | Part | What it is | Job for Barry |
 |---|---|---|
 | **Service worker** (`background.js`) | runs in the background, can't draw | **Decides when**: calendar, blocklist, timers. Sends commands to tabs. |
-| **Content script** | runs inside every webpage | **Plays** the animations: `src/sprites.js` → `engine.js` → `triggers.js` → `listener.js` |
+| **Content script** | runs inside every webpage | **Plays** the animations: `demo/barry/sprites.js` → `engine.js` → `triggers.js` → `listener.js` |
 | **Popup** (`popup.html`) | window from the 🐻 toolbar button | User buttons: slack pass, cave, get up, mode override |
 
 Messages: `chrome.tabs.sendMessage(tabId, msg)` (worker → page) · `chrome.runtime.sendMessage(msg)` (page/popup → worker).
@@ -310,15 +300,15 @@ function closeTab() { chrome.runtime.sendMessage({ type: "armReachedTab" }); }
 "permissions": ["tabs", "storage", "alarms"],
 "content_scripts": [{
   "matches": ["<all_urls>"],
-  "js": ["src/sprites.js", "src/engine.js", "src/triggers.js", "content/listener.js"],
-  "css": ["src/barry.css"]
+  "js": ["demo/barry/sprites.js", "demo/barry/engine.js", "demo/barry/triggers.js", "content/listener.js"],
+  "css": ["demo/barry/barry.css"]
 }],
 "web_accessible_resources": [{ "resources": ["assets/sprites/*.png"], "matches": ["<all_urls>"] }]
 ```
 `sprites.js` already switches to `chrome.runtime.getURL("assets/sprites/")` inside the extension.
 
 ### 6. Demo-only parts to replace
-- **`#browser`, `#video`, `#tabX`:** `mountBarry()` creates a full-page fixed overlay inside a **shadow DOM**, so page CSS can't touch Barry. Inject `barry.css` into the shadow root. The corner sprite uses `pointer-events: none`, so he never blocks the page. Aim the arm at the top-right of the window instead of `#tabX`.
+- **`#browser`, `#video`, `#tabX`:** `mountBarry()` creates a full-page fixed overlay inside a **shadow DOM**, so page CSS can't touch Barry. Inject `demo/barry/barry.css` into the shadow root. The corner sprite uses `pointer-events: none`, so he never blocks the page. Aim the arm at the top-right of the window instead of `#tabX`.
 - **`#video` text:** pause real `<video>`/`<audio>` elements, and catch `play` events as eaten "unpause" clicks.
 - **`sfx()` beeps:** `new Audio(chrome.runtime.getURL("assets/sounds/chomp.ogg")).play()`.
 - **The cave lives in the popup.** The page and the popup are separate windows, so "send barry back" plays two animations: the page hops off and the popup hops into the cave. The popup messages the worker, which saves `cave: true` and sends `goToCave` to the tabs.
@@ -341,3 +331,17 @@ The PRD's dev panel works the same way: each dev button sends one of these messa
   - `cave.png` to replace the CSS cave.
   - A frowning chud face (chud always smiles).
   - A pixel-art explosion strip to replace the code particles.
+
+---
+
+## Rules
+
+The demo code under `demo/` is the art reference. The extension's overlay (`src/overlay/`) ports its look in TypeScript while the brain decides what to show (see ADR 0001).
+
+- Edit art in `source/`, then run `python3 tools/build_sprites.py` (`source/` and `tools/build_sprites.py` live with the art team, outside this repo). Never hand-edit `public/assets/sprites/` (it gets overwritten).
+- Sprite sizes in `demo/barry/sprites.js` are in art pixels for ONE frame. Update `w`/`h`/`frames`/`frameMs` there when art changes.
+- Keep pixel art crisp: integer scale (`S`), `image-rendering: pixelated`, move things in whole art-pixel steps.
+- One function per trigger in `demo/barry/triggers.js`. When you add or change a trigger, update the trigger list in docs/animations.md too.
+- Triggers should be started by messages (`{ type: "burstIn", task }`), not by reaching into the page from elsewhere.
+- Barry is only chud-sized while eating clicks and during the max-chud dance (chud meter at 10/10).
+- After changes, open `demo/index.html` and click through the affected trigger to check it.

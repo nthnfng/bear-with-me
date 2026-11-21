@@ -18,20 +18,6 @@ _Avoid_: Distracting tab, blocked tab
 The user's list of sites that can be Restricted sites. Each entry can be toggled off, which stops it being restricted until it's toggled back on.
 _Avoid_: Blacklist, deny list
 
-### Animations
-Read **animations.md** first: it maps every file, trigger and sprite.
-
-**Current state:** this folder is the animation layer only (sprites + functions that play each animation, plus a demo with buttons). The Chrome-extension parts are NOT built yet: the service worker that decides *when* triggers fire (calendar/ICS, blocklist, slack alarms, free gaps), the message wiring, `mountBarry()` for real pages, real tab closing/media pausing/storage, and the popup. See "Status" and "Connecting to the extension" in ANIMATIONS.md for the plan and the suggested build order.
-
-Rules:
-- Edit art in `source/`, then run `python3 tools/build_sprites.py`. Never hand-edit `assets/sprites/` (it gets overwritten).
-- Sprite sizes in `src/sprites.js` are in art pixels for ONE frame. Update `w`/`h`/`frames`/`frameMs` there when art changes.
-- Keep pixel art crisp: integer scale (`S`), `image-rendering: pixelated`, move things in whole art-pixel steps.
-- One function per trigger in `src/triggers.js`. When you add or change a trigger, update the trigger list in ANIMATIONS.md too.
-- Triggers should be started by messages (`{ type: "burstIn", task }`), not by reaching into the page from elsewhere.
-- Barry is only chud-sized while eating clicks and during the max-chud dance (chud meter at 10/10).
-- After changes, open `demo/index.html` and click through the affected trigger to check it.
-
 ### Modes and the Confrontation
 
 **Chill**:

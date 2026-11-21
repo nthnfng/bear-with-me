@@ -5,15 +5,15 @@
    frames  = how many frames sit side by side in the PNG strip
    frameMs = ms per frame for animated strips (optional)
 
-   Rebuild the PNGs with:  python3 tools/build_sprites.py
+   Rebuild the PNGs with the art team's tools/build_sprites.py (lives with the art team, not in this repo)
    ============================================================ */
 
 // Where the PNGs live.
-//   demo (opened from demo/index.html):  "../assets/sprites/"
+//   demo (opened from demo/index.html):  "../public/assets/sprites/"
 //   Chrome extension content script:     chrome.runtime.getURL("assets/sprites/")
 const SPRITE_DIR = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL)
   ? chrome.runtime.getURL("assets/sprites/")
-  : "../assets/sprites/";
+  : "../public/assets/sprites/";
 
 const S = 4;   // screen scale: 1 art pixel = 4 screen pixels. Keep an integer so pixels stay crisp.
 
