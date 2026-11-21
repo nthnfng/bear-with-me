@@ -43,6 +43,7 @@ In the popup open **Todos** and press **Point Barry at my task list**, then clic
 | `alarms` | A 30 s safety-net tick (the service worker is killed when idle) and the 5 minute calendar refresh. |
 | `scripting` | Inject Barry into tabs that were already open when the extension was installed or reloaded. |
 | `idle` | Stop counting Studying when you are away, your screen is locked or the computer sleeps. |
+| `offscreen` | Play Barry's sounds from a hidden extension page, because Chrome blocks sound on a page you haven't clicked yet (a tab you just opened). |
 | host access `<all_urls>` | Barry must appear on whichever site you put on the Blocklist, and the background fetches your calendar feed. |
 
 ## Privacy

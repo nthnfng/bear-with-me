@@ -32,6 +32,7 @@ import {
   refreshSchedule,
   shouldDispatchSchedule,
 } from '../schedule/fetcher';
+import { playSoundOffscreen } from './offscreen';
 import { dropStaleEffects, isScriptableUrl, planTabSync, tabSlotFor } from './tabs';
 import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './todos';
 
@@ -155,6 +156,8 @@ export function startRuntime(brain: Brain) {
         return;
       }
       case 'playSound':
+        await playSoundOffscreen(effect.sound);
+        return;
       case 'showSuggestion':
         await sendToTab(effect.tabId, { type: 'effect', effect });
         return;
