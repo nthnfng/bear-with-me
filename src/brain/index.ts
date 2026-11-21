@@ -108,7 +108,7 @@ function apply(
     case 'mutedSet':
       return { state: { ...state, muted: event.muted } };
     case 'dev':
-      return applyDev(state, event);
+      return applyDev(state, event, effects);
     case 'slackPassStarted': {
       // Lock In only, and not while a break or fight is already running.
       if (
@@ -251,6 +251,7 @@ function advance(start: BarryState, now: Millis, effects: BarryEffect[]): BarryS
 function applyDev(
   state: BarryState,
   event: Extract<BarryEvent, { type: 'dev' }>,
+  effects: BarryEffect[],
 ): { state: BarryState; keepFatness?: boolean } {
   const c = event.command;
   switch (c.kind) {
@@ -277,9 +278,13 @@ function applyDev(
       return { state: { ...state, fatness: Math.max(0, c.fatness) }, keepFatness: true };
     case 'setChudMeter':
       return { state: { ...state, chudMeter: Math.min(1, Math.max(0, c.value)) } };
-    case 'triggerFreeGap':
-      // TODO(Phase 3): free-gap suggestion.
+    case 'triggerFreeGap': {
+      // Forces a suggestion now, ignoring mode, gap length and `lastGapSuggested`.
+      const next = nextBlockStart(state, event.now);
+      const freeMs = next === null ? state.tuning.freeGapMinMs : next - event.now;
+      pushSuggestion(state, freeMs, effects);
       return { state };
+    }
     case 'reset':
       // openTabs/activeTabId mirror real browser tabs, so they survive a reset.
       return {
@@ -288,9 +293,86 @@ function applyDev(
   }
 }
 
+/** Chud fill is clamped to 0..1 and snapped to 1 against float dust. */
+function clampChud(v: number): number {
+  return v >= 1 - 1e-9 ? 1 : Math.max(0, v);
+}
+
+/**
+ * The Chud meter at `now`: stored value plus Snooze time since `lastNow` (capped at the
+ * Snooze's end). Timestamps only, so it fills smoothly even between events.
+ */
+function liveChud(state: BarryState, now: Millis): number {
+  if (state.phase !== 'snoozing' || state.snoozeEndsAt === null || state.lastNow === null) {
+    return state.chudMeter;
+  }
+  const ms = Math.max(0, Math.min(now, state.snoozeEndsAt) - state.lastNow);
+  if (ms === 0) return state.chudMeter;
+  const full = state.tuning.chudFullMs;
+  return full <= 0 ? 1 : clampChud(state.chudMeter + ms / full);
+}
+
+/**
+ * Studying: Lock In, no Slack pass or Snooze, no Restricted tab active, user not idle.
+ * (A warning or Arm fight on a non-Restricted active tab still counts: the user is working.)
+ */
+function isStudying(state: BarryState, now: Millis): boolean {
+  if (resolveMode(state, now) !== 'lockIn') return false;
+  if (state.userIdle) return false;
+  if (state.phase === 'slackPass' || state.phase === 'snoozing') return false;
+  const active = state.activeTabId === null ? undefined : state.openTabs[state.activeTabId];
+  return !isRestricted(active, state.blocklist);
+}
+
+/** Start of the next timed Calendar block after `now`, or null. */
+function nextBlockStart(state: BarryState, now: Millis): Millis | null {
+  const starts = state.blocks.filter((b) => !b.allDay && b.start > now).map((b) => b.start);
+  return starts.length ? Math.min(...starts) : null;
+}
+
+/** Suggestion for the top todo on the active tab (the tab the user is looking at). */
+function pushSuggestion(state: BarryState, freeMs: Millis, effects: BarryEffect[]): boolean {
+  const todo = state.todos[0];
+  if (!todo || state.activeTabId === null) return false;
+  effects.push({
+    type: 'showSuggestion',
+    tabId: state.activeTabId,
+    todo,
+    freeMinutes: Math.floor(freeMs / 60_000),
+  });
+  return true;
+}
+
+/**
+ * Free-time suggestion: Chill, no block running, and the next block today is at least
+ * freeGapMinMs away. Once per gap (`lastGapSuggested` = the gap's start: the end of the block
+ * before it, or the moment of the suggestion when there is none). Not marked as suggested
+ * while there is no todo, no active tab, or the cave is on, so it fires once those clear.
+ * No upcoming block means no gap to fill, so no suggestion.
+ */
+function maybeSuggest(state: BarryState, now: Millis, effects: BarryEffect[]): BarryState {
+  if (resolveMode(state, now) !== 'chill' || currentBlock(state, now) !== null || state.cave) {
+    return state;
+  }
+  const next = nextBlockStart(state, now);
+  if (next === null || next - now < state.tuning.freeGapMinMs) return state;
+  const ends = state.blocks.filter((b) => !b.allDay && b.end <= now).map((b) => b.end);
+  const gapStart = ends.length ? Math.max(...ends) : null;
+  const last = state.lastGapSuggested;
+  if (last !== null && (gapStart === null || last >= gapStart) && last < next) return state;
+  if (!pushSuggestion(state, next - now, effects)) return state;
+  return { ...state, lastGapSuggested: gapStart ?? now };
+}
+
 function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
   const effects: BarryEffect[] = [];
-  const applied = apply(prev, event, effects);
+  // Snooze time since the last event fills the Chud meter (uses the pre-event phase).
+  const chudNow = liveChud(prev, event.now);
+  const applied = apply(
+    chudNow === prev.chudMeter ? prev : { ...prev, chudMeter: chudNow },
+    event,
+    effects,
+  );
   let state: BarryState = { ...applied.state, lastNow: event.now };
 
   // Derived: break/fight phases first, then Confrontation, then Fatness lifetime.
@@ -308,6 +390,22 @@ function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
     state = { ...state, fatness: 0 };
   }
 
+  // Lock back in: an unbroken Studying stretch of lockBackInMs resets the Chud meter. The
+  // stretch ended at `now`, or (going idle) idleAfterSec earlier, since the idle event is late.
+  if (prev.studyingSince !== null && state.chudMeter > 0) {
+    const stretchEnd =
+      event.type === 'idleChanged' && event.idle
+        ? event.now - state.tuning.idleAfterSec * 1000
+        : event.now;
+    if (stretchEnd >= prev.studyingSince + state.tuning.lockBackInMs) {
+      state = { ...state, chudMeter: 0 };
+    }
+  }
+  const studying = isStudying(state, event.now);
+  state = { ...state, studyingSince: studying ? (prev.studyingSince ?? event.now) : null };
+
+  state = maybeSuggest(state, event.now, effects);
+
   return { state, effects: state.muted ? effects.filter((e) => e.type !== 'playSound') : effects };
 }
 
@@ -317,17 +415,25 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
   const inBreak = state.phase !== 'clear' && state.phase !== 'confronting';
   if (!inBreak && confrontedTab(state, now) === tabId) {
     const block = currentBlock(state, now);
+    const chud = liveChud(state, now);
+    const full = chud >= 1;
     return {
       ...HIDDEN_VIEW,
       visible: true,
       placement: 'face',
       position: state.position,
-      pose: 'confrontation',
+      pose: full ? 'chud' : 'confrontation',
       scale: Math.min(1 + state.fatness * state.tuning.scalePerFat, state.tuning.maxScale),
-      line: block ? `You planned ${block.title} ,':/` : "You said you'd lock in ,':/",
+      line: full
+        ? chudLine
+        : block
+          ? `You planned ${block.title} ,':/`
+          : "You said you'd lock in ,':/",
       showBackToIt: true,
       eatInput: true,
       pauseMedia: true,
+      chudMeter: chud > 0 ? chud : null,
+      singChud: full && !state.muted,
     };
   }
 
@@ -347,6 +453,7 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
 /** How long the "Okay... -_-" pose lingers on the tab a Slack pass interrupted. */
 export const OKAY_MS = 4000;
 
+const chudLine = "I'm a chud 🎵";
 const warningLine = 'Wrapping up?';
 const reachLine = 'Closing restricted tabs 💣';
 
@@ -370,11 +477,11 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
   };
   // Other tabs just see calm studious Barry (no arm, no countdown).
   if (!isRestricted(state.openTabs[tabId], state.blocklist)) {
-    return state.cave && state.phase === 'slackPass'
-      ? { ...HIDDEN_VIEW, position: state.position }
-      : base;
+    return state.cave ? { ...HIDDEN_VIEW, position: state.position } : base;
   }
-  const shared = { ...base, chudMeter: state.chudMeter };
+  const chud = liveChud(state, now);
+  const full = chud >= 1;
+  const shared = { ...base, chudMeter: chud };
   switch (state.phase) {
     case 'slackPass': {
       if (state.cave) return { ...HIDDEN_VIEW, position: state.position };
@@ -393,6 +500,7 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
     case 'reaching':
       return {
         ...shared,
+        ...(full ? { pose: 'chud' as const, singChud: !state.muted } : {}),
         line: reachLine,
         reach:
           state.reachStartedAt === null
@@ -422,8 +530,23 @@ function nextDeadline(state: BarryState): Millis | null {
     reachEnd,
     state.snoozeEndsAt,
     blockDeadline(state),
+    lockBackInDeadline(state),
+    chudFullDeadline(state),
   ].filter((d): d is Millis => d !== null);
   return all.length ? Math.min(...all) : null;
+}
+
+/** When the current Studying stretch reaches lockBackInMs (only matters while the meter is up). */
+function lockBackInDeadline(state: BarryState): Millis | null {
+  if (state.studyingSince === null || state.chudMeter <= 0) return null;
+  return state.studyingSince + state.tuning.lockBackInMs;
+}
+
+/** When the Chud meter hits 1 during a Snooze (the view flips to chud Barry then). */
+function chudFullDeadline(state: BarryState): Millis | null {
+  if (state.phase !== 'snoozing' || state.lastNow === null || state.chudMeter >= 1) return null;
+  const at = state.lastNow + Math.ceil((1 - state.chudMeter) * state.tuning.chudFullMs);
+  return state.snoozeEndsAt !== null && at > state.snoozeEndsAt ? null : at;
 }
 
 /** Next moment a tick is needed: end of the current block, else start of the next one. */
@@ -436,6 +559,15 @@ function blockDeadline(state: BarryState): Millis | null {
     return Math.min(...timed.filter((b) => b.start <= now && now < b.end).map((b) => b.end));
   const upcoming = timed.filter((b) => b.start > now).map((b) => b.start);
   return upcoming.length ? Math.min(...upcoming) : null;
+}
+
+/**
+ * Whether the cave can hide Barry right now. False in Lock In while he is confronting,
+ * warning, Reaching or Snoozed (a Restricted tab is in play); the popup greys the toggle.
+ */
+export function caveAllowed(state: BarryState, now: Millis): boolean {
+  if (resolveMode(state, now) !== 'lockIn') return true;
+  return state.phase === 'clear' || state.phase === 'slackPass';
 }
 
 export const brain: Brain = { initialState, reduce, viewFor, nextDeadline };
