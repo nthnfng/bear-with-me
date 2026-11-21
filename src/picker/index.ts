@@ -173,30 +173,52 @@ export function startPicker(opts: PickerOptions): void {
     const m = e as MouseEvent;
     if (keepsTarget(m.clientX, m.clientY)) return;
     adjusted = false;
-    setDeepest(pick(m.clientX, m.clientY));
-    draw();
+    try {
+      setDeepest(pick(m.clientX, m.clientY));
+      draw();
+    } catch (err) {
+      console.error('[barry] picker hover failed', err);
+    }
   };
-  const onClick = (e: Event) => {
-    swallow(e);
-    const m = e as MouseEvent;
-    if (!keepsTarget(m.clientX, m.clientY)) setDeepest(pick(m.clientX, m.clientY) ?? deepest);
-    const el = target;
-    // Docs: any click saves the marker (the text is read from the export, not the DOM).
+  /** Marker selector for pages with a dedicated reader, judged from the raw element under the pointer. */
+  const markerFor = (...els: (Element | null)[]): string | null => {
     const docsMarker = pageSpecificSelector(location.hostname, location.pathname);
-    // Brightspace Work To Do: any click inside the widget saves its marker.
-    const marker =
-      docsMarker ??
-      (insideW2D(deepest) || insideW2D(el) || !!el?.querySelector(W2D_TAG) ? W2D_SELECTOR : null);
-    if (!el && !marker) return;
+    if (docsMarker) return docsMarker;
+    for (const el of els) {
+      try {
+        if (el && (insideW2D(el) || el.querySelector(W2D_TAG))) return W2D_SELECTOR;
+      } catch {
+        // odd node: ignore, try the next
+      }
+    }
+    return null;
+  };
+  const save = (selector: string, docs: boolean) => {
     const source: TodoSource = {
       id: makeSourceId(),
       origin: location.origin,
-      path: (docsMarker && docPathPrefix(location.pathname)) || location.pathname,
-      selector: marker ?? deepSelectorFor(el!, deepest),
+      path: (docs && docPathPrefix(location.pathname)) || location.pathname,
+      selector,
     };
     stop();
     opts.send({ type: 'pickerSaved', source });
     opts.onSaved?.(source);
+  };
+  const onClick = (e: Event) => {
+    swallow(e);
+    const m = e as MouseEvent;
+    try {
+      // Dedicated-reader pages (Docs, Brightspace Work To Do): decide from the raw hit first, so a
+      // failure while computing the highlight box can never lose the click.
+      const raw = pick(m.clientX, m.clientY);
+      const marker = markerFor(raw, deepest, target);
+      if (marker) return save(marker, !!pageSpecificSelector(location.hostname, location.pathname));
+      if (!keepsTarget(m.clientX, m.clientY)) setDeepest(raw ?? deepest);
+      if (!target) return;
+      save(deepSelectorFor(target, deepest), false);
+    } catch (err) {
+      console.error('[barry] picker click failed', err);
+    }
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {

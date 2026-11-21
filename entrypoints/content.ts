@@ -1,5 +1,10 @@
 import { storage } from 'wxt/utils/storage';
-import { STORAGE_KEYS, type BackgroundMessage, type ContentMessage } from '@/src/contracts';
+import {
+  STORAGE_KEYS,
+  type BackgroundMessage,
+  type ContentMessage,
+  type Settings,
+} from '@/src/contracts';
 import { mountOverlay } from '@/src/overlay';
 import { startPicker, stopActivePicker } from '@/src/picker';
 import { startTodoReader } from '@/src/picker/reader';
@@ -39,8 +44,13 @@ export default defineContentScript({
         startPicker({ send, onSaved: (source) => reader.captureNow(source) });
     });
 
-    // A source saved in another frame ends this frame's picker too.
-    const unwatch = storage.watch(STORAGE_KEYS.settings, () => stopActivePicker());
+    // A source saved in another frame ends this frame's picker too. Only a NEW source counts:
+    // other settings writes (e.g. removing an old source just before re-picking) must not
+    // cancel the picker the user is about to click with.
+    const unwatch = storage.watch<Settings>(STORAGE_KEYS.settings, (next, prev) => {
+      const before = new Set((prev?.todoSources ?? []).map((s) => s.id));
+      if ((next?.todoSources ?? []).some((s) => !before.has(s.id))) stopActivePicker();
+    });
     document.addEventListener(TAKEOVER, unwatch, { once: true });
 
     if (isTop) send({ type: 'hello' });

@@ -55,4 +55,38 @@ describe('brightspace work to do', () => {
     expect(textRuns(widget)).not.toContain('hidden');
     expect(textRuns(widget)).not.toContain('Assignment:');
   });
+
+  describe('typed items with slotted titles', () => {
+    const typed = (tag: string, title: string, withSlot: boolean) => {
+      const content = el('d2l-list-item-content', [
+        el('div', [text(title)]),
+        el('div', [text('Due Oct 4, 2026 11:59 PM')], { attrs: { slot: 'secondary' } }),
+        el('div', [text('COMPSCI 3319A 200 LEC')], { attrs: { slot: 'supporting-info' } }),
+      ]);
+      return el(tag, [], {
+        shadow: [
+          text('Due Oct 4'),
+          el('d2l-list-item-generic-layout', [], { shadow: [] }),
+          content,
+        ],
+      });
+    };
+    it('matches d2l-w2d-list-item-* and reads the default-slot title', () => {
+      const w = el('d2l-w2d-work-to-do', [], {
+        shadow: [
+          typed('d2l-w2d-list-item-content', 'Lab 4', true),
+          typed('d2l-w2d-list-item-assignment', 'Essay', true),
+        ],
+      });
+      expect(w2dCandidates(w).map((c) => c.text)).toEqual(['Lab 4', 'Essay']);
+    });
+    it('falls back to the first non-date, non-course run', () => {
+      const w = el('x', [
+        el('d2l-w2d-list-item-quiz', [], {
+          shadow: [text('Due Oct 4'), text('COMPSCI 3319A 200 LEC'), text('Quiz 1')],
+        }),
+      ]);
+      expect(w2dCandidates(w).map((c) => c.text)).toEqual(['Quiz 1']);
+    });
+  });
 });
