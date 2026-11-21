@@ -14,6 +14,8 @@ export interface InputEaterOptions {
 export type Listener = [type: string, passive: boolean, kind: EatKind | null];
 
 // kind = what gets reported; null = eaten silently (part of a gesture reported elsewhere).
+// Only clicks chomp. Keys are blocked silently (YouTube's space/k can't unpause, but no Fatness).
+// Scrolling and touch swipes pass through to the page; a tap still ends in a click, eaten here.
 export const LISTENERS: Listener[] = [
   ['click', false, 'click'],
   ['auxclick', false, 'click'],
@@ -23,14 +25,9 @@ export const LISTENERS: Listener[] = [
   ['mouseup', false, null],
   ['pointerdown', false, null],
   ['pointerup', false, null],
-  ['wheel', false, 'scroll'],
-  ['touchstart', false, 'click'], // preventDefault on touchstart cancels the synthetic click
-  ['touchmove', false, 'scroll'],
-  ['keydown', false, 'key'],
+  ['keydown', false, null],
   ['keyup', false, null],
   ['keypress', false, null],
-  ['touchend', false, null],
-  ['touchcancel', false, null],
 ];
 
 /** Attribute on <html> the isolated-world eater sets while eating; the MAIN-world early script reads it. */

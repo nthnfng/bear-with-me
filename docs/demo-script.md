@@ -32,7 +32,7 @@ Note: an injected block survives the 5 minute calendar refresh. Inject it with a
 - Sound: `burst` once. (If the Chud meter is already full, the chud song starts here too, so keep it under 1 until beat 8.)
 
 ### 3. Chomps and growth (about 20 s)
-- Presenter: click the video, scroll, press space or a key, try to unpause. Do about 8 to 10 interactions.
+- Presenter: click the video and the page 8 to 10 times, and try to unpause. Only clicks chomp; keys do nothing and scrolling still scrolls.
 - Barry: eats each one; he grows each time (scale 1 + 0.06 per eat, capped at 2x with default tuning). Same line.
 - Sound: `chomp` on each eaten interaction.
 - Say: "Nothing reaches the page."

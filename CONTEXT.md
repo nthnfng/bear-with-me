@@ -37,7 +37,7 @@ Barry in the user's face on a Restricted tab during Lock In, naming the planned 
 _Avoid_: Intervention, popup, nudge
 
 **Eat**:
-What Barry does to the user's clicks, scrolls, key presses and unpauses during a Confrontation. An eaten interaction never reaches the page and makes Barry fatter.
+What Barry does to the user's clicks and unpauses during a Confrontation. An eaten interaction never reaches the page and makes Barry fatter. Key presses are blocked without being eaten (no chomp, no Fatness); scrolling passes through.
 _Avoid_: Block, swallow, intercept
 
 **Fatness**:
