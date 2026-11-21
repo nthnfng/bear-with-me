@@ -7,6 +7,8 @@
 import { windowsEmptiedBy } from './windowsEmptiedBy';
 import { storage } from 'wxt/utils/storage';
 import {
+  DEFAULT_SETTINGS,
+  ICS_REFRESH_MINUTES,
   STORAGE_KEYS,
   TICK_ALARM_SECONDS,
   type BackgroundMessage,
@@ -16,13 +18,18 @@ import {
   type Brain,
   type ContentMessage,
   type DevCommand,
+  type ScheduleStatus,
+  type Settings,
   type PopupMessage,
   type TabId,
 } from '../contracts';
 import { contentMessageToEvent, isPopupMessage, popupMessageToEvent } from './messageToEvent';
 import { createSerialQueue } from './serialQueue';
+import { EMPTY_STATUS, normalizeIcsUrl, refreshSchedule } from '../schedule/fetcher';
+import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './todos';
 
 const TICK_ALARM = 'barry-tick';
+const ICS_ALARM = 'barry-ics-refresh';
 const EXPLODE_MS = 1000;
 const CONTENT_SCRIPT_FILE = '/content-scripts/content.js'; // WXT output path for entrypoints/content.ts
 
@@ -37,6 +44,14 @@ export function startRuntime(brain: Brain) {
   async function loadState(): Promise<BarryState> {
     return (await storage.getItem<BarryState>(STORAGE_KEYS.state)) ?? brain.initialState();
   }
+
+  async function loadSettings(): Promise<Settings> {
+    return {
+      ...DEFAULT_SETTINGS,
+      ...((await storage.getItem<Settings>(STORAGE_KEYS.settings)) ?? {}),
+    };
+  }
+  const saveSettings = (s: Settings) => storage.setItem(STORAGE_KEYS.settings, s);
 
   // ---- talking to tabs ------------------------------------------------------------------
 
@@ -104,16 +119,97 @@ export function startRuntime(brain: Brain) {
     deadlineTimer = setTimeout(() => dispatch({ type: 'tick', now: Date.now() }), delay);
   }
 
-  /** load → reduce → save → push views → run effects, one event at a time. */
+  /** load → reduce → save → push views → run effects. Call only from inside the queue. */
+  async function handle(event: BarryEvent) {
+    const { state, effects } = brain.reduce(await loadState(), event);
+    await storage.setItem(STORAGE_KEYS.state, state);
+    await pushViews(state, Object.keys(state.openTabs).map(Number));
+    scheduleDeadline(state);
+    applyIdleThreshold(state.tuning.idleAfterSec);
+    // Not awaited: explodeAndClose waits ~1s and must not stall the queue.
+    for (const effect of effects) void runEffect(effect).catch(console.error);
+  }
+
+  /** One event at a time, in order. */
   function dispatch(event: BarryEvent) {
+    return queue.enqueue(() => handle(event));
+  }
+
+  // ---- idle -----------------------------------------------------------------------------
+
+  let idleSec = 0;
+  function applyIdleThreshold(sec: number) {
+    const clamped = Math.max(15, Math.round(sec)); // chrome.idle minimum is 15s
+    if (clamped === idleSec) return;
+    idleSec = clamped;
+    browser.idle.setDetectionInterval(clamped);
+  }
+  browser.idle.onStateChanged.addListener((s) => {
+    dispatch({ type: 'idleChanged', now: Date.now(), idle: s !== 'active' });
+  });
+
+  // ---- calendar -------------------------------------------------------------------------
+
+  let refreshing: Promise<void> | null = null;
+  /** Fetch the ICS feed, keep the last good result on failure, tell the brain. Never logs the URL. */
+  function refreshScheduleNow(): Promise<void> {
+    refreshing ??= (async () => {
+      const settings = await queue.enqueue(loadSettings);
+      const previous =
+        (await storage.getItem<ScheduleStatus>(STORAGE_KEYS.schedule)) ?? EMPTY_STATUS;
+      const status = await refreshSchedule(settings?.icsUrl ?? null, previous, {
+        fetchText: (url) => fetch(url),
+        now: Date.now(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      await storage.setItem(STORAGE_KEYS.schedule, status);
+      void dispatch({ type: 'scheduleUpdated', now: Date.now(), blocks: status.blocks });
+    })()
+      .catch(() => console.error('[barry] schedule refresh failed'))
+      .finally(() => {
+        refreshing = null;
+      });
+    return refreshing;
+  }
+
+  // ---- settings and todos ---------------------------------------------------------------
+
+  function setIcsUrl(raw: string) {
+    return queue
+      .enqueue(async () => {
+        const url = raw.trim() === '' ? null : normalizeIcsUrl(raw);
+        if (raw.trim() !== '' && !url) {
+          const prev =
+            (await storage.getItem<ScheduleStatus>(STORAGE_KEYS.schedule)) ?? EMPTY_STATUS;
+          await storage.setItem(STORAGE_KEYS.schedule, {
+            ...prev,
+            error: 'That is not a valid calendar URL',
+          });
+          return false;
+        }
+        await saveSettings({ ...(await loadSettings()), icsUrl: url });
+        return true;
+      })
+      .then(async (saved) => {
+        if (saved) await refreshScheduleNow();
+      });
+  }
+
+  /** Recompute the brain's todos from the sources list and a change to one source's items. */
+  function updateTodos(
+    change: (todos: BarryState['todos'], settings: Settings) => BarryState['todos'],
+  ) {
     return queue.enqueue(async () => {
-      const { state, effects } = brain.reduce(await loadState(), event);
-      await storage.setItem(STORAGE_KEYS.state, state);
-      await pushViews(state, Object.keys(state.openTabs).map(Number));
-      scheduleDeadline(state);
-      // Not awaited: explodeAndClose waits ~1s and must not stall the queue.
-      for (const effect of effects) void runEffect(effect).catch(console.error);
+      const settings = await loadSettings();
+      const state = await loadState();
+      const todos = orderTodos(change(state.todos, settings), settings.todoSources);
+      await handle({ type: 'todosUpdated', now: Date.now(), todos });
     });
+  }
+
+  async function startPickerInActiveTab() {
+    const tabId = await activeTabOfFocusedWindow();
+    if (tabId !== null) await sendToTab(tabId, { type: 'startPicker' });
   }
 
   // ---- tab tracking ---------------------------------------------------------------------
@@ -177,12 +273,40 @@ export function startRuntime(brain: Brain) {
   // the real `now` recomputes the phase, re-pushes views to all known open tabs (the overlay
   // derives arm progress from reachStartedAt) and re-arms the deadline timer.
   void dispatch({ type: 'tick', now: Date.now() });
+  // Sync idle state (a worker restart or browser start may have missed a change).
+  void queue.enqueue(async () => {
+    const state = await loadState();
+    applyIdleThreshold(state.tuning.idleAfterSec);
+    const idle = (await browser.idle.queryState(idleSec)) !== 'active';
+    if (idle !== state.userIdle) await handle({ type: 'idleChanged', now: Date.now(), idle });
+  });
 
   // ---- messages -------------------------------------------------------------------------
 
   browser.runtime.onMessage.addListener((msg: ContentMessage | PopupMessage, sender) => {
     const now = Date.now();
     if (isPopupMessage(msg)) {
+      switch (msg.type) {
+        case 'setIcsUrl':
+          void setIcsUrl(msg.url);
+          return;
+        case 'refreshSchedule':
+          void refreshScheduleNow();
+          return;
+        case 'startPicker':
+          void startPickerInActiveTab();
+          return;
+        case 'removeTodoSource':
+          void queue.enqueue(async () => {
+            const settings = await loadSettings();
+            await saveSettings({
+              ...settings,
+              todoSources: removeSource(settings.todoSources, msg.sourceId),
+            });
+          });
+          void updateTodos((todos) => todos.filter((t) => t.sourceId !== msg.sourceId));
+          return;
+      }
       const event = popupMessageToEvent(msg, now);
       if (event) dispatch(event);
       return;
@@ -194,6 +318,25 @@ export function startRuntime(brain: Brain) {
       queue.enqueue(async () => pushViews(await loadState(), [tabId]));
       return;
     }
+    if (msg.type === 'pickerSaved') {
+      // Saves the source; the content script follows with todosCaptured for it.
+      void queue.enqueue(async () => {
+        const settings = await loadSettings();
+        await saveSettings({
+          ...settings,
+          todoSources: upsertSource(settings.todoSources, msg.source),
+        });
+      });
+      return;
+    }
+    if (msg.type === 'todosCaptured') {
+      void updateTodos((todos, settings) =>
+        settings.todoSources.some((s) => s.id === msg.sourceId)
+          ? replaceSourceTodos(todos, msg.sourceId, msg.items)
+          : todos,
+      );
+      return;
+    }
     const event = contentMessageToEvent(msg, tabId, now);
     if (event) dispatch(event);
   });
@@ -202,9 +345,13 @@ export function startRuntime(brain: Brain) {
 
   // Chrome's minimum alarm period is 30s (0.5 min), which equals TICK_ALARM_SECONDS.
   browser.alarms.create(TICK_ALARM, { periodInMinutes: TICK_ALARM_SECONDS / 60 });
+  browser.alarms.create(ICS_ALARM, { periodInMinutes: ICS_REFRESH_MINUTES });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === TICK_ALARM) dispatch({ type: 'tick', now: Date.now() });
+    if (alarm.name === ICS_ALARM) void refreshScheduleNow();
   });
+  // Refresh on worker start too (the alarm only fires after its first period).
+  void refreshScheduleNow();
 
   // ---- temporary dev hook: run `barry.injectBlock()` in the service worker's DevTools -----
 

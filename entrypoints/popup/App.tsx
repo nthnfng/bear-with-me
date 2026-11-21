@@ -12,6 +12,7 @@ import {
   secondsToMs,
   tuningSeconds,
 } from '@/src/popup/view';
+import { ChudMeter, SettingsSections } from './Settings';
 
 const send = (msg: PopupMessage) => {
   browser.runtime.sendMessage(msg).catch(() => {});
@@ -151,6 +152,10 @@ function App() {
             </div>
             {v.slackHint && <p className="hint">{v.slackHint}</p>}
           </div>
+
+          <ChudMeter meter={state.chudMeter} />
+
+          <SettingsSections state={state} now={now} send={send} />
 
           {devOpen && <DevPanel state={state} onClose={() => setDevOpen(false)} />}
         </>

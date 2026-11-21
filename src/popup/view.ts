@@ -1,8 +1,17 @@
 // Derived display logic for the popup (ADR 0001: the React components only draw this).
 // Pure: no browser imports.
 
-import type { BarryState, CalendarBlock, Millis, Mode, ModeOverride, Tuning } from '../contracts';
+import type {
+  BarryState,
+  BlocklistEntry,
+  CalendarBlock,
+  Millis,
+  Mode,
+  ModeOverride,
+  Tuning,
+} from '../contracts';
 import { currentBlock, resolveMode } from '../brain/helpers';
+import { caveAllowed } from '../brain';
 
 export interface Countdown {
   label: string;
@@ -138,3 +147,95 @@ export function tuningSeconds(t: Tuning) {
 }
 
 export const SLACK_PRESETS_MIN = [1, 5, 10, 15] as const;
+
+// ---- settings ---------------------------------------------------------------------------
+
+/**
+ * Turn what the user typed ("https://www.YouTube.com/watch?v=1", "Reddit.com/") into a bare host
+ * ("youtube.com"), or null if it isn't a plausible domain. Strips a leading "www.".
+ */
+export function normalizeDomain(input: string): string | null {
+  let s = input.trim().toLowerCase();
+  if (!s) return null;
+  s = s.replace(/^[a-z][a-z0-9+.-]*:\/\//, '');
+  s = s.split(/[/?#]/)[0] ?? '';
+  s = s
+    .replace(/^[^@]*@/, '')
+    .replace(/:\d+$/, '')
+    .replace(/\.$/, '')
+    .replace(/^www\./, '');
+  const label = '[a-z0-9]([a-z0-9-]*[a-z0-9])?';
+  return new RegExp(`^${label}(\\.${label})+$`).test(s) ? s : null;
+}
+
+export type AddDomainResult =
+  { ok: true; blocklist: BlocklistEntry[] } | { ok: false; error: string };
+
+export function addDomain(blocklist: BlocklistEntry[], input: string): AddDomainResult {
+  const domain = normalizeDomain(input);
+  if (!domain) return { ok: false, error: 'Enter a site like youtube.com' };
+  const existing = blocklist.find((e) => e.domain === domain);
+  if (existing) {
+    // Re-adding a toggled-off site turns it back on.
+    return {
+      ok: true,
+      blocklist: blocklist.map((e) => (e.domain === domain ? { ...e, enabled: true } : e)),
+    };
+  }
+  return { ok: true, blocklist: [...blocklist, { domain, enabled: true }] };
+}
+
+export const removeDomain = (blocklist: BlocklistEntry[], domain: string) =>
+  blocklist.filter((e) => e.domain !== domain);
+
+export const toggleDomain = (blocklist: BlocklistEntry[], domain: string) =>
+  blocklist.map((e) => (e.domain === domain ? { ...e, enabled: !e.enabled } : e));
+
+/**
+ * The Cave hides calm Barry. A Confrontation is never hidden, so during one the toggle is
+ * disabled (the current Lane A rule: src/brain viewFor). Keep in sync with the brain.
+ */
+export function caveStatus(
+  state: BarryState,
+  now: Millis,
+): {
+  disabled: boolean;
+  reason: string | null;
+} {
+  return caveAllowed(state, now)
+    ? { disabled: false, reason: null }
+    : { disabled: true, reason: "Barry can't hide while he's dealing with you." };
+}
+
+/** Chud meter as a whole percent, clamped 0-100. */
+export function chudPercent(meter: number): number {
+  return Math.round(Math.min(1, Math.max(0, Number.isFinite(meter) ? meter : 0)) * 100);
+}
+
+/** One line for the ICS section: error wins, then last fetch time. */
+export function scheduleStatusLine(
+  status: { fetchedAt: Millis | null; error: string | null; blocks: unknown[] } | null,
+  hasUrl: boolean,
+  now: Millis,
+): { text: string; isError: boolean } {
+  if (!hasUrl) return { text: 'No calendar connected yet.', isError: false };
+  if (status?.error) {
+    const when =
+      status.fetchedAt === null ? '' : ` Last good fetch ${formatAgo(now - status.fetchedAt)}.`;
+    return { text: status.error + '.' + when, isError: true };
+  }
+  if (!status || status.fetchedAt === null) return { text: 'Fetching...', isError: false };
+  const n = status.blocks.length;
+  return {
+    text: `Fetched ${formatAgo(now - status.fetchedAt)} (${n} ${n === 1 ? 'event' : 'events'}).`,
+    isError: false,
+  };
+}
+
+export function formatAgo(ms: number): string {
+  const m = Math.floor(Math.max(0, ms) / 60_000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h} h ago` : `${Math.floor(h / 24)} d ago`;
+}

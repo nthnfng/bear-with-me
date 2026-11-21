@@ -177,3 +177,130 @@ button:disabled {
 .danger {
   color: var(--lock);
 }
+
+/* Settings: compact collapsible sections, same palette */
+.chud {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.label {
+  font-size: 12px;
+  color: var(--dim);
+}
+.chud .bar {
+  flex: 1;
+  height: 8px;
+  background: var(--card);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.chud .fill {
+  height: 100%;
+  background: var(--lock);
+  transition: width 0.3s;
+}
+.chud .pct {
+  width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.settings {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.settings details {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.settings summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 0;
+}
+.settings details[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+}
+.settings details[open] summary {
+  margin-bottom: 2px;
+}
+.settings input[type='text'],
+.settings input[type='password'],
+.settings input:not([type]) {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--dim);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.settings .row span {
+  flex: initial;
+}
+.settings .seg {
+  background: var(--bg);
+}
+.settings .steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--dim);
+}
+.settings .hint {
+  margin: 0;
+}
+.settings .hint.error {
+  color: var(--lock);
+}
+.settings .list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.settings .list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+}
+.settings .list label,
+.settings .check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings .x {
+  padding: 0 6px;
+  background: transparent;
+  color: var(--dim);
+}
+.settings .link {
+  background: transparent;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  font-size: 12px;
+}
+.settings .wide {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.settings .field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

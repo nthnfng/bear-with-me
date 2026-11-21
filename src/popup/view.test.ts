@@ -93,3 +93,70 @@ describe('popup view', () => {
     expect(secondsToMs('-3')).toBeNull();
   });
 });
+
+import {
+  addDomain,
+  caveStatus,
+  chudPercent,
+  formatAgo,
+  normalizeDomain,
+  removeDomain,
+  scheduleStatusLine,
+  toggleDomain,
+} from './view';
+
+describe('blocklist editing', () => {
+  it('normalises typed input to a bare host', () => {
+    expect(normalizeDomain('https://www.YouTube.com/watch?v=1')).toBe('youtube.com');
+    expect(normalizeDomain(' Reddit.com/ ')).toBe('reddit.com');
+    expect(normalizeDomain('old.reddit.com:8080/r/x')).toBe('old.reddit.com');
+    expect(normalizeDomain('twitch.tv')).toBe('twitch.tv');
+  });
+  it('rejects junk', () => {
+    for (const bad of ['', '  ', 'localhost', 'not a domain', 'a..b', '-a.com', 'x.com y']) {
+      expect(normalizeDomain(bad)).toBeNull();
+    }
+  });
+  it('adds, dedupes (re-enabling) and removes', () => {
+    const base = [{ domain: 'x.com', enabled: false }];
+    const added = addDomain(base, 'https://news.ycombinator.com');
+    expect(added.ok && added.blocklist.map((e) => e.domain)).toEqual([
+      'x.com',
+      'news.ycombinator.com',
+    ]);
+    const again = addDomain(base, 'X.com');
+    expect(again.ok && again.blocklist).toEqual([{ domain: 'x.com', enabled: true }]);
+    expect(addDomain(base, 'nope').ok).toBe(false);
+    expect(removeDomain(base, 'x.com')).toEqual([]);
+    expect(toggleDomain(base, 'x.com')[0]!.enabled).toBe(true);
+  });
+});
+
+describe('settings display', () => {
+  it('cave follows the brain: locked during a Lock In fight, free otherwise', () => {
+    const lockIn = { modeOverride: 'lockIn' as const };
+    for (const phase of ['confronting', 'warning', 'reaching', 'snoozing'] as const) {
+      expect(caveStatus(base({ ...lockIn, phase }), 0).disabled).toBe(true);
+    }
+    expect(caveStatus(base({ ...lockIn, phase: 'confronting' }), 0).reason).toBeTruthy();
+    expect(caveStatus(base({ ...lockIn, phase: 'clear' }), 0)).toEqual({ disabled: false, reason: null });
+    expect(caveStatus(base({ modeOverride: 'chill', phase: 'snoozing' }), 0).disabled).toBe(false);
+  });
+  it('chud percent clamps', () => {
+    expect(chudPercent(0.456)).toBe(46);
+    expect(chudPercent(2)).toBe(100);
+    expect(chudPercent(NaN)).toBe(0);
+  });
+  it('formats ago and status lines', () => {
+    expect(formatAgo(10_000)).toBe('just now');
+    expect(formatAgo(5 * 60_000)).toBe('5 min ago');
+    expect(formatAgo(3 * 3_600_000)).toBe('3 h ago');
+    expect(scheduleStatusLine(null, false, 0).text).toMatch(/No calendar/);
+    expect(
+      scheduleStatusLine({ fetchedAt: 0, error: null, blocks: [1, 2] }, true, 120_000).text,
+    ).toBe('Fetched 2 min ago (2 events).');
+    const err = scheduleStatusLine({ fetchedAt: 0, error: 'Nope', blocks: [] }, true, 120_000);
+    expect(err.isError).toBe(true);
+    expect(err.text).toContain('Last good fetch 2 min ago');
+  });
+});
