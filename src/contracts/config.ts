@@ -45,7 +45,11 @@ export const DEFAULT_BLOCKLIST: BlocklistEntry[] = [
 export const DEFAULT_SETTINGS: Settings = {
   icsUrl: null,
   todoSources: [],
+  popupTodos: [],
 };
+
+/** sourceId of the brain Todos that come from todos typed into the popup. */
+export const POPUP_TODO_SOURCE_ID = 'popup';
 
 /** How often the background re-fetches the ICS feed. */
 export const ICS_REFRESH_MINUTES = 5;

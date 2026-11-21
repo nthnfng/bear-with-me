@@ -60,6 +60,7 @@ const POPUP_TYPES = new Set([
   'refreshSchedule',
   'startPicker',
   'removeTodoSource',
+  'setPopupTodos',
   'gotUp', // also sent by content scripts (tired Barry); both map to the same event
   'dev',
 ]);

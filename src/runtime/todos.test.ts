@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './todos';
+import {
+  orderTodos,
+  removeSource,
+  replaceSourceTodos,
+  upsertSource,
+  withPopupTodos,
+} from './todos';
+
+describe('popup todos', () => {
+  it('puts unfinished popup todos first and skips done or blank ones', () => {
+    const out = withPopupTodos(
+      [{ text: 'a1', sourceId: 'a' }],
+      [
+        { id: '1', text: ' Gym ', done: false },
+        { id: '2', text: 'Done thing', done: true },
+        { id: '3', text: '  ', done: false },
+      ],
+    );
+    expect(out).toEqual([
+      { text: 'Gym', sourceId: 'popup' },
+      { text: 'a1', sourceId: 'a' },
+    ]);
+  });
+  it('replaces earlier popup todos instead of stacking them', () => {
+    const once = withPopupTodos([], [{ id: '1', text: 'x', done: false }]);
+    expect(withPopupTodos(once, [{ id: '1', text: 'x', done: true }])).toEqual([]);
+  });
+});
 
 const src = (id: string) => ({ id, origin: 'https://a', path: '/', selector: 'ul' });
 

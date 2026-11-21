@@ -28,6 +28,13 @@ export interface Todo {
   sourceId: string;
 }
 
+/** A todo typed into the popup. Stored in Settings; unfinished ones reach the brain as Todos. */
+export interface PopupTodo {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
 /** Where the element picker found a todo list. */
 export interface TodoSource {
   id: string;

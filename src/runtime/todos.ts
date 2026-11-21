@@ -1,6 +1,15 @@
 // Pure todo-source bookkeeping. No browser imports.
 
-import type { Todo, TodoSource } from '../contracts';
+import { POPUP_TODO_SOURCE_ID } from '../contracts';
+import type { PopupTodo, Todo, TodoSource } from '../contracts';
+
+/** Unfinished popup todos first (the user typed them in Barry's own list), then the rest. */
+export function withPopupTodos(todos: Todo[], popupTodos: PopupTodo[]): Todo[] {
+  const mine = popupTodos
+    .filter((t) => !t.done && t.text.trim())
+    .map((t) => ({ text: t.text.trim(), sourceId: POPUP_TODO_SOURCE_ID }));
+  return [...mine, ...todos.filter((t) => t.sourceId !== POPUP_TODO_SOURCE_ID)];
+}
 
 /** Add (or replace by id) a source, keeping existing order. */
 export function upsertSource(sources: TodoSource[], source: TodoSource): TodoSource[] {

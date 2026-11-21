@@ -35,7 +35,13 @@ import {
 import { ensureOffscreen, playSoundOffscreen, stopChudSongOffscreen } from './offscreen';
 import { explosionSoundDelay } from './explosionSound';
 import { dropStaleEffects, isScriptableUrl, planTabSync, tabSlotFor } from './tabs';
-import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './todos';
+import {
+  orderTodos,
+  removeSource,
+  replaceSourceTodos,
+  upsertSource,
+  withPopupTodos,
+} from './todos';
 
 const TICK_ALARM = 'barry-tick';
 const ICS_ALARM = 'barry-ics-refresh';
@@ -298,7 +304,10 @@ export function startRuntime(brain: Brain) {
     return queue.enqueue(async () => {
       const settings = await loadSettings();
       const state = await loadState();
-      const todos = orderTodos(change(state.todos, settings), settings.todoSources);
+      const todos = withPopupTodos(
+        orderTodos(change(state.todos, settings), settings.todoSources),
+        settings.popupTodos,
+      );
       await handle({ type: 'todosUpdated', now: Date.now(), todos });
     });
   }
@@ -445,6 +454,13 @@ export function startRuntime(brain: Brain) {
             });
           });
           void updateTodos((todos) => todos.filter((t) => t.sourceId !== msg.sourceId));
+          return;
+        case 'setPopupTodos':
+          void queue.enqueue(async () => {
+            const settings = await loadSettings();
+            await saveSettings({ ...settings, popupTodos: msg.todos });
+          });
+          void updateTodos((todos) => todos);
           return;
       }
       const event = popupMessageToEvent(msg, now);

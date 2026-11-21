@@ -2,7 +2,15 @@
 // stamping `now` itself, so pages and the popup never send times except where noted.
 
 import type { BarryEffect, DevCommand, TabView } from './brain';
-import type { BlocklistEntry, EatKind, Millis, ModeOverride, Position, TodoSource } from './domain';
+import type {
+  BlocklistEntry,
+  EatKind,
+  Millis,
+  ModeOverride,
+  PopupTodo,
+  Position,
+  TodoSource,
+} from './domain';
 
 /** Content script → background. The tab id comes from the message sender. */
 export type ContentMessage =
@@ -34,4 +42,6 @@ export type PopupMessage =
   | { type: 'refreshSchedule' }
   | { type: 'startPicker' }
   | { type: 'removeTodoSource'; sourceId: string }
+  /** The whole list of popup todos after an add, tick or delete. */
+  | { type: 'setPopupTodos'; todos: PopupTodo[] }
   | { type: 'dev'; command: DevCommand };
