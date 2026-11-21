@@ -16,7 +16,7 @@ import type {
   SoundId,
   TabView,
 } from '../contracts';
-import manifestJson from '../../public/assets/manifest.json';
+import manifestJson from '../assets/manifest.json';
 import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
 import { SUGGESTION_MS, formatCountdown, suggestionText } from './hud';
 import { createInputEater } from './input-eater';

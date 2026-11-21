@@ -1,5 +1,5 @@
 // Asset ids and the sprite manifest shape.
-// Real files live in public/assets/ and are described by public/assets/manifest.json.
+// Real files live in public/assets/ and are described by src/assets/manifest.json.
 // Pose → situation map: docs/implementation-plan.md (Phase 5, "Pose map"). Pure: no browser imports.
 
 export const POSES = [

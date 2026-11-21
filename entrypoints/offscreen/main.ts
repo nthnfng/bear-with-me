@@ -5,7 +5,7 @@
 // Short sounds are fetched and decoded once when the document opens and played through Web
 // Audio, so a click's chomp starts at once instead of after loading an <audio> element.
 import type { AssetManifest, SoundId } from '@/src/contracts';
-import manifestJson from '@/public/assets/manifest.json';
+import manifestJson from '@/src/assets/manifest.json';
 import { isOffscreenSound, isOffscreenStop } from '@/src/runtime/offscreen';
 
 const manifest = manifestJson as unknown as AssetManifest;
