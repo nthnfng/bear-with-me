@@ -169,7 +169,7 @@ describe('other poses', () => {
     expect(view(s, 3, t)).toMatchObject({
       pose: 'chill',
       breakEndsAt: T0 + 10 + MIN,
-      chudMeter: 0,
+      chudMeter: null,
       poseSince: T0 + 10,
     });
     expect(view(s, 2, t).pose).toBe('studious');
@@ -332,7 +332,7 @@ describe('Get up', () => {
     const s = run(snoozing(), gotUp(at), tick(at + GOT_UP_HAPPY_MS)).state;
     expect(s.chudMeter).toBeCloseTo((TIRED + 3000) / T.chudFullMs);
     const live = run(snoozing(), gotUp(at)).state;
-    expect(view(live, 1, at + 500).chudMeter).toBeCloseTo((TIRED + 3000) / T.chudFullMs);
+    expect(run(live, tick(at + 500)).state.chudMeter).toBeCloseTo((TIRED + 3000) / T.chudFullMs);
   });
   it('a laptop-sleep jump past the Snooze end ignores Get up (the Snooze already ended)', () => {
     const s = snoozing();

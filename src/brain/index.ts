@@ -620,7 +620,6 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
       showBackToIt: true,
       eatInput: true,
       pauseMedia: true,
-      chudMeter: chud > 0 ? chud : null,
     };
   }
 
@@ -659,7 +658,8 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
   }
   const chud = liveChud(state, now);
   const full = chud >= 1;
-  const shared = { ...base, chudMeter: chud };
+  // The Chud meter is shown only in the popup, never on the page.
+  const shared = base;
   switch (state.phase) {
     case 'slackPass': {
       if (state.cave) return { ...HIDDEN_VIEW, position: state.position };

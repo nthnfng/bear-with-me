@@ -83,8 +83,8 @@ describe('Chud meter fill', () => {
     const t = s.lastNow!;
     const r = run(s, tick(t + T.snoozeMs / 5)).state;
     expect(r.chudMeter).toBeCloseTo(T.snoozeMs / 5 / T.chudFullMs);
-    // live view value between events
-    expect(brain.viewFor(s, 1, t + MIN).chudMeter).toBeCloseTo(MIN / T.chudFullMs);
+    // the meter lives in the popup only, never on the page
+    expect(brain.viewFor(s, 1, t + MIN).chudMeter).toBeNull();
   });
 
   it('stops at the Snooze end and the meter carries across Lock In ending', () => {
@@ -195,7 +195,7 @@ describe('Full Chud meter', () => {
     expect(brain.viewFor(c, 1, T0)).toMatchObject({
       pose: 'chud-point',
       placement: 'face',
-      chudMeter: 1,
+      chudMeter: null,
       eatInput: true,
     });
     let r = run(working(), setChud(1), act(1), {
@@ -277,7 +277,7 @@ describe('Full Chud meter', () => {
   it('becomes chud when the meter fills during a Snooze, then the Reach returns', () => {
     let s = { ...snoozing(), chudMeter: 0.9 };
     const full = s.lastNow! + 0.1 * T.chudFullMs;
-    expect(brain.viewFor(s, 1, full).chudMeter).toBe(1);
+    expect(run(s, tick(full)).state.chudMeter).toBe(1);
     s = run(s, tick(s.snoozeEndsAt!)).state;
     expect(s.phase).toBe('reaching');
     expect(brain.viewFor(s, 1, s.lastNow!)).toMatchObject({ pose: 'chud' });

@@ -414,7 +414,7 @@ describe('Slack pass', () => {
       line: 'Okay... -_-',
       eatInput: false,
       pauseMedia: false,
-      chudMeter: 0,
+      chudMeter: null,
       breakEndsAt: T0 + 5 + SLACK,
       reach: null,
     });
@@ -448,7 +448,7 @@ describe('Slack pass', () => {
       placement: 'corner',
       eatInput: false,
       pauseMedia: false,
-      chudMeter: 0.2,
+      chudMeter: null,
     });
   });
 
@@ -629,7 +629,7 @@ describe('Snooze', () => {
       pose: 'got-owned',
       line: null,
       breakEndsAt: now + SNOOZE,
-      chudMeter: 0,
+      chudMeter: null,
       reach: null,
       eatInput: false,
     });

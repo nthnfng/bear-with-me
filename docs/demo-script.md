@@ -11,7 +11,7 @@ Timings assume the demo tuning (popup Dev panel "Demo speed" button, or `barry.d
 3. Click **Demo speed** (Lane B's button; it applies `DEMO_TUNING`). If it is missing, paste the setTuning line above into the service worker console (`chrome://extensions` -> Barry -> "service worker").
 4. Optional but recommended: also shorten the stage timings in the Dev panel fields: Warning 10 s, Reach 8 s (leave), Slack pass irrelevant (the popup presets are 1/5/10/15 min, so the 1 min preset is the shortest; talk over it, or see the 1 minute note in beat 5).
 5. Staged tabs: window 1 has a docs/work tab (for example a Google Doc) active, plus a YouTube tab with a video loaded and paused. Optionally a second Restricted tab (reddit.com) in the same window to show the Reach closing more than one.
-6. Pre-set the Chud meter so the song lands on time: in the service worker console, `barry.dev({kind:'setChudMeter', value: 0.9})`. A 20 s Snooze at 60 s full adds 0.33, so it reaches 1 about 3 s into the Snooze. (Setting the meter also makes Barry forget arrivals, so the song can play again.) The meter shows in the Confrontation as soon as it is above 0; if you do not want the audience to see 0.9 early, set it right before beat 6 instead (you cannot while a Reach is running without it showing; the popup Dev panel "Chud (0-1)" works too).
+6. Pre-set the Chud meter so the song lands on time: in the service worker console, `barry.dev({kind:'setChudMeter', value: 0.9})`. A 20 s Snooze at 60 s full adds 0.33, so it reaches 1 about 3 s into the Snooze. (Setting the meter also makes Barry forget arrivals, so the song can play again.) The meter shows only in the popup, never on the page.
 7. Todos for the free-gap line (only if you show it): `barry.todos(['Lab report'])`.
 8. Sound: unmute the laptop and the Barry mute toggle (popup). Click once on each demo tab so Chrome allows audio. Turn OS notifications and Do Not Disturb on so nothing pops over the demo.
 9. Start from a clean state: `barry.dev({kind:'reset'})` then `barry.chill()` (or `barry.auto()` with no calendar block). Reset keeps open tabs, your real calendar blocks and todos; it drops injected blocks, Fatness, the Chud meter and tuning (so apply Demo speed after the reset, then set the Chud meter).
@@ -46,7 +46,7 @@ Note: an injected block survives the 5 minute calendar refresh. Inject it with a
 
 ### 5. Slack pass (about 60 s on the shortest preset)
 - Presenter: on the YouTube tab, open the popup, click **1 min** Slack pass.
-- Barry: shrinks to the corner, `suspicious` pose, line `Okay... -_-` for 4 seconds, then lounging `chill` Barry with the clock icon, time left and the Chud bar. YouTube works normally and plays; Fatness is reset to slim.
+- Barry: shrinks to the corner, `suspicious` pose, line `Okay... -_-` for 4 seconds, then lounging `chill` Barry with the clock icon, and time left. YouTube works normally and plays; Fatness is reset to slim.
 - Sound: none.
 - Say: "I earned a break on purpose." To save stage time, talk through it and keep using the page; the countdown is visible. (Total Slack pass 60 s, then the warning.)
 
