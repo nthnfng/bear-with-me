@@ -70,7 +70,15 @@ function apply(
     case 'todosUpdated':
       return { state: event.type === 'todosUpdated' ? { ...state, todos: event.todos } : state };
     case 'scheduleUpdated':
-      return { state: { ...state, blocks: event.blocks } };
+      // The feed replaces the ICS blocks only: an injected dev block must survive the
+      // 5-minute refresh (and the refresh every worker wake does).
+      return {
+        state: {
+          ...state,
+          blocks: [...state.blocks.filter((b) => b.source === 'dev'), ...event.blocks],
+          scheduleKnown: true,
+        },
+      };
     case 'tabActivated':
       return { state: { ...state, activeTabId: event.tabId } };
     case 'tabNavigated':
@@ -97,6 +105,11 @@ function apply(
       }
       return { state };
     case 'backToIt':
+      // Only the tab Barry is confronting. A stale click (the tab navigated away, a break
+      // started, Chill) must never close a work tab.
+      if (state.phase !== 'confronting' || confrontedTab(state, event.now) !== event.tabId) {
+        return { state };
+      }
       effects.push({ type: 'explodeAndClose', tabIds: [event.tabId] });
       return { state };
     case 'modeOverrideSet':
@@ -291,9 +304,19 @@ function applyDev(
       return { state };
     }
     case 'reset':
-      // openTabs/activeTabId mirror real browser tabs, so they survive a reset.
+      // Everything the runtime feeds the brain survives (it would not be re-sent): real tabs,
+      // idle, the ICS schedule (dev blocks go) and the captured todos. Settings (blocklist,
+      // position, cave, muted, tuning) return to their defaults.
       return {
-        state: { ...initialState(), openTabs: state.openTabs, activeTabId: state.activeTabId },
+        state: {
+          ...initialState(),
+          openTabs: state.openTabs,
+          activeTabId: state.activeTabId,
+          userIdle: state.userIdle,
+          blocks: state.blocks.filter((b) => b.source !== 'dev'),
+          scheduleKnown: state.scheduleKnown,
+          todos: state.todos,
+        },
       };
   }
 }
@@ -359,6 +382,9 @@ function maybeSuggest(state: BarryState, now: Millis, effects: BarryEffect[]): B
   if (resolveMode(state, now) !== 'chill' || currentBlock(state, now) !== null || state.cave) {
     return state;
   }
+  // Fresh install: todos can load before the calendar. Without the schedule "free right now"
+  // would be a guess, so wait for the first scheduleUpdated.
+  if (!state.scheduleKnown) return state;
   const next = nextBlockStart(state, now);
   if (next !== null && next - now < state.tuning.freeGapMinMs) return state;
   const ends = state.blocks.filter((b) => !b.allDay && b.end <= now).map((b) => b.end);
@@ -415,7 +441,12 @@ function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
     event,
     effects,
   );
-  let state: BarryState = { ...applied.state, lastNow: event.now };
+  // lastNow never moves back: a clock step backwards must not make time-based growth
+  // (the Chud meter) count the same stretch twice.
+  let state: BarryState = {
+    ...applied.state,
+    lastNow: Math.max(event.now, prev.lastNow ?? event.now),
+  };
 
   // Derived: break/fight phases first, then Confrontation, then Fatness lifetime.
   state = advance(state, event.now, effects);
@@ -545,7 +576,7 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
           state.reachStartedAt === null
             ? null
             : { startedAt: state.reachStartedAt, durationMs: state.tuning.reachMs },
-        pushesLeft: state.tuning.maxPushes - state.pushes,
+        pushesLeft: Math.max(0, state.tuning.maxPushes - state.pushes),
       };
     case 'snoozing':
       return {

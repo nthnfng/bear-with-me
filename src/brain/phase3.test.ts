@@ -230,7 +230,7 @@ describe('Full Chud meter', () => {
     expect(back.state.arrivedTabs).toEqual([1]);
   });
 
-  it('forgets arrivals on tabClosed, navigating away, Slack pass, Snooze, Lock In end, reset', () => {
+  it('forgets arrivals on tabClosed, navigating away, Slack pass, Snooze, Lock In end, reset (re-arrives)', () => {
     const arrived = run(working(), act(1)).state;
     expect(arrived.arrivedTabs).toEqual([1]);
     expect(run(arrived, { type: 'tabClosed', tabId: 1, now: T0 + 1 }).state.arrivedTabs).toEqual(
@@ -243,7 +243,8 @@ describe('Full Chud meter', () => {
     const chill = run(arrived, { type: 'modeOverrideSet', override: 'chill', now: T0 + 1 });
     expect(chill.state.arrivedTabs).toEqual([]);
     const rst = run(arrived, { type: 'dev', now: T0 + 1, command: { kind: 'reset' } });
-    expect(rst.state.arrivedTabs).toEqual([]);
+    // The ICS block survives a reset, so the still-confronted tab arrives afresh (burst again).
+    expect(rst.last).toContainEqual({ type: 'playSound', tabId: 1, sound: 'burst' });
     const meter = run(arrived, setChud(1, T0 + 1));
     // setChudMeter forgets, so the still-confronted tab arrives again and sings
     expect(meter.last).toContainEqual({ type: 'playSound', tabId: 1, sound: 'chudSong' });
@@ -343,13 +344,13 @@ describe('Free-time suggestion', () => {
   });
 
   it('with no upcoming block it suggests once with freeMinutes null', () => {
-    const r = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x'));
+    const r = run(initialState(), nav(1, DOCS), act(1), sched(T0), todos(T0, 'x'));
     expect(r.last).toMatchObject([{ type: 'showSuggestion', tabId: 1, freeMinutes: null }]);
     expect(run(r.state, tick(T0 + MIN), act(1, T0 + 2 * MIN)).effects.flat()).toEqual([]);
   });
 
   it('with no next block, suggests again after a block has ended', () => {
-    const s = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x')).state;
+    const s = run(initialState(), nav(1, DOCS), act(1), sched(T0), todos(T0, 'x')).state;
     const b = block(T0 + MIN, T0 + 2 * MIN);
     const r = run(s, sched(T0 + MIN, b), tick(T0 + 2 * MIN));
     expect(r.last).toMatchObject([{ type: 'showSuggestion', freeMinutes: null }]);
@@ -380,8 +381,35 @@ describe('Free-time suggestion', () => {
     expect(uncaved.last).toMatchObject([{ type: 'showSuggestion', tabId: 1 }]);
   });
 
-  it('dev triggerFreeGap forces one', () => {
+  it('waits for the schedule: todos first on a fresh install never suggest "free right now"', () => {
+    const early = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x'), tick(T0 + MIN));
+    expect(early.effects.flat()).toEqual([]);
+    expect(early.state.scheduleKnown).toBe(false);
+    expect(early.state.lastGapSuggested).toBeNull();
+    // The schedule arrives with a block 45 min away: the suggestion carries the real gap.
+    const r = run(early.state, sched(T0 + 2 * MIN, block(T0 + 45 * MIN, T0 + 90 * MIN)));
+    expect(r.state.scheduleKnown).toBe(true);
+    expect(r.last).toMatchObject([{ type: 'showSuggestion', freeMinutes: 43 }]);
+  });
+
+  it('an empty schedule still counts as known', () => {
+    const r = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x'), sched(T0));
+    expect(r.state.scheduleKnown).toBe(true);
+    expect(r.last).toMatchObject([{ type: 'showSuggestion', freeMinutes: null }]);
+  });
+
+  it('dev triggerFreeGap forces one even before the schedule is known', () => {
     const r = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x'), {
+      type: 'dev',
+      now: T0,
+      command: { kind: 'triggerFreeGap' },
+    });
+    expect(r.state.scheduleKnown).toBe(false);
+    expect(r.last).toHaveLength(1);
+  });
+
+  it('dev triggerFreeGap forces one', () => {
+    const r = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x'), sched(T0), {
       type: 'dev',
       now: T0,
       command: { kind: 'triggerFreeGap' },
