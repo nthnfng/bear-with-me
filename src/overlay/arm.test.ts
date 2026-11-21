@@ -68,5 +68,9 @@ describe('suggestionText', () => {
       "You've got 40 free minutes. How about: Lab report?",
     );
     expect(suggestionText(1, 'x')).toContain('1 free minute.');
+    expect(suggestionText(180, 'x')).toBe("You've got 3 free hours. How about: x?");
+    expect(suggestionText(null, 'Lab report')).toBe(
+      "You're free right now. How about: Lab report?",
+    );
   });
 });

@@ -37,6 +37,7 @@ export function initialState(): BarryState {
     studyingSince: null,
     lastGapSuggested: null,
     lastNow: null,
+    arrivedTabs: [],
     position: 'right',
     cave: false,
     muted: false,
@@ -277,11 +278,14 @@ function applyDev(
     case 'setFatness':
       return { state: { ...state, fatness: Math.max(0, c.fatness) }, keepFatness: true };
     case 'setChudMeter':
-      return { state: { ...state, chudMeter: Math.min(1, Math.max(0, c.value)) } };
+      // Also forgets arrivals, so the chud song can be tested again.
+      return {
+        state: { ...state, chudMeter: Math.min(1, Math.max(0, c.value)), arrivedTabs: [] },
+      };
     case 'triggerFreeGap': {
       // Forces a suggestion now, ignoring mode, gap length and `lastGapSuggested`.
       const next = nextBlockStart(state, event.now);
-      const freeMs = next === null ? state.tuning.freeGapMinMs : next - event.now;
+      const freeMs = next === null ? null : next - event.now;
       pushSuggestion(state, freeMs, effects);
       return { state };
     }
@@ -324,44 +328,81 @@ function isStudying(state: BarryState, now: Millis): boolean {
   return !isRestricted(active, state.blocklist);
 }
 
-/** Start of the next timed Calendar block after `now`, or null. */
+/** Start of the next timed Calendar block after `now` (any day), or null. */
 function nextBlockStart(state: BarryState, now: Millis): Millis | null {
   const starts = state.blocks.filter((b) => !b.allDay && b.start > now).map((b) => b.start);
   return starts.length ? Math.min(...starts) : null;
 }
 
 /** Suggestion for the top todo on the active tab (the tab the user is looking at). */
-function pushSuggestion(state: BarryState, freeMs: Millis, effects: BarryEffect[]): boolean {
+function pushSuggestion(state: BarryState, freeMs: Millis | null, effects: BarryEffect[]): boolean {
   const todo = state.todos[0];
   if (!todo || state.activeTabId === null) return false;
   effects.push({
     type: 'showSuggestion',
     tabId: state.activeTabId,
     todo,
-    freeMinutes: Math.floor(freeMs / 60_000),
+    freeMinutes: freeMs === null ? null : Math.floor(freeMs / 60_000),
   });
   return true;
 }
 
 /**
- * Free-time suggestion: Chill, no block running, and the next block today is at least
- * freeGapMinMs away. Once per gap (`lastGapSuggested` = the gap's start: the end of the block
+ * Free-time suggestion: Chill, no block running, and the next timed block (any day) is at
+ * least freeGapMinMs away, or there is none (an open-ended gap, `freeMinutes: null`). Once per gap (`lastGapSuggested` = the gap's start: the end of the block
  * before it, or the moment of the suggestion when there is none). Not marked as suggested
  * while there is no todo, no active tab, or the cave is on, so it fires once those clear.
- * No upcoming block means no gap to fill, so no suggestion.
+ * With no next block the gap runs from the last block's end, or from the first suggestion.
  */
 function maybeSuggest(state: BarryState, now: Millis, effects: BarryEffect[]): BarryState {
   if (resolveMode(state, now) !== 'chill' || currentBlock(state, now) !== null || state.cave) {
     return state;
   }
   const next = nextBlockStart(state, now);
-  if (next === null || next - now < state.tuning.freeGapMinMs) return state;
+  if (next !== null && next - now < state.tuning.freeGapMinMs) return state;
   const ends = state.blocks.filter((b) => !b.allDay && b.end <= now).map((b) => b.end);
   const gapStart = ends.length ? Math.max(...ends) : null;
   const last = state.lastGapSuggested;
-  if (last !== null && (gapStart === null || last >= gapStart) && last < next) return state;
-  if (!pushSuggestion(state, next - now, effects)) return state;
+  if (last !== null && (gapStart === null || last >= gapStart) && (next === null || last < next)) {
+    return state;
+  }
+  if (!pushSuggestion(state, next === null ? null : next - now, effects)) return state;
   return { ...state, lastGapSuggested: gapStart ?? now };
+}
+
+/**
+ * Arrival: the first time Barry is on a Restricted tab this episode (Confrontation or Arm
+ * fight) he bursts (Confrontation only) and, with a full Chud meter, starts the chud song.
+ * Coming back to a tab in `arrivedTabs` plays nothing. The list is forgotten when a Slack
+ * pass or Snooze is running, when Lock In is not on, and for tabs that are closed or no
+ * longer Restricted (so it is empty once no Restricted tab is open).
+ */
+function arrive(state: BarryState, now: Millis, effects: BarryEffect[]): BarryState {
+  const forget =
+    resolveMode(state, now) !== 'lockIn' ||
+    state.phase === 'slackPass' ||
+    state.phase === 'snoozing';
+  const kept = forget
+    ? []
+    : state.arrivedTabs.filter((id) => isRestricted(state.openTabs[id], state.blocklist));
+  let arrived = kept;
+  const id = state.activeTabId;
+  if (
+    (state.phase === 'confronting' || state.phase === 'reaching') &&
+    id !== null &&
+    isRestricted(state.openTabs[id], state.blocklist) &&
+    !kept.includes(id)
+  ) {
+    arrived = [...kept, id];
+    if (state.phase === 'confronting')
+      effects.push({ type: 'playSound', tabId: id, sound: 'burst' });
+    if (liveChud(state, now) >= 1)
+      effects.push({ type: 'playSound', tabId: id, sound: 'chudSong' });
+  }
+  return arrived.length === state.arrivedTabs.length &&
+    arrived.every((t, i) => t === state.arrivedTabs[i])
+    ? state
+    : { ...state, arrivedTabs: arrived };
 }
 
 function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
@@ -380,10 +421,6 @@ function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
   if (state.phase === 'clear' || state.phase === 'confronting') {
     const tab = confrontedTab(state, event.now);
     state = { ...state, phase: tab === null ? 'clear' : 'confronting' };
-    const prevTab = prev.phase === 'confronting' ? prev.activeTabId : null;
-    if (tab !== null && tab !== prevTab) {
-      effects.push({ type: 'playSound', tabId: tab, sound: 'burst' });
-    }
   }
   // Fatness resets only when no Restricted tab is open anywhere.
   if (!applied.keepFatness && state.fatness !== 0 && !anyRestrictedOpen(state)) {
@@ -401,6 +438,8 @@ function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
       state = { ...state, chudMeter: 0 };
     }
   }
+  state = arrive(state, event.now, effects);
+
   const studying = isStudying(state, event.now);
   state = { ...state, studyingSince: studying ? (prev.studyingSince ?? event.now) : null };
 
@@ -433,7 +472,6 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
       eatInput: true,
       pauseMedia: true,
       chudMeter: chud > 0 ? chud : null,
-      singChud: full && !state.muted,
     };
   }
 
@@ -500,7 +538,7 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
     case 'reaching':
       return {
         ...shared,
-        ...(full ? { pose: 'chud' as const, singChud: !state.muted } : {}),
+        ...(full ? { pose: 'chud' as const } : {}),
         line: reachLine,
         reach:
           state.reachStartedAt === null

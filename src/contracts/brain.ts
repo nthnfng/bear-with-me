@@ -69,6 +69,12 @@ export interface BarryState {
   lastGapSuggested: Millis | null;
   /** `now` of the last processed event; time-based growth integrates from here. */
   lastNow: Millis | null;
+  /**
+   * Restricted tabs Barry has already arrived on this episode (burst, and the chud song when the
+   * Chud meter is full). Coming back to one plays nothing. Clears when a break starts, Lock In
+   * ends, or no Restricted tab is open anywhere.
+   */
+  arrivedTabs: TabId[];
 
   position: Position;
   cave: boolean;
@@ -114,7 +120,8 @@ export type BarryEffect =
   /** Explosion on each tab, then close them. */
   | { type: 'explodeAndClose'; tabIds: TabId[] }
   /** Shown as a speech bubble from chill Barry in his corner. */
-  | { type: 'showSuggestion'; tabId: TabId; todo: Todo; freeMinutes: number }
+  /** freeMinutes is null when no block is coming up (an open-ended gap). */
+  | { type: 'showSuggestion'; tabId: TabId; todo: Todo; freeMinutes: number | null }
   | { type: 'setBadge'; pose: PoseId; text: string };
 
 export interface ReduceResult {
@@ -146,8 +153,6 @@ export interface TabView {
   /** The arm stretching out of corner Barry. Progress = (now - startedAt) / durationMs. Null = no arm. */
   reach: { startedAt: Millis; durationMs: number } | null;
   pushesLeft: number | null;
-  /** Play the chud song once when this view first appears. */
-  singChud: boolean;
 }
 
 export const HIDDEN_VIEW: TabView = {
@@ -164,7 +169,6 @@ export const HIDDEN_VIEW: TabView = {
   breakEndsAt: null,
   reach: null,
   pushesLeft: null,
-  singChud: false,
 };
 
 /** The brain's public surface. Implemented in src/brain (Workstream A). */

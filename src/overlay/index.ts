@@ -111,8 +111,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     suggestTimer = setTimeout(hideSuggestion, SUGGESTION_MS);
   }
 
-  // Chud song: once per arrival (singChud rising edge), not per view push.
-  let singing = false;
+  // Chud song: started by a playSound effect once per arrival; it outlives view changes and tab switches.
   let chudAudio: HTMLAudioElement | null = null;
 
   let spriteKey = '';
@@ -267,8 +266,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     }
     syncCountdown(view);
     syncArm(view);
-    if (view.singChud && !singing) playChudSong();
-    singing = view.singChud;
     // A suggestion belongs to chill Barry; any other pose or a hidden tab drops it.
     if (!view.visible || view.pose !== 'chill') hideSuggestion();
     else if (suggestion !== null) suggestEl.hidden = false;
@@ -299,7 +296,11 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     const variants = manifest.sounds.chudSong;
     const file = variants[Math.floor(Math.random() * variants.length)]!;
     try {
-      chudAudio?.pause();
+      if (chudAudio && !chudAudio.ended) {
+        // Already singing: keep it going, never restart.
+        if (chudAudio.paused) chudAudio.play().catch(() => flash(SOUND_FLASH.chudSong));
+        return;
+      }
       chudAudio = new Audio(assetUrl(file));
       chudAudio.play().catch(() => flash(SOUND_FLASH.chudSong));
     } catch {
@@ -324,9 +325,8 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     playEffect(effect) {
       switch (effect.type) {
         case 'playSound':
-          // The chud song is driven by view.singChud; ignore a duplicate effect while singing.
-          if (effect.sound === 'chudSong' && singing) break;
-          playSound(effect.sound);
+          if (effect.sound === 'chudSong') playChudSong();
+          else playSound(effect.sound);
           break;
         case 'explodeAndClose':
           explode();

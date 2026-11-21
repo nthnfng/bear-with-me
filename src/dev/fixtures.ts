@@ -70,7 +70,6 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
       pose: 'chud',
       line: "I'm a chud 🎵",
       chudMeter: 1,
-      singChud: true,
     },
   };
 }

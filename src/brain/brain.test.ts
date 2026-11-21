@@ -43,6 +43,9 @@ describe('Confrontation arrival', () => {
     expect(r.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'burst' }]);
     const again = run(r.state, { type: 'tick', now: T0 + 1 });
     expect(again.last).toEqual([]);
+    // switching away and back does not burst again
+    const back = run(r.state, nav(2, DOCS), act(2, T0 + 1), act(1, T0 + 2));
+    expect(back.effects.flat()).toEqual([]);
   });
 
   it('confronts on navigating the active tab to a Restricted site', () => {

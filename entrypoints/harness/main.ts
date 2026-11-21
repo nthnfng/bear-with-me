@@ -136,8 +136,8 @@ document.getElementById('picker')!.onclick = () =>
     onSaved: (source) =>
       send({ type: 'todosCaptured', sourceId: source.id, items: readSource(source) }),
   });
-// Re-pushing the same chud view must not replay the song; hide first to reset the edge.
+// The song starts once per arrival; pressing again while it plays must not restart it.
 document.getElementById('chudsong')!.onclick = () => {
-  renderNow('hidden');
   renderNow('chudFull');
+  overlay.playEffect({ type: 'playSound', tabId: 0, sound: 'chudSong' });
 };

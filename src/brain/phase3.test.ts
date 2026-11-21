@@ -186,12 +186,11 @@ describe('Studying and Locking back in', () => {
 });
 
 describe('Full Chud meter', () => {
-  it('uses chud pose and singChud in a Confrontation and the Arm fight', () => {
+  it('uses chud pose in a Confrontation and the Arm fight', () => {
     const c = run(working(), setChud(1), act(1)).state;
     expect(brain.viewFor(c, 1, T0)).toMatchObject({
       pose: 'chud',
       placement: 'face',
-      singChud: true,
       chudMeter: 1,
       eatInput: true,
     });
@@ -204,17 +203,62 @@ describe('Full Chud meter', () => {
     expect(r.phase).toBe('reaching');
     expect(brain.viewFor(r, 1, T0 + MIN + T.warningMs)).toMatchObject({
       pose: 'chud',
-      singChud: true,
     });
     // the warning is not an Arm fight
     expect(brain.viewFor(r, 1, T0).pose).toBeDefined();
   });
 
   it('is not chud below full, and muted silences the song', () => {
-    const c = run(working(), setChud(0.99), act(1)).state;
-    expect(brain.viewFor(c, 1, T0)).toMatchObject({ pose: 'confrontation', singChud: false });
-    const m = run(working(), setChud(1), act(1), { type: 'mutedSet', muted: true, now: T0 }).state;
-    expect(brain.viewFor(m, 1, T0)).toMatchObject({ pose: 'chud', singChud: false });
+    const c = run(working(), setChud(0.99), act(1));
+    expect(brain.viewFor(c.state, 1, T0)).toMatchObject({ pose: 'confrontation' });
+    expect(c.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'burst' }]);
+    const m = run(working(), setChud(1), { type: 'mutedSet', muted: true, now: T0 }, act(1));
+    expect(brain.viewFor(m.state, 1, T0)).toMatchObject({ pose: 'chud' });
+    expect(m.last).toEqual([]);
+  });
+
+  it('emits chudSong with the burst on arrival, once per tab', () => {
+    const r = run(working(), setChud(1), act(1));
+    expect(r.last).toEqual([
+      { type: 'playSound', tabId: 1, sound: 'burst' },
+      { type: 'playSound', tabId: 1, sound: 'chudSong' },
+    ]);
+    expect(r.state.arrivedTabs).toEqual([1]);
+    // away and back: nothing replays
+    const back = run(r.state, act(2, T0 + 1), act(1, T0 + 2));
+    expect(back.effects.flat()).toEqual([]);
+    expect(back.state.arrivedTabs).toEqual([1]);
+  });
+
+  it('forgets arrivals on tabClosed, navigating away, Slack pass, Snooze, Lock In end, reset', () => {
+    const arrived = run(working(), act(1)).state;
+    expect(arrived.arrivedTabs).toEqual([1]);
+    expect(run(arrived, { type: 'tabClosed', tabId: 1, now: T0 + 1 }).state.arrivedTabs).toEqual(
+      [],
+    );
+    expect(run(arrived, nav(1, DOCS, T0 + 1)).state.arrivedTabs).toEqual([]);
+    const slack = run(arrived, { type: 'slackPassStarted', durationMs: MIN, now: T0 + 1 });
+    expect(slack.state.arrivedTabs).toEqual([]);
+    expect(snoozing().arrivedTabs).toEqual([]);
+    const chill = run(arrived, { type: 'modeOverrideSet', override: 'chill', now: T0 + 1 });
+    expect(chill.state.arrivedTabs).toEqual([]);
+    const rst = run(arrived, { type: 'dev', now: T0 + 1, command: { kind: 'reset' } });
+    expect(rst.state.arrivedTabs).toEqual([]);
+    const meter = run(arrived, setChud(1, T0 + 1));
+    // setChudMeter forgets, so the still-confronted tab arrives again and sings
+    expect(meter.last).toContainEqual({ type: 'playSound', tabId: 1, sound: 'chudSong' });
+  });
+
+  it('the Arm fight starts the song (no burst) when the meter is full', () => {
+    let r = run(working(), setChud(1), act(1), {
+      type: 'slackPassStarted',
+      durationMs: MIN,
+      now: T0,
+    });
+    const at = T0 + MIN + T.warningMs;
+    r = run(r.state, tick(at));
+    expect(r.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'chudSong' }]);
+    expect(run(r.state, act(2, at + 1), act(1, at + 2)).effects.flat()).toEqual([]);
   });
 
   it('ends when the user Locks back in', () => {
@@ -222,7 +266,6 @@ describe('Full Chud meter', () => {
     s = run(s, tick(T0 + T.lockBackInMs), act(1, T0 + T.lockBackInMs)).state;
     expect(brain.viewFor(s, 1, T0 + T.lockBackInMs)).toMatchObject({
       pose: 'confrontation',
-      singChud: false,
     });
   });
 
@@ -232,7 +275,7 @@ describe('Full Chud meter', () => {
     expect(brain.viewFor(s, 1, full).chudMeter).toBe(1);
     s = run(s, tick(s.snoozeEndsAt!)).state;
     expect(s.phase).toBe('reaching');
-    expect(brain.viewFor(s, 1, s.lastNow!)).toMatchObject({ pose: 'chud', singChud: true });
+    expect(brain.viewFor(s, 1, s.lastNow!)).toMatchObject({ pose: 'chud' });
   });
 });
 
@@ -244,8 +287,8 @@ describe('Free-time suggestion', () => {
       initialState(),
       nav(1, DOCS),
       act(1),
-      todos(T0, 'Lab report', 'Laundry'),
       sched(T0, block(T0 - 60 * MIN, gapStart), block(nextStart, nextStart + 60 * MIN)),
+      todos(T0, 'Lab report', 'Laundry'),
       ...extra,
     );
 
@@ -299,9 +342,29 @@ describe('Free-time suggestion', () => {
     expect(lock.effects.flat()).toEqual([]);
   });
 
-  it('with no upcoming block there is nothing to fill: no suggestion', () => {
-    const r = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x'), tick(T0 + MIN));
-    expect(r.effects.flat()).toEqual([]);
+  it('with no upcoming block it suggests once with freeMinutes null', () => {
+    const r = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x'));
+    expect(r.last).toMatchObject([{ type: 'showSuggestion', tabId: 1, freeMinutes: null }]);
+    expect(run(r.state, tick(T0 + MIN), act(1, T0 + 2 * MIN)).effects.flat()).toEqual([]);
+  });
+
+  it('with no next block, suggests again after a block has ended', () => {
+    const s = run(initialState(), nav(1, DOCS), act(1), todos(T0, 'x')).state;
+    const b = block(T0 + MIN, T0 + 2 * MIN);
+    const r = run(s, sched(T0 + MIN, b), tick(T0 + 2 * MIN));
+    expect(r.last).toMatchObject([{ type: 'showSuggestion', freeMinutes: null }]);
+    expect(run(r.state, tick(T0 + 3 * MIN)).last).toEqual([]);
+  });
+
+  it('counts a block on a later day as the next block', () => {
+    const r = run(
+      initialState(),
+      nav(1, DOCS),
+      act(1),
+      sched(T0, block(T0 + 30 * 60 * MIN, T0 + 31 * 60 * MIN)),
+      todos(T0, 'x'),
+    );
+    expect(r.last).toMatchObject([{ freeMinutes: 1800 }]);
   });
 
   it('waits (without using up the gap) for a todo, an active tab, and no cave', () => {
@@ -324,7 +387,7 @@ describe('Free-time suggestion', () => {
       command: { kind: 'triggerFreeGap' },
     });
     expect(r.last).toEqual([
-      { type: 'showSuggestion', tabId: 1, todo: { text: 'x', sourceId: 's' }, freeMinutes: 20 },
+      { type: 'showSuggestion', tabId: 1, todo: { text: 'x', sourceId: 's' }, freeMinutes: null },
     ]);
   });
 });
