@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BarryEvent, BarryState, TabId } from '../contracts';
-import { brain, initialState } from '.';
+import { OKAY_MS, brain, initialState } from '.';
 
 const YT = 'https://www.youtube.com/watch?v=1';
 const DOCS = 'https://docs.google.com/';
@@ -357,5 +357,378 @@ describe('nextDeadline', () => {
     expect(at([blk(0, 1000, true)], 50)).toBeNull();
     expect(at([blk(0, 100)], 50, 'chill')).toBeNull();
     expect(brain.nextDeadline(initialState())).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------- Phase 2
+const tickAt = (now: number): BarryEvent => ({ type: 'tick', now });
+const slack = (durationMs: number, now = T0): BarryEvent => ({
+  type: 'slackPassStarted',
+  durationMs,
+  now,
+});
+const push = (tabId: TabId, now: number): BarryEvent => ({ type: 'pushed', tabId, now });
+const tune = (tuning: Partial<BarryState['tuning']>, now = T0): BarryEvent => ({
+  type: 'dev',
+  now,
+  command: { kind: 'setTuning', tuning },
+});
+const SLACK = 10_000;
+const WARN = 5_000;
+const REACH = 8_000;
+const SNOOZE = 300_000;
+
+/** Lock In for a long time, YouTube (1) active and a Reddit tab (2) open, short test timings. */
+function lockedIn() {
+  return run(
+    initialState(),
+    { type: 'modeOverrideSet', override: 'lockIn', now: T0 },
+    tune({ warningMs: WARN, reachMs: REACH, snoozeMs: SNOOZE, maxPushes: 5 }),
+    nav(1, YT),
+    nav(2, 'https://reddit.com/'),
+    act(1),
+  ).state;
+}
+/** Slack pass started from the Confrontation, then ticked into the Reach. */
+function reaching(extra: BarryEvent[] = []) {
+  return run(lockedIn(), slack(SLACK), ...extra, tickAt(T0 + SLACK + WARN)).state;
+}
+
+describe('Slack pass', () => {
+  it('is ignored in Chill and while a break is running', () => {
+    const chill = run(initialState(), nav(1, YT), act(1), slack(SLACK)).state;
+    expect(chill.phase).toBe('clear');
+    expect(chill.slackPassEndsAt).toBeNull();
+    const s = run(lockedIn(), slack(SLACK), slack(99_999, T0 + 1)).state;
+    expect(s.slackPassEndsAt).toBe(T0 + SLACK);
+  });
+
+  it('from a Confrontation: okay pose, Fatness reset, corner, countdown, nothing eaten', () => {
+    const s = run(lockedIn(), eat(1), eat(1), { ...slack(SLACK), now: T0 + 5 }).state;
+    expect(s.phase).toBe('slackPass');
+    expect(s.fatness).toBe(0);
+    expect(s.slackPassEndsAt).toBe(T0 + 5 + SLACK);
+    expect(brain.viewFor(s, 1, T0 + 5)).toMatchObject({
+      visible: true,
+      placement: 'corner',
+      pose: 'okay',
+      line: 'Okay... -_-',
+      eatInput: false,
+      pauseMedia: false,
+      chudMeter: 0,
+      breakEndsAt: T0 + 5 + SLACK,
+      reach: null,
+      scale: 1,
+    });
+    // eating does nothing now
+    expect(run(s, eat(1)).state.fatness).toBe(0);
+  });
+
+  it('okay lingers OKAY_MS on the interrupted tab only, then studious', () => {
+    const s = run(lockedIn(), slack(SLACK)).state;
+    expect(brain.viewFor(s, 1, T0 + OKAY_MS - 1).pose).toBe('okay');
+    const later = brain.viewFor(s, 1, T0 + OKAY_MS);
+    expect(later).toMatchObject({ pose: 'studious', line: null, breakEndsAt: T0 + SLACK });
+    expect(brain.viewFor(s, 2, T0).pose).toBe('studious');
+  });
+
+  it('from clear (no Confrontation) is studious, no okay line', () => {
+    const s = run(lockedIn(), act(null), slack(SLACK)).state;
+    expect(s.phase).toBe('slackPass');
+    expect(brain.viewFor(s, 1, T0)).toMatchObject({ pose: 'studious', line: null });
+  });
+
+  it('opening/activating a Restricted tab does not confront; shows chud meter', () => {
+    let s = run(lockedIn(), slack(SLACK), {
+      type: 'dev',
+      now: T0,
+      command: { kind: 'setChudMeter', value: 0.2 },
+    }).state;
+    s = run(s, nav(3, YT), act(3), tickAt(T0 + 5000)).state;
+    expect(s.phase).toBe('slackPass');
+    expect(brain.viewFor(s, 3, T0 + 5000)).toMatchObject({
+      placement: 'corner',
+      eatInput: false,
+      pauseMedia: false,
+      chudMeter: 0.2,
+    });
+  });
+
+  it('non-Restricted tabs show plain studious Barry (no countdown)', () => {
+    const s = run(lockedIn(), nav(3, DOCS), slack(SLACK)).state;
+    expect(brain.viewFor(s, 3, T0)).toMatchObject({
+      pose: 'studious',
+      breakEndsAt: null,
+      chudMeter: null,
+      reach: null,
+    });
+  });
+});
+
+describe('warning and Reach', () => {
+  it('slack pass end -> warning with deadline-based end', () => {
+    const s = run(lockedIn(), slack(SLACK), tickAt(T0 + SLACK + 1000)).state;
+    expect(s.phase).toBe('warning');
+    expect(s.warningEndsAt).toBe(T0 + SLACK + WARN);
+    expect(s.slackPassEndsAt).toBeNull();
+    expect(brain.viewFor(s, 1, T0 + SLACK + 1000)).toMatchObject({
+      line: 'Wrapping up?',
+      breakEndsAt: T0 + SLACK + WARN,
+      eatInput: false,
+      pauseMedia: false,
+    });
+  });
+
+  it('warning end -> reaching, reachStartedAt = the deadline', () => {
+    const s = run(lockedIn(), slack(SLACK), tickAt(T0 + SLACK + WARN + 700)).state;
+    expect(s.phase).toBe('reaching');
+    expect(s.reachStartedAt).toBe(T0 + SLACK + WARN);
+  });
+
+  it('one very late tick jumps slack pass, warning and still lands correctly', () => {
+    const s = run(lockedIn(), slack(SLACK), tickAt(T0 + SLACK + WARN + 3000)).state;
+    expect(s.phase).toBe('reaching');
+    expect(s.reachStartedAt).toBe(T0 + SLACK + WARN);
+    const way = run(lockedIn(), slack(SLACK), tickAt(T0 + SLACK + WARN + REACH + 1));
+    expect(way.state.phase).toBe('clear');
+    expect(way.last).toEqual([{ type: 'explodeAndClose', tabIds: [1, 2] }]);
+  });
+
+  it('every Restricted tab shows the same arm; page works; non-Restricted does not', () => {
+    const s = run(reaching(), nav(3, DOCS)).state;
+    const start = T0 + SLACK + WARN;
+    const want = {
+      pose: 'studious',
+      placement: 'corner',
+      line: 'Closing restricted tabs 💣',
+      reach: { startedAt: start, durationMs: REACH },
+      pushesLeft: 5,
+      eatInput: false,
+      pauseMedia: false,
+    };
+    expect(brain.viewFor(s, 1, start + 10)).toMatchObject(want);
+    expect(brain.viewFor(s, 2, start + 10)).toMatchObject(want);
+    expect(brain.viewFor(s, 3, start + 10)).toMatchObject({
+      reach: null,
+      pushesLeft: null,
+      line: null,
+    });
+  });
+
+  it('opening a Restricted tab during the fight does not confront', () => {
+    const s = run(reaching(), nav(3, YT), act(3)).state;
+    expect(s.phase).toBe('reaching');
+  });
+
+  it('warning ending with no Restricted tab open goes back to clear', () => {
+    const s = run(
+      lockedIn(),
+      slack(SLACK),
+      { type: 'tabClosed', tabId: 1, now: T0 + 1 },
+      { type: 'tabClosed', tabId: 2, now: T0 + 2 },
+      tickAt(T0 + SLACK + 1),
+    ).state;
+    expect(s.phase).toBe('warning'); // still warns
+    const done = run(s, tickAt(T0 + SLACK + WARN));
+    expect(done.state.phase).toBe('clear');
+    expect(done.last).toEqual([]);
+    expect(done.state.warningEndsAt).toBeNull();
+  });
+
+  it('user closing every Restricted tab mid-Reach ends the fight', () => {
+    const s = run(
+      reaching([push(1, T0 + SLACK + WARN + 1)]),
+      { type: 'tabClosed', tabId: 1, now: T0 + SLACK + WARN + 2 },
+      { type: 'tabClosed', tabId: 2, now: T0 + SLACK + WARN + 3 },
+    ).state;
+    expect(s.phase).toBe('clear');
+    expect(s.pushes).toBe(0);
+  });
+});
+
+describe('Push and landing', () => {
+  const t1 = T0 + SLACK + WARN + 1000;
+
+  it('Push: punch on that tab, restarts the Reach, counts down', () => {
+    const r = run(reaching(), push(2, t1));
+    expect(r.last).toEqual([{ type: 'playSound', tabId: 2, sound: 'punch' }]);
+    expect(r.state.pushes).toBe(1);
+    expect(r.state.reachStartedAt).toBe(t1);
+    expect(brain.viewFor(r.state, 1, t1)).toMatchObject({
+      reach: { startedAt: t1, durationMs: REACH },
+      pushesLeft: 4,
+    });
+  });
+
+  it('Push is ignored outside the Reach and after it ran out', () => {
+    expect(run(lockedIn(), push(1, T0 + 1)).state.pushes).toBe(0);
+    const late = T0 + SLACK + WARN + REACH;
+    const r = run(reaching(), push(1, late));
+    expect(r.state.pushes).toBe(0);
+    expect(r.state.phase).toBe('clear'); // landed by timeout
+  });
+
+  it('stale reachLanded is ignored; matching one explodes every Restricted tab', () => {
+    const start = T0 + SLACK + WARN;
+    const s = run(reaching(), push(1, t1)).state;
+    const stale = run(s, { type: 'reachLanded', tabId: 1, reachStartedAt: start, now: t1 + 5 });
+    expect(stale.state.phase).toBe('reaching');
+    expect(stale.last).toEqual([]);
+    const ok = run(s, nav(3, DOCS), {
+      type: 'reachLanded',
+      tabId: 1,
+      reachStartedAt: t1,
+      now: t1 + REACH,
+    });
+    expect(ok.last).toEqual([{ type: 'explodeAndClose', tabIds: [1, 2] }]);
+    expect(ok.state).toMatchObject({
+      phase: 'clear',
+      pushes: 0,
+      fatness: 0,
+      reachStartedAt: null,
+      warningEndsAt: null,
+      slackPassEndsAt: null,
+      snoozeEndsAt: null,
+    });
+    expect(ok.state.openTabs).toEqual({ 3: DOCS });
+    // a second report does nothing
+    expect(
+      run(ok.state, { type: 'reachLanded', tabId: 2, reachStartedAt: t1, now: t1 + REACH + 1 })
+        .last,
+    ).toEqual([]);
+  });
+
+  it('a tick past the Reach end lands it without the overlay', () => {
+    const t = T0 + SLACK + WARN + REACH;
+    const r = run(reaching(), tickAt(t - 1), tickAt(t));
+    expect(r.effects[0]).toEqual([]);
+    expect(r.last).toEqual([{ type: 'explodeAndClose', tabIds: [1, 2] }]);
+    expect(r.state.phase).toBe('clear');
+  });
+
+  it('muted suppresses punch/ow but not explosion', () => {
+    const m = { type: 'mutedSet', muted: true, now: T0 } as const;
+    const s = reaching([m]);
+    expect(run(s, push(1, t1)).last).toEqual([]);
+    expect(
+      run(s, { type: 'reachLanded', tabId: 1, reachStartedAt: T0 + SLACK + WARN, now: t1 }).last,
+    ).toHaveLength(1);
+  });
+});
+
+describe('Snooze', () => {
+  it('5th Push: ow only, beaten corner view with line, pushes reset', () => {
+    let s = reaching();
+    let now = T0 + SLACK + WARN;
+    for (let i = 0; i < 4; i++) s = run(s, push(1, (now += 100))).state;
+    expect(s.pushes).toBe(4);
+    expect(brain.viewFor(s, 1, now).pushesLeft).toBe(1);
+    const r = run(s, push(1, (now += 100)));
+    expect(r.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'ow' }]);
+    expect(r.state).toMatchObject({ phase: 'snoozing', pushes: 0, snoozeEndsAt: now + SNOOZE });
+    expect(brain.viewFor(r.state, 2, now)).toMatchObject({
+      placement: 'corner',
+      pose: 'beaten',
+      line: "Ow... T-T my hand hurts so I'll leave you alone for 5 minutes...",
+      breakEndsAt: now + SNOOZE,
+      chudMeter: 0,
+      reach: null,
+      eatInput: false,
+    });
+    // opening a Restricted tab during the Snooze does not confront
+    expect(run(r.state, nav(3, YT), act(3)).state.phase).toBe('snoozing');
+  });
+
+  it('line uses the tuned length', () => {
+    const s = run(
+      reaching(),
+      tune({ snoozeMs: 10_000, maxPushes: 1 }),
+      push(1, T0 + SLACK + WARN + 1),
+    ).state;
+    expect(brain.viewFor(s, 1, T0).line).toContain('10 seconds');
+  });
+
+  it('Snooze end restarts the Reach immediately, no warning, from the deadline', () => {
+    let s = run(reaching(), tune({ maxPushes: 1 }), push(1, T0 + SLACK + WARN + 1)).state;
+    expect(s.phase).toBe('snoozing');
+    const end = s.snoozeEndsAt!;
+    s = run(s, tickAt(end - 1)).state;
+    expect(s.phase).toBe('snoozing');
+    s = run(s, tickAt(end + 2000)).state;
+    expect(s).toMatchObject({
+      phase: 'reaching',
+      reachStartedAt: end,
+      snoozeEndsAt: null,
+      pushes: 0,
+    });
+    expect(brain.viewFor(s, 1, end + 2000).pushesLeft).toBe(1);
+  });
+});
+
+describe('Lock In ending mid-break', () => {
+  it.each([
+    ['slackPass', (s: BarryState) => s],
+    ['warning', (s: BarryState) => run(s, tickAt(T0 + SLACK)).state],
+    ['reaching', (s: BarryState) => run(s, tickAt(T0 + SLACK + WARN)).state],
+  ])('override to Chill during %s drops everything, keeps chud meter', (_n, to) => {
+    const base = run(
+      lockedIn(),
+      { type: 'dev', now: T0, command: { kind: 'setChudMeter', value: 0.4 } },
+      slack(SLACK),
+    ).state;
+    const s = to(base);
+    const r = run(s, { type: 'modeOverrideSet', override: 'chill', now: T0 + SLACK + WARN + 1 });
+    expect(r.state).toMatchObject({
+      phase: 'clear',
+      slackPassEndsAt: null,
+      warningEndsAt: null,
+      reachStartedAt: null,
+      snoozeEndsAt: null,
+      pushes: 0,
+      chudMeter: 0.4,
+    });
+    expect(r.last).toEqual([]);
+  });
+
+  it('block ending ends a Snooze too', () => {
+    let s = run(
+      initialState(),
+      tune({ warningMs: WARN, reachMs: REACH, maxPushes: 1 }),
+      inject(),
+      nav(1, YT),
+      act(1),
+      slack(1000),
+      tickAt(T0 + 1000 + WARN),
+      push(1, T0 + 1000 + WARN + 1),
+    ).state;
+    expect(s.phase).toBe('snoozing');
+    s = run(s, tickAt(T0 + 60_000)).state;
+    expect(s.phase).toBe('clear');
+    expect(s.snoozeEndsAt).toBeNull();
+  });
+});
+
+describe('nextDeadline (Phase 2)', () => {
+  it('tracks slack pass, warning, reach and snooze ends', () => {
+    let s = run(lockedIn(), slack(SLACK)).state;
+    expect(brain.nextDeadline(s)).toBe(T0 + SLACK);
+    s = run(s, tickAt(T0 + SLACK)).state;
+    expect(brain.nextDeadline(s)).toBe(T0 + SLACK + WARN);
+    s = run(s, tickAt(T0 + SLACK + WARN)).state;
+    expect(brain.nextDeadline(s)).toBe(T0 + SLACK + WARN + REACH);
+    s = run(s, tune({ maxPushes: 1 }), push(1, T0 + SLACK + WARN + 5)).state;
+    expect(brain.nextDeadline(s)).toBe(T0 + SLACK + WARN + 5 + SNOOZE);
+  });
+
+  it('is the earlier of a break deadline and a block boundary', () => {
+    const s = run(initialState(), inject(), nav(1, YT), act(1), slack(100_000)).state;
+    expect(brain.nextDeadline(s)).toBe(T0 + 60_000); // block ends first
+  });
+});
+
+describe('setTuning during timers', () => {
+  it('applies from the next transition', () => {
+    const s = run(lockedIn(), slack(SLACK), tune({ warningMs: 1000 })).state;
+    expect(run(s, tickAt(T0 + SLACK)).state.warningEndsAt).toBe(T0 + SLACK + 1000);
   });
 });
