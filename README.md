@@ -41,3 +41,8 @@ To load it into your normal Chrome instead: `npm run build`, then go to `chrome:
 | `public/assets/` | G | Sprites, explosion GIF, sounds, `manifest.json`. |
 | `src/dev/` | all | Fixture TabViews for building the overlay and popup without the brain. |
 | `entrypoints/` | | WXT entrypoints; keep them thin and delegate to `src/`. |
+
+## Pixel-art Animations
+
+- **Docs and map:** [ANIMATIONS.md](ANIMATIONS.md)
+- **Try it:** open `demo/index.html` in Chrome
