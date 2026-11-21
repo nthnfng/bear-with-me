@@ -52,6 +52,10 @@ Everything stays on your machine in `chrome.storage.local`. There are no servers
 
 ## Dev panel and console hooks
 
+### The popup
+
+The header shows pixel-art Barry in whatever pose he has right now (sipping, studying, fat, tired...) next to his picture. While a Snooze has Barry sitting tired, a **Get up** button appears; it ends the Snooze early (one happy jump, then the Arm comes back). The Chud meter is a pixel bar that fills orange in 10 steps. In **Barry**, the cave is a small scene: **Send Barry back** hops him into the cave and hides him while he's calm, **Let Barry out** hops him back. Restricted tabs exploding now play an explosion sound (silent when muted).
+
 Click Barry's picture in the popup 5 times to unlock the Dev panel (stays unlocked): inject a fake calendar block, **Demo speed** / **Normal speed** buttons, tuning fields, set Fatness and the Chud meter, reset Barry.
 
 In the service worker console (`chrome://extensions` > Barry > "service worker"):
@@ -95,3 +99,8 @@ Barry cannot appear on `chrome://` pages, the Chrome Web Store, `file://` pages 
 | `public/assets/` | G | Sprites, explosion GIF, sounds, `manifest.json`. |
 | `src/dev/` | all | Fixture TabViews for building the overlay and popup without the brain. |
 | `entrypoints/` | | WXT entrypoints; keep them thin and delegate to `src/`. |
+
+## Pixel-art Animations
+
+- **Docs and map:** [ANIMATIONS.md](ANIMATIONS.md)
+- **Try it:** open `demo/index.html` in Chrome

@@ -17,6 +17,8 @@ export function contentMessageToEvent(
       return { type: 'pushed', now, tabId };
     case 'reachLanded':
       return { type: 'reachLanded', now, tabId, reachStartedAt: msg.reachStartedAt };
+    case 'gotUp':
+      return { type: 'gotUp', now };
     // 'hello' is answered with a view by the runtime; picker messages are TODO Phase 3.
     default:
       return null;
@@ -31,6 +33,8 @@ export function popupMessageToEvent(msg: PopupMessage, now: Millis): BarryEvent 
       return { type: 'modeOverrideSet', now, override: msg.override };
     case 'startSlackPass':
       return { type: 'slackPassStarted', now, durationMs: msg.durationMs };
+    case 'gotUp':
+      return { type: 'gotUp', now };
     case 'setCave':
       return { type: 'caveSet', now, cave: msg.cave };
     case 'setPosition':
@@ -56,6 +60,7 @@ const POPUP_TYPES = new Set([
   'refreshSchedule',
   'startPicker',
   'removeTodoSource',
+  'gotUp', // also sent by content scripts (tired Barry); both map to the same event
   'dev',
 ]);
 

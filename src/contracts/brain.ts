@@ -54,7 +54,19 @@ export interface BarryState {
   okayStartedAt: Millis | null;
   /** End of the running Snooze ('snoozing' phase). */
   snoozeEndsAt: Millis | null;
+  /** Start of the running Snooze. Its stages (knocked down, getting up, "ow", ..., tired) are timed from it. */
+  snoozeStartedAt: Millis | null;
+  /** When the user clicked tired Barry (Get up). The Snooze then ends after a short happy jump. */
+  gotUpAt: Millis | null;
   warningEndsAt: Millis | null;
+  /** When the current warning began (stable under retuning); null outside a warning. */
+  warningStartedAt: Millis | null;
+  /** Start of the running Slack pass ('slackPass' phase). Chill Barry's pose run starts here. */
+  slackPassStartedAt: Millis | null;
+  /** When the current Confrontation pose (Fatness tier or chud-point) began; shared start for its poseSince. */
+  confrontSince: Millis | null;
+  /** Start of the current Arm fight run (not reset by a Push), so the Reach pose isn't restarted by each Push. */
+  fightStartedAt: Millis | null;
   /** One shared start time so the Reach is in sync on every tab. */
   reachStartedAt: Millis | null;
   /** Pushes in the current Arm fight. Resets when a Snooze is won. */
@@ -109,6 +121,8 @@ export type BarryEvent =
   | Ev<'pushed', { tabId: TabId }>
   /** Sent by the overlay; ignored if `reachStartedAt` is stale (a Push restarted it). */
   | Ev<'reachLanded', { tabId: TabId; reachStartedAt: Millis }>
+  /** Get up: the user clicked tired Barry (or the popup button). Ignored unless `canGetUp`. */
+  | Ev<'gotUp'>
   | Ev<'modeOverrideSet', { override: ModeOverride }>
   | Ev<'blocklistSet', { blocklist: BlocklistEntry[] }>
   | Ev<'positionSet', { position: Position }>
@@ -140,16 +154,19 @@ export interface TabView {
   placement: 'corner' | 'face';
   position: Position;
   pose: PoseId;
-  /** Sprite scale from Fatness (1 = as drawn). Only grows during a Confrontation. */
-  scale: number;
+  /**
+   * When this pose began, so every tab starts the pose's strip and entrance animation from
+   * the same moment. A view with the same pose and a new poseSince restarts it.
+   */
+  poseSince: Millis;
+  /** Tired Barry during a Snooze: clicking him sends 'gotUp'. */
+  canGetUp: boolean;
   /** Speech bubble text, or null for none. */
   line: string | null;
   showBackToIt: boolean;
   /** True only during a Confrontation. Pages work normally during an Arm fight. */
   eatInput: boolean;
   pauseMedia: boolean;
-  /** 0..1, or null to hide the meter. */
-  chudMeter: number | null;
   /** The renderer counts down to this; null hides the countdown. */
   breakEndsAt: Millis | null;
   /** The arm stretching out of corner Barry. Progress = (now - startedAt) / durationMs. Null = no arm. */
@@ -177,12 +194,12 @@ export const HIDDEN_VIEW: TabView = {
   placement: 'corner',
   position: 'right',
   pose: 'studious',
-  scale: 1,
+  poseSince: 0,
+  canGetUp: false,
   line: null,
   showBackToIt: false,
   eatInput: false,
   pauseMedia: false,
-  chudMeter: null,
   breakEndsAt: null,
   reach: null,
   pushesLeft: null,

@@ -32,7 +32,8 @@ import {
   refreshSchedule,
   shouldDispatchSchedule,
 } from '../schedule/fetcher';
-import { playSoundOffscreen } from './offscreen';
+import { ensureOffscreen, playSoundOffscreen, stopChudSongOffscreen } from './offscreen';
+import { explosionSoundDelay } from './explosionSound';
 import { dropStaleEffects, isScriptableUrl, planTabSync, tabSlotFor } from './tabs';
 import { orderTodos, removeSource, replaceSourceTodos, upsertSource } from './todos';
 
@@ -144,6 +145,8 @@ export function startRuntime(brain: Brain) {
             browser.tabs.create({ windowId, active: true }).catch(() => {}),
           ),
         );
+        // Barry's done with those tabs: the chud song stops with them.
+        void stopChudSongOffscreen();
         // One call for every tab and window; closed tabs raise onRemoved -> tabClosed via the queue.
         try {
           await browser.tabs.remove(ids);
@@ -180,16 +183,38 @@ export function startRuntime(brain: Brain) {
   /** load → reduce → save → push views → run effects. Call only from inside the queue. */
   async function handle(event: BarryEvent) {
     const before = await loadState();
+    // Chrome closes the offscreen player after ~30 s of silence. Reopen it ahead of the sounds a
+    // Confrontation or Arm fight is about to make, so the first burst or chomp isn't late.
+    if (
+      !before.muted &&
+      (before.phase !== 'clear' || event.type === 'tabNavigated' || event.type === 'tabActivated')
+    ) {
+      void ensureOffscreen().catch(() => {});
+    }
     const result = brain.reduce(before, event);
     const { state } = result;
     // After sleep or a closed browser, episodes that ended meanwhile must not play out now.
     const effects = dropStaleEffects(event, before.lastNow, result.effects);
+    // Barry's episode is over (no Restricted tab open, or a break started): stop the chud song.
+    if (before.arrivedTabs.length > 0 && state.arrivedTabs.length === 0) {
+      void stopChudSongOffscreen();
+    }
+    // Sounds first: they're the feedback for a click, and saving and pushing views takes a while.
+    const sounds = effects.filter((e) => e.type === 'playSound');
+    for (const effect of sounds) void runEffect(effect).catch(console.error);
     await storage.setItem(STORAGE_KEYS.state, state);
     await pushViews(state, Object.keys(state.openTabs).map(Number));
     scheduleDeadline(state);
     applyIdleThreshold(state.tuning.idleAfterSec);
+    // The explosion sound is runtime-originated, so the brain's muted filter does not cover it.
+    const explosionDelay = explosionSoundDelay(event, effects, state.muted);
+    if (explosionDelay !== null) {
+      setTimeout(() => void playSoundOffscreen('explosion').catch(console.error), explosionDelay);
+    }
     // Not awaited: explodeAndClose waits ~1s and must not stall the queue.
-    for (const effect of effects) void runEffect(effect).catch(console.error);
+    for (const effect of effects) {
+      if (effect.type !== 'playSound') void runEffect(effect).catch(console.error);
+    }
   }
 
   /** One event at a time, in order. */

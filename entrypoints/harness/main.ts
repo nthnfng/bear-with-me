@@ -3,13 +3,14 @@
 
 import { browser } from 'wxt/browser';
 import type { ContentMessage, TabView } from '@/src/contracts';
-import { fixtureViews } from '@/src/dev/fixtures';
+import { POSE_ROWS, fixtureViews } from '@/src/dev/fixtures';
 import { mountOverlay } from '@/src/overlay';
 import { startPicker } from '@/src/picker';
 import { readSource } from '@/src/picker/reader';
 
 const log = document.getElementById('log')!;
 const send = (msg: ContentMessage) => {
+  harnessReacts(msg);
   const line = document.createElement('div');
   line.textContent = `${new Date().toLocaleTimeString()} ${JSON.stringify(msg)}`;
   log.appendChild(line);
@@ -20,14 +21,69 @@ document.getElementById('clear')!.onclick = (e) => {
   log.textContent = '';
 };
 
-const overlay = mountOverlay({ send });
+const overlay = mountOverlay({
+  send,
+  exempt: (e) => !!(e.target as Element | null)?.closest?.('#panel'),
+});
 
 const views = fixtureViews(Date.now());
 const select = document.getElementById('views') as HTMLSelectElement;
 for (const name of Object.keys(views)) select.add(new Option(name, name));
-const show = () => overlay.render(fixtureViews(Date.now())[select.value]!);
+let currentName = 'hidden';
+const show = () => {
+  currentName = select.value;
+  eats = Math.max(0, TIERS.indexOf(currentName));
+  overlay.render(fixtureViews(Date.now())[select.value]!);
+};
 select.onchange = show;
 select.value = 'hidden';
+
+// One button per row of the pose map, grouped like the demo's panel.
+const posesEl = document.getElementById('poses')!;
+let group = '';
+for (const row of POSE_ROWS) {
+  if (row.group !== group) {
+    group = row.group;
+    const h = document.createElement('div');
+    h.className = 'grp';
+    h.textContent = group;
+    posesEl.appendChild(h);
+  }
+  const b = document.createElement('button');
+  b.textContent = row.label;
+  b.onclick = () => {
+    timers.splice(0).forEach(clearTimeout);
+    eats = Math.max(0, TIERS.indexOf(row.view));
+    select.value = currentName = row.view;
+    overlay.render(fixtureViews(Date.now())[row.view]!);
+    if (row.effect === 'explodeAndClose') overlay.playEffect({ type: 'explodeAndClose', tabIds: [0] });
+    if (row.effect === 'showSuggestion')
+      overlay.playEffect({
+        type: 'showSuggestion',
+        tabId: 0,
+        freeMinutes: 40,
+        todo: { text: 'Write lab report', sourceId: 'demo' },
+      });
+  };
+  posesEl.appendChild(b);
+}
+
+// The harness plays the brain's part for a few messages, so clicking the real UI works.
+let eats = 0;
+const TIERS = ['confrontation', 'confrontation1', 'confrontation2', 'confrontation3', 'confrontation4', 'confrontation5'];
+function harnessReacts(msg: ContentMessage) {
+  if (msg.type === 'eaten' && TIERS.includes(currentName)) {
+    eats = Math.min(eats + 1, 5);
+    const name = TIERS[eats]!;
+    currentName = select.value = name;
+    setTimeout(() => overlay.render(fixtureViews(Date.now())[name]!), 30);
+  }
+  if (msg.type === 'backToIt') overlay.playEffect({ type: 'explodeAndClose', tabIds: [0] });
+  if (msg.type === 'gotUp') {
+    setTimeout(() => renderNow('happy'), 0);
+  }
+  if (msg.type === 'pushed') setTimeout(() => doPush(), 0);
+}
 
 // Arm fight controls. Harness-only state; the real brain owns this in the extension.
 let fightPushes = 5;
@@ -37,8 +93,26 @@ const tabSlot = () =>
   (document.getElementById('tabnull') as HTMLInputElement).checked
     ? null
     : { index: num('tabindex'), count: num('tabcount'), pinned: num('tabpinned') };
-const renderNow = (name: string, patch: Partial<TabView> = {}) =>
+const renderNow = (name: string, patch: Partial<TabView> = {}) => {
+  currentName = name;
   overlay.render({ ...fixtureViews(Date.now())[name]!, ...(name.startsWith('reach') || name === 'reaching' ? { tabSlot: tabSlot() } : {}), ...patch });
+};
+function doPush() {
+  // The brain restarts the Reach with a new shared start time on each Push.
+  fightPushes = Math.max(0, fightPushes - 1);
+  overlay.playEffect({ type: 'playSound', tabId: 0, sound: 'punch' });
+  if (fightPushes === 0) {
+    overlay.playEffect({ type: 'playSound', tabId: 0, sound: 'ow' });
+    renderNow('knockedDown');
+    // The brain's Snooze stages, compressed: down, getting up, standing, ow, hurts, tired.
+    const at = (ms: number, name: string) => timers.push(window.setTimeout(() => renderNow(name), ms));
+    at(5000, 'gettingUp');
+    at(5600, 'standing');
+    at(7600, 'ow');
+    at(8600, 'armHurts');
+    at(10800, 'tired');
+  } else renderNow(currentName === 'reachingChud' ? 'reachingChud' : 'reaching', { pushesLeft: fightPushes });
+}
 document.querySelectorAll<HTMLElement>('[data-fight]').forEach((b) => {
   b.onclick = () => {
     timers.splice(0).forEach(clearTimeout);
@@ -47,16 +121,8 @@ document.querySelectorAll<HTMLElement>('[data-fight]').forEach((b) => {
       fightPushes = 5;
       renderNow('reaching', { pushesLeft: fightPushes });
     }
-    if (f === 'push') {
-      // The brain restarts the Reach with a new shared start time on each Push.
-      fightPushes = Math.max(0, fightPushes - 1);
-      overlay.playEffect({ type: 'playSound', tabId: 0, sound: 'punch' });
-      if (fightPushes === 0) {
-        overlay.playEffect({ type: 'playSound', tabId: 0, sound: 'ow' });
-        renderNow('snoozing');
-      } else renderNow('reaching', { pushesLeft: fightPushes });
-    }
-    if (f === 'snooze') renderNow('snoozing');
+    if (f === 'push') doPush();
+    if (f === 'snooze') renderNow('knockedDown');
     if (f === 'okay') {
       renderNow('confrontation');
       timers.push(window.setTimeout(() => renderNow('slackPassStarting'), 1200));
@@ -143,6 +209,6 @@ document.getElementById('picker')!.onclick = () =>
   });
 // The song starts once per arrival; pressing again while it plays must not restart it.
 document.getElementById('chudsong')!.onclick = () => {
-  renderNow('chudFull');
+  renderNow('chudPoint');
   overlay.playEffect({ type: 'playSound', tabId: 0, sound: 'chudSong' });
 };

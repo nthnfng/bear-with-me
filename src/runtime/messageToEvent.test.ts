@@ -22,4 +22,11 @@ describe('messageToEvent', () => {
     expect(isPopupMessage({ type: 'dev' })).toBe(true);
     expect(isPopupMessage({ type: 'hello' })).toBe(false);
   });
+
+  it('maps gotUp from a page and from the popup to the same event', () => {
+    expect(contentMessageToEvent({ type: 'gotUp' }, 7, 100)).toEqual({ type: 'gotUp', now: 100 });
+    expect(popupMessageToEvent({ type: 'gotUp' }, 100)).toEqual({ type: 'gotUp', now: 100 });
+    // Pages send it too; the runtime's popup branch handles it, so it must be recognised there.
+    expect(isPopupMessage({ type: 'gotUp' })).toBe(true);
+  });
 });

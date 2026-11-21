@@ -83,8 +83,6 @@ describe('Chud meter fill', () => {
     const t = s.lastNow!;
     const r = run(s, tick(t + T.snoozeMs / 5)).state;
     expect(r.chudMeter).toBeCloseTo(T.snoozeMs / 5 / T.chudFullMs);
-    // live view value between events
-    expect(brain.viewFor(s, 1, t + MIN).chudMeter).toBeCloseTo(MIN / T.chudFullMs);
   });
 
   it('stops at the Snooze end and the meter carries across Lock In ending', () => {
@@ -125,7 +123,11 @@ describe('Chud meter fill', () => {
     const s = { ...snoozing(), chudMeter: 0.8 };
     const at = s.lastNow! + 0.2 * T.chudFullMs;
     expect(at).toBeLessThan(s.snoozeEndsAt!);
-    expect(brain.nextDeadline(s)).toBe(at);
+    // Snooze stage boundaries come first; from the tired stage on, the fill moment is next.
+    let t = s;
+    for (let i = 0; i < 10 && brain.nextDeadline(t)! < at; i++)
+      t = run(t, tick(brain.nextDeadline(t)!)).state;
+    expect(brain.nextDeadline(t)).toBe(at);
   });
 });
 
@@ -189,9 +191,8 @@ describe('Full Chud meter', () => {
   it('uses chud pose in a Confrontation and the Arm fight', () => {
     const c = run(working(), setChud(1), act(1)).state;
     expect(brain.viewFor(c, 1, T0)).toMatchObject({
-      pose: 'chud',
+      pose: 'chud-point',
       placement: 'face',
-      chudMeter: 1,
       eatInput: true,
     });
     let r = run(working(), setChud(1), act(1), {
@@ -210,10 +211,10 @@ describe('Full Chud meter', () => {
 
   it('is not chud below full, and muted silences the song', () => {
     const c = run(working(), setChud(0.99), act(1));
-    expect(brain.viewFor(c.state, 1, T0)).toMatchObject({ pose: 'confrontation' });
+    expect(brain.viewFor(c.state, 1, T0)).toMatchObject({ pose: 'suspicious' });
     expect(c.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'burst' }]);
     const m = run(working(), setChud(1), { type: 'mutedSet', muted: true, now: T0 }, act(1));
-    expect(brain.viewFor(m.state, 1, T0)).toMatchObject({ pose: 'chud' });
+    expect(brain.viewFor(m.state, 1, T0)).toMatchObject({ pose: 'chud-point' });
     expect(m.last).toEqual([]);
   });
 
@@ -266,14 +267,14 @@ describe('Full Chud meter', () => {
     let s = run(working(), setChud(1)).state;
     s = run(s, tick(T0 + T.lockBackInMs), act(1, T0 + T.lockBackInMs)).state;
     expect(brain.viewFor(s, 1, T0 + T.lockBackInMs)).toMatchObject({
-      pose: 'confrontation',
+      pose: 'suspicious',
     });
   });
 
   it('becomes chud when the meter fills during a Snooze, then the Reach returns', () => {
     let s = { ...snoozing(), chudMeter: 0.9 };
     const full = s.lastNow! + 0.1 * T.chudFullMs;
-    expect(brain.viewFor(s, 1, full).chudMeter).toBe(1);
+    expect(run(s, tick(full)).state.chudMeter).toBe(1);
     s = run(s, tick(s.snoozeEndsAt!)).state;
     expect(s.phase).toBe('reaching');
     expect(brain.viewFor(s, 1, s.lastNow!)).toMatchObject({ pose: 'chud' });
@@ -424,7 +425,7 @@ describe('Cave rules and settings events', () => {
   it('cave hides calm Barry on non-Restricted tabs in any break phase, never a Restricted-tab fight view', () => {
     const s = { ...snoozing(), cave: true };
     expect(brain.viewFor(s, 2, s.lastNow!).visible).toBe(false);
-    expect(brain.viewFor(s, 1, s.lastNow!)).toMatchObject({ visible: true, pose: 'beaten' });
+    expect(brain.viewFor(s, 1, s.lastNow!)).toMatchObject({ visible: true, pose: 'got-owned' });
   });
 
   it('caveAllowed is false in Lock In while a Restricted tab is in play', () => {
