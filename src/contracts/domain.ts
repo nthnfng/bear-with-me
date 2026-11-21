@@ -45,10 +45,8 @@ export interface BlocklistEntry {
 
 /** Every tunable number, so playtesting never touches logic. Defaults in config.ts. */
 export interface Tuning {
+  /** Fatness picks the Confrontation sprite tier: 0 suspicious, 1-4 fat-1..fat-4, 5+ chud. */
   fatPerEat: number;
-  /** Confrontation sprite scale = 1 + fatness * scalePerFat, capped at maxScale. */
-  scalePerFat: number;
-  maxScale: number;
   defaultSlackPassMs: number;
   snoozeMs: number;
   /** Heads-up between a break ending and the first Reach. Only after a Slack pass. */
