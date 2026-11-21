@@ -25,9 +25,16 @@ describe('suggestContainer', () => {
   });
   it('climbs to a div that holds repeated div rows', () => {
     const span = n('span');
-    const board = n('div', [n('div', [span]), n('div', [n('span')])]);
+    const board = n('div', [n('div', [span]), n('div', [n('span')]), n('div')]);
     n('body', [n('div', [board])]);
     expect(suggestContainer(span)).toBe(board);
+  });
+  it('does not treat two divs or a run of inline spans as a list', () => {
+    const span = n('span');
+    const p = n('p', [span, n('span'), n('span'), n('a')]);
+    const pair = n('div', [n('div', [p]), n('div')]);
+    n('body', [n('main', [pair])]);
+    expect(suggestContainer(span)).toBe(span);
   });
   it('keeps a container when it is clicked directly', () => {
     const ul = n('ul', [n('li'), n('li')]);

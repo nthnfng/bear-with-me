@@ -94,6 +94,7 @@ export function startPicker(opts: PickerOptions): void {
   const box = shadow.querySelector('.box') as HTMLElement;
   if (window !== window.top) shadow.querySelector('.tip')?.remove(); // one tip, in the top frame
   document.documentElement.appendChild(host);
+  if (window === window.top) window.focus(); // so Up/Down reach the picker once the popup closes
   stopActive = () => stop();
 
   // `deepest` is the element under the cursor; `target` is what we highlight: by default the
@@ -109,8 +110,19 @@ export function startPicker(opts: PickerOptions): void {
     chain = el ? ancestorChain(el, composedParent) : [];
     target = el ? suggestContainer(el, composedParent) : null;
   };
+  // After the user resizes the box, keep it while the pointer stays inside it, so a small mouse
+  // twitch before clicking doesn't throw the choice away.
+  let adjusted = false;
+  const keepsTarget = (x: number, y: number) => {
+    if (!adjusted || !target) return false;
+    const r = target.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  };
   const step = (delta: number) => {
-    if (target) target = stepInChain(chain, target, delta);
+    if (target) {
+      target = stepInChain(chain, target, delta);
+      adjusted = true;
+    }
     draw();
   };
   const draw = () => {
@@ -143,13 +155,15 @@ export function startPicker(opts: PickerOptions): void {
   };
   const onMove = (e: Event) => {
     const m = e as MouseEvent;
+    if (keepsTarget(m.clientX, m.clientY)) return;
+    adjusted = false;
     setDeepest(pick(m.clientX, m.clientY));
     draw();
   };
   const onClick = (e: Event) => {
     swallow(e);
     const m = e as MouseEvent;
-    setDeepest(pick(m.clientX, m.clientY) ?? deepest);
+    if (!keepsTarget(m.clientX, m.clientY)) setDeepest(pick(m.clientX, m.clientY) ?? deepest);
     const el = target;
     if (!el) return;
     const selector =

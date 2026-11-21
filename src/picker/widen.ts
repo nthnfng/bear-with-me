@@ -19,11 +19,21 @@ export function isListContainer<E extends TreeEl<E>>(el: E): boolean {
   return t === 'ul' || t === 'ol' || LIST_ROLES.includes(el.getAttribute('role') ?? '');
 }
 
-/** True if `el` has two or more element children sharing one tag (a repeated-row container). */
+/** Inline tags never count as rows: a paragraph with a few spans or links is not a list. */
+const INLINE = new Set([
+  'span', 'a', 'b', 'i', 'em', 'strong', 'u', 's', 'code', 'br', 'img', 'svg', 'path', 'small',
+  'sup', 'sub', 'mark', 'label', 'input', 'button',
+]);
+const MIN_ROWS = 3;
+
+/** True if `el` has MIN_ROWS or more block-ish children sharing one tag (a repeated-row container). */
 function hasRepeatedChildren<E extends TreeEl<E>>(el: E): boolean {
   const counts = new Map<string, number>();
-  for (const c of Array.from(el.children)) counts.set(tag(c), (counts.get(tag(c)) ?? 0) + 1);
-  return [...counts.values()].some((n) => n >= 2);
+  for (const c of Array.from(el.children)) {
+    if (INLINE.has(tag(c))) continue;
+    counts.set(tag(c), (counts.get(tag(c)) ?? 0) + 1);
+  }
+  return [...counts.values()].some((n) => n >= MIN_ROWS);
 }
 
 /**

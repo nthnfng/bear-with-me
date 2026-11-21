@@ -221,10 +221,22 @@ export function SettingsSections({
 
       <details>
         <summary>Todos</summary>
-        <button className="wide" onClick={() => send({ type: 'startPicker' })}>
+        <button
+          className="wide"
+          onClick={() =>
+            // Close the popup so the page gets the mouse and the Up/Down keys for the picker.
+            browser.runtime
+              .sendMessage({ type: 'startPicker' } satisfies PopupMessage)
+              .catch(() => {})
+              .finally(() => window.close())
+          }
+        >
           Point Barry at my task list
         </button>
-        <p className="hint">Opens a picker on the tab you were just on.</p>
+        <p className="hint">
+          The popup closes. Hover your list on the page, Up/Down to grow or shrink the box, click
+          to save.
+        </p>
         {state.todos.length > 0 ? (
           <ul className="list">
             {state.todos.map((t, i) => (
