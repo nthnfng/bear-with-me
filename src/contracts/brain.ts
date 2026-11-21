@@ -59,6 +59,12 @@ export interface BarryState {
   /** When the user clicked tired Barry (Get up). The Snooze then ends after a short happy jump. */
   gotUpAt: Millis | null;
   warningEndsAt: Millis | null;
+  /** Start of the running Slack pass ('slackPass' phase). Chill Barry's pose run starts here. */
+  slackPassStartedAt: Millis | null;
+  /** When the current Confrontation pose (Fatness tier or chud-point) began; shared start for its poseSince. */
+  confrontSince: Millis | null;
+  /** Start of the current Arm fight run (not reset by a Push), so the Reach pose isn't restarted by each Push. */
+  fightStartedAt: Millis | null;
   /** One shared start time so the Reach is in sync on every tab. */
   reachStartedAt: Millis | null;
   /** Pushes in the current Arm fight. Resets when a Snooze is won. */

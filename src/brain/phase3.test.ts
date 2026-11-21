@@ -125,7 +125,11 @@ describe('Chud meter fill', () => {
     const s = { ...snoozing(), chudMeter: 0.8 };
     const at = s.lastNow! + 0.2 * T.chudFullMs;
     expect(at).toBeLessThan(s.snoozeEndsAt!);
-    expect(brain.nextDeadline(s)).toBe(at);
+    // Snooze stage boundaries come first; from the tired stage on, the fill moment is next.
+    let t = s;
+    for (let i = 0; i < 10 && brain.nextDeadline(t)! < at; i++)
+      t = run(t, tick(brain.nextDeadline(t)!)).state;
+    expect(brain.nextDeadline(t)).toBe(at);
   });
 });
 
@@ -189,7 +193,7 @@ describe('Full Chud meter', () => {
   it('uses chud pose in a Confrontation and the Arm fight', () => {
     const c = run(working(), setChud(1), act(1)).state;
     expect(brain.viewFor(c, 1, T0)).toMatchObject({
-      pose: 'chud',
+      pose: 'chud-point',
       placement: 'face',
       chudMeter: 1,
       eatInput: true,
@@ -213,7 +217,7 @@ describe('Full Chud meter', () => {
     expect(brain.viewFor(c.state, 1, T0)).toMatchObject({ pose: 'suspicious' });
     expect(c.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'burst' }]);
     const m = run(working(), setChud(1), { type: 'mutedSet', muted: true, now: T0 }, act(1));
-    expect(brain.viewFor(m.state, 1, T0)).toMatchObject({ pose: 'chud' });
+    expect(brain.viewFor(m.state, 1, T0)).toMatchObject({ pose: 'chud-point' });
     expect(m.last).toEqual([]);
   });
 

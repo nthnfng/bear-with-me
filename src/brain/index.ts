@@ -10,6 +10,7 @@ import {
   type BarryState,
   type Brain,
   type Millis,
+  type PoseId,
   type ReduceResult,
   type TabId,
   type TabView,
@@ -33,6 +34,9 @@ export function initialState(): BarryState {
     snoozeStartedAt: null,
     gotUpAt: null,
     warningEndsAt: null,
+    slackPassStartedAt: null,
+    confrontSince: null,
+    fightStartedAt: null,
     reachStartedAt: null,
     pushes: 0,
     chudMeter: 0,
@@ -140,6 +144,7 @@ function apply(
           ...state,
           phase: 'slackPass',
           slackPassEndsAt: event.now + event.durationMs,
+          slackPassStartedAt: event.now,
           okayStartedAt: wasConfronting ? event.now : null,
           fatness: 0,
         },
@@ -160,6 +165,9 @@ function apply(
             phase: 'snoozing',
             pushes: 0,
             reachStartedAt: null,
+            fightStartedAt: null,
+            snoozeStartedAt: event.now,
+            gotUpAt: null,
             snoozeEndsAt: event.now + state.tuning.snoozeMs,
           },
         };
@@ -172,8 +180,25 @@ function apply(
         return { state: land(state, effects) };
       }
       return { state };
-    case 'gotUp':
-      return { state }; // Phase 5 lane A
+    case 'gotUp': {
+      // Only tired Barry can be told to get up. Past the Snooze's end it has already ended.
+      if (
+        state.phase !== 'snoozing' ||
+        state.gotUpAt !== null ||
+        state.snoozeEndsAt === null ||
+        event.now >= state.snoozeEndsAt ||
+        snoozeStage(state, event.now) !== 'tired'
+      ) {
+        return { state };
+      }
+      return {
+        state: {
+          ...state,
+          gotUpAt: event.now,
+          snoozeEndsAt: Math.min(state.snoozeEndsAt, event.now + GOT_UP_HAPPY_MS),
+        },
+      };
+    }
   }
 }
 
@@ -192,8 +217,12 @@ function toClear(state: BarryState): BarryState {
     slackPassEndsAt: null,
     okayStartedAt: null,
     warningEndsAt: null,
+    slackPassStartedAt: null,
+    fightStartedAt: null,
     reachStartedAt: null,
     snoozeEndsAt: null,
+    snoozeStartedAt: null,
+    gotUpAt: null,
     pushes: 0,
   };
 }
@@ -243,7 +272,9 @@ function advance(start: BarryState, now: Millis, effects: BarryEffect[]): BarryS
         ...state,
         phase: 'reaching',
         reachStartedAt: state.warningEndsAt,
+        fightStartedAt: state.warningEndsAt,
         warningEndsAt: null,
+        slackPassStartedAt: null,
       };
     } else if (state.phase === 'reaching' && state.reachStartedAt !== null) {
       // The user closed every Restricted tab themselves: the fight is over.
@@ -258,7 +289,10 @@ function advance(start: BarryState, now: Millis, effects: BarryEffect[]): BarryS
         ...state,
         phase: 'reaching',
         reachStartedAt: state.snoozeEndsAt,
+        fightStartedAt: state.snoozeEndsAt,
         snoozeEndsAt: null,
+        snoozeStartedAt: null,
+        gotUpAt: null,
       };
     } else {
       break;
@@ -325,6 +359,53 @@ function applyDev(
   }
 }
 
+/** The Snooze's stages, timed from `snoozeStartedAt`. A Snooze shorter than them just ends early. */
+export const SNOOZE_KNOCKED_MS = 5000; // got-owned, spinning
+export const SNOOZE_GET_UP_MS = 600; // get-up (the overlay adds the in-between frames)
+export const SNOOZE_STANDING_MS = 2000; // default
+export const SNOOZE_OW_MS = 1000; // suspicious + "ow"
+export const SNOOZE_GRIEVED_MS = 2200; // grieved + "my arm hurts..."; then tired until the end
+/** How long Barry jumps happily after Get up before the Snooze ends. */
+export const GOT_UP_HAPPY_MS = 1000;
+
+type SnoozeStage = 'knocked' | 'getUp' | 'standing' | 'ow' | 'grieved' | 'tired' | 'happy';
+const SNOOZE_STAGES: { stage: SnoozeStage; ms: number }[] = [
+  { stage: 'knocked', ms: SNOOZE_KNOCKED_MS },
+  { stage: 'getUp', ms: SNOOZE_GET_UP_MS },
+  { stage: 'standing', ms: SNOOZE_STANDING_MS },
+  { stage: 'ow', ms: SNOOZE_OW_MS },
+  { stage: 'grieved', ms: SNOOZE_GRIEVED_MS },
+];
+
+/** Start of each timed stage after the first, as offsets from the Snooze start. */
+function stageStarts(): { stage: SnoozeStage; at: number }[] {
+  const out: { stage: SnoozeStage; at: number }[] = [];
+  let at = 0;
+  for (const s of SNOOZE_STAGES) {
+    out.push({ stage: s.stage, at });
+    at += s.ms;
+  }
+  out.push({ stage: 'tired', at });
+  return out;
+}
+
+/** The Snooze stage at `now` and when it began, or null outside a Snooze. */
+function snoozeStageAt(
+  state: BarryState,
+  now: Millis,
+): { stage: SnoozeStage; since: Millis } | null {
+  if (state.phase !== 'snoozing' || state.snoozeStartedAt === null) return null;
+  if (state.gotUpAt !== null && now >= state.gotUpAt)
+    return { stage: 'happy', since: state.gotUpAt };
+  const elapsed = now - state.snoozeStartedAt;
+  let cur = stageStarts()[0]!;
+  for (const st of stageStarts()) if (elapsed >= st.at) cur = st;
+  return { stage: cur.stage, since: state.snoozeStartedAt + cur.at };
+}
+function snoozeStage(state: BarryState, now: Millis): SnoozeStage | null {
+  return snoozeStageAt(state, now)?.stage ?? null;
+}
+
 /** Chud fill is clamped to 0..1 and snapped to 1 against float dust. */
 function clampChud(v: number): number {
   return v >= 1 - 1e-9 ? 1 : Math.max(0, v);
@@ -335,7 +416,12 @@ function clampChud(v: number): number {
  * Snooze's end). Timestamps only, so it fills smoothly even between events.
  */
 function liveChud(state: BarryState, now: Millis): number {
-  if (state.phase !== 'snoozing' || state.snoozeEndsAt === null || state.lastNow === null) {
+  if (
+    state.phase !== 'snoozing' ||
+    state.snoozeEndsAt === null ||
+    state.lastNow === null ||
+    state.gotUpAt !== null // Barry got up: no more Snooze time is used
+  ) {
     return state.chudMeter;
   }
   const ms = Math.max(0, Math.min(now, state.snoozeEndsAt) - state.lastNow);
@@ -458,6 +544,14 @@ function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
     const tab = confrontedTab(state, event.now);
     state = { ...state, phase: tab === null ? 'clear' : 'confronting' };
   }
+  // The Confrontation pose run restarts when the pose (tier or chud-point) changes or begins.
+  const prevPose = prev.phase === 'confronting' ? tierPose(prev.fatness, prev.chudMeter) : null;
+  const newPose = state.phase === 'confronting' ? tierPose(state.fatness, state.chudMeter) : null;
+  if (newPose === null) {
+    if (state.confrontSince !== null) state = { ...state, confrontSince: null };
+  } else if (newPose !== prevPose || state.confrontSince === null) {
+    state = { ...state, confrontSince: event.now };
+  }
   // Fatness resets only when no Restricted tab is open anywhere.
   if (!applied.keepFatness && state.fatness !== 0 && !anyRestrictedOpen(state)) {
     state = { ...state, fatness: 0 };
@@ -484,6 +578,14 @@ function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
   return { state, effects: state.muted ? effects.filter((e) => e.type !== 'playSound') : effects };
 }
 
+/** Confrontation pose: full Chud meter is chud-point, else the Fatness tier. */
+function tierPose(fatness: number, chud: number): PoseId {
+  if (chud >= 1) return 'chud-point';
+  const tier = Math.floor(fatness);
+  if (tier <= 0) return 'suspicious';
+  return tier >= 5 ? 'chud' : (`fat-${tier}` as PoseId);
+}
+
 function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
   const mode = resolveMode(state, now);
 
@@ -497,7 +599,8 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
       visible: true,
       placement: 'face',
       position: state.position,
-      pose: full ? 'chud' : 'suspicious',
+      pose: tierPose(state.fatness, chud),
+      poseSince: state.confrontSince ?? 0,
       line: full
         ? chudLine
         : block
@@ -519,25 +622,16 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
     ...HIDDEN_VIEW,
     visible: true,
     position: state.position,
-    pose: mode === 'lockIn' ? 'studious' : 'chill',
+    pose: mode === 'lockIn' ? 'studious' : 'chill-mug',
   };
 }
 
 /** How long the "Okay... -_-" pose lingers on the tab a Slack pass interrupted. */
 export const OKAY_MS = 4000;
 
-const chudLine = "I'm a chud 🎵";
-const warningLine = 'Wrapping up?';
+const chudLine = "♪ I'm a chud ♪";
+const warningLine = 'Wrap it up!';
 const reachLine = 'Closing restricted tabs 💣';
-
-function snoozeLine(ms: number): string {
-  const secs = Math.round(ms / 1000);
-  const span =
-    secs >= 60
-      ? `${Math.round(secs / 60)} minute${Math.round(secs / 60) === 1 ? '' : 's'}`
-      : `${secs} seconds`;
-  return `Ow... T-T my hand hurts so I'll leave you alone for ${span}...`;
-}
 
 /** Views during a Slack pass, warning, Arm fight or Snooze. Null = not in a break. */
 function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | null {
@@ -564,16 +658,31 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
         now < state.okayStartedAt + OKAY_MS;
       return {
         ...shared,
+        pose: 'chill',
+        poseSince: state.slackPassStartedAt ?? 0,
         breakEndsAt: state.slackPassEndsAt,
-        ...(okay ? { pose: 'suspicious' as const, line: 'Okay... -_-' } : {}),
+        ...(okay
+          ? {
+              pose: 'suspicious' as const,
+              poseSince: state.okayStartedAt ?? 0,
+              line: 'Okay... -_-',
+            }
+          : {}),
       };
     }
     case 'warning':
-      return { ...shared, line: warningLine, breakEndsAt: state.warningEndsAt };
+      return {
+        ...shared,
+        pose: 'suspicious-tap',
+        poseSince: state.warningEndsAt === null ? 0 : state.warningEndsAt - state.tuning.warningMs,
+        line: warningLine,
+        breakEndsAt: state.warningEndsAt,
+      };
     case 'reaching':
       return {
         ...shared,
-        ...(full ? { pose: 'chud' as const } : {}),
+        pose: full ? 'chud' : 'close-tab',
+        poseSince: state.fightStartedAt ?? state.reachStartedAt ?? 0,
         line: reachLine,
         reach:
           state.reachStartedAt === null
@@ -581,13 +690,33 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
             : { startedAt: state.reachStartedAt, durationMs: state.tuning.reachMs },
         pushesLeft: Math.max(0, state.tuning.maxPushes - state.pushes),
       };
-    case 'snoozing':
+    case 'snoozing': {
+      const at = snoozeStageAt(state, now);
+      const stage = at?.stage ?? 'knocked';
+      const pose: PoseId = {
+        knocked: 'got-owned',
+        getUp: 'get-up',
+        standing: 'default',
+        ow: 'suspicious',
+        grieved: 'grieved',
+        tired: 'tired',
+        happy: 'happy',
+      }[stage] as PoseId;
+      const line =
+        stage === 'ow'
+          ? 'ow'
+          : stage === 'grieved'
+            ? 'my arm hurts i guess ill leave u alone'
+            : null;
       return {
         ...shared,
-        pose: 'got-owned',
-        line: snoozeLine(state.tuning.snoozeMs),
+        pose,
+        poseSince: at?.since ?? state.snoozeStartedAt ?? 0,
+        line,
+        canGetUp: stage === 'tired',
         breakEndsAt: state.snoozeEndsAt,
       };
+    }
   }
 }
 
@@ -602,11 +731,40 @@ function nextDeadline(state: BarryState): Millis | null {
     state.warningEndsAt,
     reachEnd,
     state.snoozeEndsAt,
+    okayDeadline(state),
+    snoozeStageDeadline(state),
     blockDeadline(state),
     lockBackInDeadline(state),
     chudFullDeadline(state),
   ].filter((d): d is Millis => d !== null);
   return all.length ? Math.min(...all) : null;
+}
+
+/** When the "Okay... -_-" pose gives way to chill Barry. */
+function okayDeadline(state: BarryState): Millis | null {
+  if (state.phase !== 'slackPass' || state.okayStartedAt === null || state.lastNow === null)
+    return null;
+  const at = state.okayStartedAt + OKAY_MS;
+  return at > state.lastNow ? at : null;
+}
+
+/** Next Snooze stage boundary after the last event and before the Snooze ends (views re-push then). */
+function snoozeStageDeadline(state: BarryState): Millis | null {
+  if (
+    state.phase !== 'snoozing' ||
+    state.snoozeStartedAt === null ||
+    state.snoozeEndsAt === null ||
+    state.lastNow === null ||
+    state.gotUpAt !== null
+  ) {
+    return null;
+  }
+  const last = state.lastNow;
+  const end = state.snoozeEndsAt;
+  const next = stageStarts()
+    .map((st) => state.snoozeStartedAt! + st.at)
+    .filter((t) => t > last && t < end);
+  return next.length ? Math.min(...next) : null;
 }
 
 /** When the current Studying stretch reaches lockBackInMs (only matters while the meter is up). */
@@ -617,7 +775,13 @@ function lockBackInDeadline(state: BarryState): Millis | null {
 
 /** When the Chud meter hits 1 during a Snooze (the view flips to chud Barry then). */
 function chudFullDeadline(state: BarryState): Millis | null {
-  if (state.phase !== 'snoozing' || state.lastNow === null || state.chudMeter >= 1) return null;
+  if (
+    state.phase !== 'snoozing' ||
+    state.lastNow === null ||
+    state.chudMeter >= 1 ||
+    state.gotUpAt !== null
+  )
+    return null;
   const at = state.lastNow + Math.ceil((1 - state.chudMeter) * state.tuning.chudFullMs);
   return state.snoozeEndsAt !== null && at > state.snoozeEndsAt ? null : at;
 }
