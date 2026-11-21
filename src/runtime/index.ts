@@ -42,7 +42,10 @@ export function startRuntime(brain: Brain) {
   // ---- state ----------------------------------------------------------------------------
 
   async function loadState(): Promise<BarryState> {
-    return (await storage.getItem<BarryState>(STORAGE_KEYS.state)) ?? brain.initialState();
+    // Fill fields added since this state was saved (e.g. arrivedTabs) from the defaults.
+    const init = brain.initialState();
+    const saved = await storage.getItem<BarryState>(STORAGE_KEYS.state);
+    return saved ? { ...init, ...saved, tuning: { ...init.tuning, ...saved.tuning } } : init;
   }
 
   async function loadSettings(): Promise<Settings> {
@@ -366,6 +369,13 @@ export function startRuntime(brain: Brain) {
     lockIn: () => override('lockIn'),
     chill: () => override('chill'),
     auto: () => override('auto'),
+    /** Dev: fake captured todos, e.g. barry.todos(['Lab report']). */
+    todos: (items: string[]) =>
+      dispatch({
+        type: 'todosUpdated',
+        now: Date.now(),
+        todos: items.map((text) => ({ text, sourceId: 'dev' })),
+      }),
   };
 
   console.log('[barry] runtime started');
