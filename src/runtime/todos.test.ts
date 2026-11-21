@@ -5,6 +5,8 @@ import {
   replaceSourceTodos,
   upsertSource,
   withPopupTodos,
+  withoutHidden,
+  addHidden,
 } from './todos';
 
 describe('popup todos', () => {
@@ -59,5 +61,26 @@ describe('todo sources', () => {
   });
   it('removeSource', () => {
     expect(removeSource([src('a'), src('b')], 'a').map((s) => s.id)).toEqual(['b']);
+  });
+});
+
+describe('hidden (deleted) copied todos', () => {
+  it('drops hidden todos from their source only, matching trimmed text', () => {
+    const todos = [
+      { text: 'read ch 3', sourceId: 'a' },
+      { text: 'read ch 3', sourceId: 'b' },
+      { text: 'essay', sourceId: 'a' },
+    ];
+    expect(withoutHidden(todos, [{ sourceId: 'a', text: ' read ch 3 ' }])).toEqual([
+      { text: 'read ch 3', sourceId: 'b' },
+      { text: 'essay', sourceId: 'a' },
+    ]);
+    expect(withoutHidden(todos, undefined)).toBe(todos);
+  });
+
+  it('adds a hidden todo once', () => {
+    const once = addHidden(undefined, { sourceId: 'a', text: 'essay ' });
+    expect(once).toEqual([{ sourceId: 'a', text: 'essay' }]);
+    expect(addHidden(once, { sourceId: 'a', text: 'essay' })).toBe(once);
   });
 });

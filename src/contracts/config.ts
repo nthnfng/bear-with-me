@@ -46,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   icsUrl: null,
   todoSources: [],
   popupTodos: [],
+  hiddenTodos: [],
 };
 
 /** sourceId of the brain Todos that come from todos typed into the popup. */

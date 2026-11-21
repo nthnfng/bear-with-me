@@ -14,7 +14,12 @@ describe('headerBarry', () => {
     vi.spyOn(brain, 'viewFor').mockImplementation((_s, id) =>
       id === 2 ? view({ pose: 'fat-2', poseSince: 50 }) : view({ pose: 'studious' }),
     );
-    expect(headerBarry(state, 100, 2)).toEqual({ pose: 'fat-2', poseSince: 50, canGetUp: false });
+    expect(headerBarry(state, 100, 2)).toEqual({
+      pose: 'fat-2',
+      poseSince: 50,
+      canGetUp: false,
+      inPopup: false,
+    });
   });
 
   it('falls back to another visible tab when the active one hides Barry', () => {
@@ -22,7 +27,12 @@ describe('headerBarry', () => {
     vi.spyOn(brain, 'viewFor').mockImplementation((_s, id) =>
       id === 1 ? HIDDEN_VIEW : view({ pose: 'tired', poseSince: 9, canGetUp: true }),
     );
-    expect(headerBarry(state, 100, 1)).toEqual({ pose: 'tired', poseSince: 9, canGetUp: true });
+    expect(headerBarry(state, 100, 1)).toEqual({
+      pose: 'tired',
+      poseSince: 9,
+      canGetUp: true,
+      inPopup: false,
+    });
   });
 
   it('offers Get up even when the shown view is another tab', () => {
@@ -38,12 +48,26 @@ describe('headerBarry', () => {
   it('is calm when nobody shows Barry (Chill sips)', () => {
     const state = { ...withTabs({ 1: 'https://a.test' }), modeOverride: 'chill' as const };
     vi.spyOn(brain, 'viewFor').mockReturnValue(HIDDEN_VIEW);
-    expect(headerBarry(state, 100, 1)).toEqual({ pose: 'chill-mug', poseSince: 0, canGetUp: false });
+    expect(headerBarry(state, 100, 1)).toEqual({
+      pose: 'chill-mug',
+      poseSince: 0,
+      canGetUp: false,
+      inPopup: true,
+    });
   });
 
   it('is calm with no tabs (Lock In studies)', () => {
     const state = { ...initialState(), modeOverride: 'lockIn' as const };
     expect(headerBarry(state, 100, null).pose).toBe('studious');
+  });
+
+  it('is not drawn in the popup while a page shows him or he is in the Cave', () => {
+    const state = withTabs({ 1: 'https://a.test' });
+    vi.spyOn(brain, 'viewFor').mockReturnValueOnce(view({ pose: 'studious' }));
+    expect(headerBarry(state, 100, 1).inPopup).toBe(false);
+    vi.spyOn(brain, 'viewFor').mockReturnValue(HIDDEN_VIEW);
+    expect(headerBarry({ ...state, cave: true }, 100, 1).inPopup).toBe(false);
+    expect(headerBarry(state, 100, 1).inPopup).toBe(true);
   });
 });
 

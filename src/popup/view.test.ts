@@ -248,6 +248,14 @@ describe('pixel popup helpers', () => {
     expect(blockCardTimer({ ...base, countdown: slack, currentBlock: cur })).toBe(slack);
   });
 
+  it('shows days instead of a ticking timer a day or more out', async () => {
+    const { formatTimeLeft, DAY_MS } = await import('./view');
+    expect(formatTimeLeft(90_000)).toBe('1:30');
+    expect(formatTimeLeft(DAY_MS - 1000)).toBe('23:59:59');
+    expect(formatTimeLeft(DAY_MS)).toBe('1 day');
+    expect(formatTimeLeft(3.5 * DAY_MS)).toBe('3 days');
+  });
+
   it('lights the chud sign in eighths', async () => {
     const { chudSignSegments } = await import('./view');
     expect(chudSignSegments(0).filter(Boolean)).toHaveLength(0);

@@ -1,7 +1,7 @@
 // Pure todo-source bookkeeping. No browser imports.
 
 import { POPUP_TODO_SOURCE_ID } from '../contracts';
-import type { PopupTodo, Todo, TodoSource } from '../contracts';
+import type { HiddenTodo, PopupTodo, Todo, TodoSource } from '../contracts';
 
 /** Unfinished popup todos first (the user typed them in Barry's own list), then the rest. */
 export function withPopupTodos(todos: Todo[], popupTodos: PopupTodo[]): Todo[] {
@@ -40,4 +40,20 @@ export function orderTodos(todos: Todo[], sources: TodoSource[]): Todo[] {
     .map((t, i) => ({ t, i }))
     .sort((a, b) => rank.get(a.t.sourceId)! - rank.get(b.t.sourceId)! || a.i - b.i)
     .map((x) => x.t);
+}
+
+const hiddenKey = (t: { sourceId: string; text: string }) => `${t.sourceId}\u0000${t.text.trim()}`;
+
+/** Drop copied todos the user deleted in the popup. */
+export function withoutHidden(todos: Todo[], hidden: HiddenTodo[] | undefined): Todo[] {
+  if (!hidden?.length) return todos;
+  const keys = new Set(hidden.map(hiddenKey));
+  return todos.filter((t) => !keys.has(hiddenKey(t)));
+}
+
+/** Add one deleted todo to the hidden list (no duplicates). */
+export function addHidden(hidden: HiddenTodo[] | undefined, todo: HiddenTodo): HiddenTodo[] {
+  const list = hidden ?? [];
+  const entry = { sourceId: todo.sourceId, text: todo.text.trim() };
+  return list.some((h) => hiddenKey(h) === hiddenKey(entry)) ? list : [...list, entry];
 }

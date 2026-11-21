@@ -35,6 +35,12 @@ export interface PopupTodo {
   done: boolean;
 }
 
+/** A todo copied from a page that the user deleted in the popup; re-reads of its source skip it. */
+export interface HiddenTodo {
+  sourceId: string;
+  text: string;
+}
+
 /** Where the element picker found a todo list. */
 export interface TodoSource {
   id: string;

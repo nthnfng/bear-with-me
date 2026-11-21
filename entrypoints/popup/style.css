@@ -81,9 +81,6 @@ button:disabled {
   height: 160px;
   overflow: hidden;
 }
-.sky.short {
-  height: 96px;
-}
 .cloud {
   position: absolute;
   line-height: 0;
@@ -262,13 +259,7 @@ button:disabled {
   pointer-events: none;
   image-rendering: pixelated;
 }
-.settings .grass {
-  top: 78px;
-}
 .settings-title {
-  position: absolute;
-  left: 14px;
-  top: 16px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -730,85 +721,95 @@ button:disabled {
   image-rendering: pixelated;
   background-repeat: no-repeat;
 }
-.cavebox {
+.cave-row {
+  flex: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
+  gap: 6px;
+  padding: 3px;
 }
-.cavescene {
-  position: relative;
-  height: 90px;
-  overflow: hidden;
-  background-color: #3a3340;
-  background-size: auto 100%;
-  background-position: right center;
-  background-repeat: no-repeat;
-  box-shadow:
-    0 -2px 0 0 var(--ink),
-    0 2px 0 0 var(--ink),
-    -2px 0 0 0 var(--ink),
-    2px 0 0 0 var(--ink);
+.cave-row .dirt-hint {
+  margin: 0;
 }
-.cavebarry {
+
+/* Barry walking into the cave (right to the mouth, then shrinks into the dark) and out again. */
+.cave-walk {
   position: absolute;
-  bottom: 4px;
-  left: 10px;
+  left: 52px;
+  bottom: 6px;
+  z-index: 1;
+  display: inline-flex;
+  transform-origin: 50% 100%;
+  pointer-events: none;
 }
-.cavebarry.in {
-  left: 190px;
-  opacity: 0;
-  scale: 0.5;
+.cave-walk.entering {
+  animation: cave-walk-in 2s linear forwards;
 }
-.cavebarry.entering {
-  animation: cave-in 1.8s linear forwards;
+.cave-walk.leaving {
+  animation: cave-walk-out 1.8s linear forwards;
 }
-.cavebarry.leaving {
-  animation: cave-out 1.4s linear forwards;
-}
-@keyframes cave-in {
+@keyframes cave-walk-in {
   0% {
-    left: 10px;
-    opacity: 1;
+    left: 170px;
+    opacity: 0;
     scale: 1;
   }
-  78% {
-    left: 190px;
+  10% {
+    opacity: 1;
+  }
+  65% {
+    left: 52px;
+    bottom: 6px;
     opacity: 1;
     scale: 1;
   }
   100% {
-    left: 190px;
+    left: 56px;
+    bottom: 14px;
     opacity: 0;
     scale: 0.5;
   }
 }
-@keyframes cave-out {
+@keyframes cave-walk-out {
   0% {
-    left: 190px;
+    left: 56px;
+    bottom: 14px;
+    opacity: 0;
+    scale: 0.5;
+  }
+  30% {
+    left: 52px;
+    bottom: 6px;
     opacity: 1;
     scale: 1;
   }
-  100% {
-    left: 10px;
+  85% {
     opacity: 1;
+  }
+  100% {
+    left: 170px;
+    opacity: 0;
     scale: 1;
   }
 }
 .hop {
+  display: inline-flex;
   animation: hop 0.3s steps(2) infinite;
 }
 @keyframes hop {
   50% {
-    translate: 0 -10px;
+    translate: 0 -4px;
   }
 }
 .zzz {
   position: absolute;
-  right: 20px;
-  top: 8px;
+  left: 74px;
+  top: 104px;
+  z-index: 1;
   color: #cfd8dc;
   font-size: 12px;
+  text-shadow: 1px 1px 0 var(--ink);
+  pointer-events: none;
 }
 
 /* ---- slack pass change confirmation ---------------------------------------------------- */

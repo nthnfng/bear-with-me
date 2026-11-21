@@ -10,25 +10,22 @@ import type {
   Settings as SettingsData,
 } from '@/src/contracts';
 import {
-  BUBBLE,
   SLACK_PRESETS_MIN,
   addPopupTodo,
   blockCardTimer,
-  formatClock,
-  formatCountdown,
-  headerBarry,
+  formatTimeLeft,
+  formatWhen,
   slackChangePreview,
   popupView,
   removePopupTodo,
-  sceneKey,
-  skyBands,
   togglePopupTodo,
   todosLeft,
 } from '@/src/popup/view';
 import type { PopupView } from '@/src/popup/view';
-import { send, useActiveTabId, useBarryState, useNow, useStored } from './hooks';
-import { ChudSign, Cloud, HeaderPose, Icons, Paper, SpeechTail, assetUrl } from './Pixel';
+import { send, useBarryState, useNow, useStored } from './hooks';
+import { Icons, Paper, assetUrl } from './Pixel';
 import { SettingsScreen } from './Settings';
+import { SkyHeader } from './Sky';
 
 const UNLOCK_KEY = 'barry:devUnlocked';
 const readUnlocked = () => {
@@ -95,11 +92,7 @@ function Home({
   onBarry: () => void;
   onSettings: () => void;
 }) {
-  const activeTabId = useActiveTabId();
   const v = popupView(state, now);
-  const hb = headerBarry(state, now, activeTabId);
-  const key = sceneKey(v.mode, state.phase);
-  const night = key === 'snoozing';
 
   // Chip waiting on "Are you sure?". Dropped when the Slack pass ends on its own.
   const [pendingMin, setPendingMin] = useState<number | null>(null);
@@ -115,55 +108,19 @@ function Home({
 
   return (
     <main className="popup home">
-      <header className="sky" style={{ background: skyBands(key, 36) }}>
-        <div className={night ? 'clouds dim' : 'clouds'}>
-          <Cloud left={196} top={4} scale={6} />
-          <Cloud left={24} top={40} scale={4} />
-          <Cloud left={266} top={48} scale={5} />
-        </div>
-        {night && (
-          <div className="stars" aria-hidden="true">
-            <i style={{ left: 120, top: 22 }} />
-            <i style={{ left: 172, top: 52 }} className="sm" />
-            <i style={{ left: 310, top: 28 }} />
-            <i style={{ left: 236, top: 64 }} className="sm" />
-          </div>
-        )}
-
-        <div className="topbar">
-          <span className={`badge ${v.mode}`}>{v.modeLabel.toUpperCase()}</span>
-          <button className="stone icon" aria-label="Settings" onClick={onSettings}>
-            {Icons.gear}
-          </button>
-        </div>
-
-        <img
-          className="cave"
-          src={assetUrl('barry-home.png')}
-          alt="Barry's cave"
-          draggable={false}
-          onClick={onBarry}
-        />
-        <span className="cave-barry" onClick={onBarry}>
-          <HeaderPose pose={hb.pose} poseSince={hb.poseSince} scale={2} />
-        </span>
-
-        <div className="bubble" role="status">
-          <span>{BUBBLE[key]}</span>
-          {v.countdownHint && <span className="pushes">{v.countdownHint}</span>}
-        </div>
-        <span className="bubble-tail">
-          <SpeechTail />
-        </span>
-
-        {hb.canGetUp && (
-          <button className="stone getup" onClick={() => send({ type: 'gotUp' })}>
-            Get up
-          </button>
-        )}
-
-        <ChudSign meter={state.chudMeter} />
-      </header>
+      <SkyHeader
+        state={state}
+        now={now}
+        onBarry={onBarry}
+        topbar={
+          <>
+            <span className={`badge ${v.mode}`}>{v.modeLabel.toUpperCase()}</span>
+            <button className="stone icon" aria-label="Settings" onClick={onSettings}>
+              {Icons.gear}
+            </button>
+          </>
+        }
+      />
       <img className="grass" src={assetUrl('ui/grass.svg')} alt="" />
 
       <div className="dirt">
@@ -246,7 +203,7 @@ function BlockCard({ v, now }: { v: PopupView; now: number }) {
   const timer = blockCardTimer(v);
   const cur = v.currentBlock;
   const next = v.nextBlock;
-  const nextText = next ? `Next: ${next.title} ${formatClock(next.start)}` : 'Nothing coming up';
+  const nextText = next ? `Next: ${next.title} ${formatWhen(next.start, now)}` : 'Nothing coming up';
   return (
     <Paper seed={11} label="Current block" className="block-card">
       <div className="card-head">
@@ -256,9 +213,9 @@ function BlockCard({ v, now }: { v: PopupView; now: number }) {
       <div className="block-row">
         <div className="block-text">
           <p className="title">{cur ? cur.title : 'Nothing scheduled'}</p>
-          <p className="sub">{cur ? `until ${formatClock(cur.end)} · ${nextText}` : nextText}</p>
+          <p className="sub">{cur ? `until ${formatWhen(cur.end, now)} · ${nextText}` : nextText}</p>
         </div>
-        {timer && <span className="time">{formatCountdown(timer.target - now)}</span>}
+        {timer && <span className="time">{formatTimeLeft(timer.target - now)}</span>}
       </div>
     </Paper>
   );
@@ -343,6 +300,13 @@ function TodoCard({ state }: { state: BarryState }) {
             <span className="bullet" aria-hidden="true" />
             <span className="text">{t.text}</span>
             <span className="from">{hostOf.get(t.sourceId) ?? 'copied'}</span>
+            <button
+              className="trash"
+              aria-label={`Delete ${t.text}`}
+              onClick={() => send({ type: 'hideTodo', sourceId: t.sourceId, text: t.text })}
+            >
+              {Icons.trash}
+            </button>
           </li>
         ))}
         {todos.length === 0 && copied.length === 0 && (

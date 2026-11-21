@@ -2,7 +2,7 @@
 // the popup reads these and listens for changes. Pure: no browser imports.
 
 import type { BarryState } from './brain';
-import type { CalendarBlock, Millis, PopupTodo, TodoSource } from './domain';
+import type { CalendarBlock, HiddenTodo, Millis, PopupTodo, TodoSource } from './domain';
 
 export const STORAGE_KEYS = {
   /** BarryState: the brain's whole state. */
@@ -20,6 +20,8 @@ export interface Settings {
   todoSources: TodoSource[];
   /** Todos typed into the popup, in the order shown. */
   popupTodos: PopupTodo[];
+  /** Copied todos deleted in the popup. Optional: settings saved before this field lack it. */
+  hiddenTodos?: HiddenTodo[];
 }
 
 export interface ScheduleStatus {

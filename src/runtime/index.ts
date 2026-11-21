@@ -41,6 +41,8 @@ import {
   replaceSourceTodos,
   upsertSource,
   withPopupTodos,
+  withoutHidden,
+  addHidden,
 } from './todos';
 
 const TICK_ALARM = 'barry-tick';
@@ -305,7 +307,10 @@ export function startRuntime(brain: Brain) {
       const settings = await loadSettings();
       const state = await loadState();
       const todos = withPopupTodos(
-        orderTodos(change(state.todos, settings), settings.todoSources),
+        withoutHidden(
+          orderTodos(change(state.todos, settings), settings.todoSources),
+          settings.hiddenTodos,
+        ),
         settings.popupTodos,
       );
       await handle({ type: 'todosUpdated', now: Date.now(), todos });
@@ -451,6 +456,7 @@ export function startRuntime(brain: Brain) {
             await saveSettings({
               ...settings,
               todoSources: removeSource(settings.todoSources, msg.sourceId),
+              hiddenTodos: (settings.hiddenTodos ?? []).filter((h) => h.sourceId !== msg.sourceId),
             });
           });
           void updateTodos((todos) => todos.filter((t) => t.sourceId !== msg.sourceId));
@@ -459,6 +465,16 @@ export function startRuntime(brain: Brain) {
           void queue.enqueue(async () => {
             const settings = await loadSettings();
             await saveSettings({ ...settings, popupTodos: msg.todos });
+          });
+          void updateTodos((todos) => todos);
+          return;
+        case 'hideTodo':
+          void queue.enqueue(async () => {
+            const settings = await loadSettings();
+            await saveSettings({
+              ...settings,
+              hiddenTodos: addHidden(settings.hiddenTodos, msg),
+            });
           });
           void updateTodos((todos) => todos);
           return;

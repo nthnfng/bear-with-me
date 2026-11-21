@@ -47,7 +47,7 @@ export function popupMessageToEvent(msg: PopupMessage, now: Millis): BarryEvent 
       return { type: 'mutedSet', now, muted: msg.muted };
     case 'setBlocklist':
       return { type: 'blocklistSet', now, blocklist: msg.blocklist };
-    // setIcsUrl, refreshSchedule, startPicker, removeTodoSource: Phase 3.
+    // setIcsUrl, refreshSchedule, startPicker, removeTodoSource, setPopupTodos, hideTodo: runtime.
     default:
       return null;
   }
@@ -67,6 +67,7 @@ const POPUP_TYPES = new Set([
   'startPicker',
   'removeTodoSource',
   'setPopupTodos',
+  'hideTodo',
   'gotUp', // also sent by content scripts (tired Barry); both map to the same event
   'dev',
 ]);

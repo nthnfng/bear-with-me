@@ -1,5 +1,6 @@
-// The Settings screen: calendar, restricted sites, Barry (position, cave, sounds), todo
-// sources and, once unlocked, the dev panel. Draws src/popup/view.ts only.
+// The Settings screen: the sky header with the cave toggle under it, then calendar, restricted
+// sites, Barry (position, sounds), todo sources and, once unlocked, the dev panel.
+// Draws src/popup/view.ts only.
 
 import { useEffect, useState } from 'react';
 import { DEFAULT_SETTINGS, DEFAULT_TUNING, DEMO_TUNING, STORAGE_KEYS } from '@/src/contracts';
@@ -17,14 +18,14 @@ import {
   removeDomain,
   scheduleStatusLine,
   secondsToMs,
-  skyBands,
   speedPreset,
   toggleDomain,
   tuningSeconds,
 } from '@/src/popup/view';
 import type { Send } from './hooks';
 import { useStored } from './hooks';
-import { CaveScene, Cloud, Icons, Paper, PositionIcon, Switch, assetUrl } from './Pixel';
+import { Icons, Paper, PositionIcon, Switch, assetUrl } from './Pixel';
+import { SkyHeader, useCaveWalk } from './Sky';
 
 const POSITIONS: { value: Position; label: string }[] = [
   { value: 'left', label: 'Left' },
@@ -60,28 +61,44 @@ export function SettingsScreen({
   devOpen: boolean;
   onHideDev: () => void;
 }) {
+  const { walk, start } = useCaveWalk();
+  const cave = caveStatus(state, now);
   // Refresh the calendar whenever Settings opens.
   useEffect(() => send({ type: 'refreshSchedule' }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <main className="popup settings">
-      <header className="sky short" style={{ background: skyBands('clear', 24) }}>
-        <div className="clouds">
-          <Cloud left={214} top={10} scale={5} />
-          <Cloud left={150} top={44} scale={3} />
-        </div>
-        <div className="settings-title">
-          <button className="stone icon" aria-label="Back" onClick={onBack}>
-            {Icons.back}
-          </button>
-          <h1>Settings</h1>
-        </div>
-      </header>
+      <SkyHeader
+        state={state}
+        now={now}
+        walk={walk}
+        topbar={
+          <div className="settings-title">
+            <button className="stone icon" aria-label="Back" onClick={onBack}>
+              {Icons.back}
+            </button>
+            <h1>Settings</h1>
+          </div>
+        }
+      />
       <img className="grass" src={assetUrl('ui/grass.svg')} alt="" />
       <div className="dirt scroll">
+        <div className="cave-row">
+          <button
+            className="stone wide"
+            disabled={cave.disabled || walk !== null}
+            onClick={() => {
+              start(state.cave ? 'leaving' : 'entering');
+              send({ type: 'setCave', cave: !state.cave });
+            }}
+          >
+            {state.cave ? 'Let Barry out' : 'Send Barry back'}
+          </button>
+          {cave.reason && <p className="dirt-hint">{cave.reason}</p>}
+        </div>
         <CalendarCard now={now} send={send} />
         <SitesCard state={state} send={send} />
-        <BarryCard state={state} now={now} send={send} />
+        <BarryCard state={state} send={send} />
         <TodoSourcesCard state={state} send={send} />
         {devOpen && <DevPanel state={state} send={send} onClose={onHideDev} />}
       </div>
@@ -224,8 +241,7 @@ function SitesCard({ state, send }: { state: BarryState; send: Send }) {
   );
 }
 
-function BarryCard({ state, now, send }: { state: BarryState; now: number; send: Send }) {
-  const cave = caveStatus(state, now);
+function BarryCard({ state, send }: { state: BarryState; send: Send }) {
   return (
     <Paper seed={23} label="Barry">
       <div className="card-head">
@@ -254,12 +270,6 @@ function BarryCard({ state, now, send }: { state: BarryState; now: number; send:
           onChange={(on) => send({ type: 'setMuted', muted: !on })}
         />
       </div>
-      <CaveScene
-        cave={state.cave}
-        disabled={cave.disabled}
-        onToggle={(c) => send({ type: 'setCave', cave: c })}
-      />
-      {cave.reason && <p className="note">{cave.reason}</p>}
     </Paper>
   );
 }

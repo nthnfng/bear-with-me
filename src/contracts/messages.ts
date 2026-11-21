@@ -46,4 +46,6 @@ export type PopupMessage =
   | { type: 'removeTodoSource'; sourceId: string }
   /** The whole list of popup todos after an add, tick or delete. */
   | { type: 'setPopupTodos'; todos: PopupTodo[] }
+  /** Delete a todo copied from a page; it stays gone when the page is read again. */
+  | { type: 'hideTodo'; sourceId: string; text: string }
   | { type: 'dev'; command: DevCommand };

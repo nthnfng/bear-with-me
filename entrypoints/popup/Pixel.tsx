@@ -11,7 +11,6 @@ import type { PaperPaths } from '@/src/popup/paper';
 export const manifest = manifestJson as unknown as AssetManifest;
 export const assetUrl = (file: string) => browser.runtime.getURL(`/assets/${file}` as any);
 
-const CAVE_SCENE_SCALE = 3;
 /** One art pixel of the paper and UI chrome, in CSS px. */
 const PX = 3;
 
@@ -297,52 +296,5 @@ export function Switch({
     >
       <span />
     </button>
-  );
-}
-
-type CaveAnim = 'entering' | 'leaving' | null;
-const CAVE_MS = { entering: 1800, leaving: 1400 };
-
-/**
- * The cave toggle: "send Barry back" hops default Barry in and shrinks him into the dark;
- * "let Barry out" has happy Barry hop back out. The setting is sent right away; the hop is
- * only decoration and blocks the button while it plays.
- */
-export function CaveScene({
-  cave,
-  disabled,
-  onToggle,
-}: {
-  cave: boolean;
-  disabled: boolean;
-  onToggle: (cave: boolean) => void;
-}) {
-  const [anim, setAnim] = useState<CaveAnim>(null);
-  useEffect(() => {
-    if (!anim) return;
-    const id = setTimeout(() => setAnim(null), CAVE_MS[anim]);
-    return () => clearTimeout(id);
-  }, [anim]);
-
-  const rest = anim ?? (cave ? 'in' : 'out');
-  const pose = manifest.poses[anim === 'leaving' ? 'happy' : 'default'];
-  const click = () => {
-    setAnim(cave ? 'leaving' : 'entering');
-    onToggle(!cave);
-  };
-  return (
-    <div className="cavebox">
-      <div className="cavescene" style={{ backgroundImage: `url(${assetUrl(manifest.cave)})` }}>
-        <div className={`cavebarry ${rest}`}>
-          <div className={anim ? 'hop' : ''}>
-            <Sprite sprite={pose} scale={CAVE_SCENE_SCALE} />
-          </div>
-        </div>
-        {rest === 'in' && <span className="zzz">z z Z</span>}
-      </div>
-      <button className="stone wide" disabled={disabled || anim !== null} onClick={click}>
-        {cave ? 'Let Barry out' : 'Send Barry back'}
-      </button>
-    </div>
   );
 }

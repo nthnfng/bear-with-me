@@ -160,6 +160,26 @@ export function formatCountdown(ms: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
+export const DAY_MS = 24 * 60 * 60_000;
+
+/** A countdown under a day ticks (m:ss / h:mm:ss); a day or more just says how many days. */
+export function formatTimeLeft(ms: number): string {
+  if (ms < DAY_MS) return formatCountdown(ms);
+  const d = Math.floor(ms / DAY_MS);
+  return `${d} ${d === 1 ? 'day' : 'days'}`;
+}
+
+/** "3:00 PM" today; "Tue 3:00 PM" within a week; "Dec 4, 3:00 PM" further out. */
+export function formatWhen(ms: Millis, now: Millis): string {
+  const d = new Date(ms);
+  if (d.toDateString() === new Date(now).toDateString()) return formatClock(ms);
+  const opts: Intl.DateTimeFormatOptions =
+    ms - now < 6 * DAY_MS
+      ? { weekday: 'short', hour: 'numeric', minute: '2-digit' }
+      : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
+  return d.toLocaleString([], opts);
+}
+
 export function formatClock(ms: Millis): string {
   return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
@@ -289,13 +309,19 @@ export interface HeaderBarry {
   /** Restarts the flipbook when the same pose begins again. 0 for the calm fallback. */
   poseSince: Millis;
   canGetUp: boolean;
+  /**
+   * Draw Barry in the popup's header. False while any tab shows him (he is out on the page)
+   * or while he is in the Cave: there is only one Barry.
+   */
+  inPopup: boolean;
 }
 
 /**
  * Which pose the popup shows and whether Get up is offered. Asks the brain what the active
  * tab shows; if that tab hides Barry (or is unknown), uses the first other open tab that shows
  * him, so a Confrontation or Snooze in another tab still appears. With nobody visible, Barry
- * is calm: Chill sips, Lock In studies. Get up shows if any tab's view offers it.
+ * is calm: Chill sips, Lock In studies. Get up shows if any tab's view offers it. `inPopup`
+ * says whether to draw him at all (see HeaderBarry).
  */
 export function headerBarry(
   state: BarryState,
@@ -310,9 +336,9 @@ export function headerBarry(
   const views = ordered.map((id) => brain.viewFor(state, id, now));
   const shown = views.find((v) => v.visible);
   const canGetUp = views.some((v) => v.canGetUp);
-  if (shown) return { pose: shown.pose, poseSince: shown.poseSince, canGetUp };
+  if (shown) return { pose: shown.pose, poseSince: shown.poseSince, canGetUp, inPopup: false };
   const calm = resolveMode(state, now) === 'chill' ? 'chill-mug' : 'studious';
-  return { pose: calm, poseSince: 0, canGetUp };
+  return { pose: calm, poseSince: 0, canGetUp, inPopup: !state.cave };
 }
 
 /** Which frame of a strip shows `elapsed` ms after the pose began (still images stay on 0). */
