@@ -127,10 +127,33 @@ function itemTitle(item: TNode): string {
   return runs.find((r) => !NOT_TITLE.test(r) && !COURSE.test(r)) ?? runs[0] ?? '';
 }
 
-/** One candidate per Work To Do item: its label, else the primary slot text, else the first non-date run. */
+/** "Due Oct 4" style: a Due line without the full year/time copy. */
+const SHORT_DUE = /^Due\s+\w{3}\s+\d{1,2}$/i;
+
+/**
+ * The subtitles shown under the title: the course and the due date, e.g.
+ * "Assignment 1 · COMPSCI 3319A: DATABASES I · Due Oct 4". The course drops its section and
+ * term codes ("200 LEC FW26") when it has the usual "CODE NUM ... : NAME" shape.
+ */
+export function withSubtitles(title: string, runs: string[]): string {
+  const rest = runs.filter((r) => r !== title);
+  const courseRun = rest.find((r) => COURSE.test(r));
+  const course = courseRun ? shortCourse(courseRun) : null;
+  const dueRun = rest.find((r) => SHORT_DUE.test(r)) ?? rest.find((r) => /^Due\b/i.test(r));
+  const due = dueRun ? dueRun.replace(/,?\s+\d{4}.*$/, '') : null;
+  return [title, course, due].filter(Boolean).join(' · ');
+}
+
+function shortCourse(run: string): string {
+  const m = run.match(/^([A-Z]{2,}\s?\d{3,}\w*)\b.*?:\s*(.+)$/);
+  return m ? `${m[1]}: ${m[2]}` : run;
+}
+
+/** One candidate per Work To Do item: its title (label, primary slot, or first non-date run)
+ * followed by its course and due date. */
 export function w2dCandidates(widget: TNode): Candidate[] {
   return findItems(widget).map((item) => ({
-    text: itemTitle(item),
+    text: withSubtitles(itemTitle(item), textRuns(item)),
     checked: false, // Work To Do lists only unfinished work
   }));
 }

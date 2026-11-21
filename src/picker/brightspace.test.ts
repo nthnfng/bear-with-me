@@ -43,7 +43,10 @@ describe('brightspace work to do', () => {
 
   it('finds items across shadow roots and takes their titles', () => {
     expect(findItems(widget)).toHaveLength(2);
-    expect(w2dCandidates(widget).map((c) => c.text)).toEqual(['Lab 4', 'Essay']);
+    expect(w2dCandidates(widget).map((c) => c.text)).toEqual([
+      'Lab 4 · Due Nov 20',
+      'Essay · Due Nov 25',
+    ]);
   });
   it('prefers a label attribute', () => {
     const w = el('x', [
@@ -78,7 +81,10 @@ describe('brightspace work to do', () => {
           typed('d2l-w2d-list-item-assignment', 'Essay', true),
         ],
       });
-      expect(w2dCandidates(w).map((c) => c.text)).toEqual(['Lab 4', 'Essay']);
+      expect(w2dCandidates(w).map((c) => c.text)).toEqual([
+        'Lab 4 · COMPSCI 3319A 200 LEC · Due Oct 4',
+        'Essay · COMPSCI 3319A 200 LEC · Due Oct 4',
+      ]);
     });
     it('falls back to the first non-date, non-course run', () => {
       const w = el('x', [
@@ -86,7 +92,27 @@ describe('brightspace work to do', () => {
           shadow: [text('Due Oct 4'), text('COMPSCI 3319A 200 LEC'), text('Quiz 1')],
         }),
       ]);
-      expect(w2dCandidates(w).map((c) => c.text)).toEqual(['Quiz 1']);
+      expect(w2dCandidates(w).map((c) => c.text)).toEqual([
+        'Quiz 1 · COMPSCI 3319A 200 LEC · Due Oct 4',
+      ]);
     });
+  });
+});
+
+import { withSubtitles } from './brightspace';
+describe('withSubtitles', () => {
+  it('adds the short course and due date', () => {
+    expect(
+      withSubtitles('Assignment 1', [
+        'Due Oct 4',
+        'Due Oct 4, 2026 11:59 PM',
+        'Assignment 1',
+        'COMPSCI 3319A 200 LEC FW26: DATABASES I',
+      ]),
+    ).toBe('Assignment 1 · COMPSCI 3319A: DATABASES I · Due Oct 4');
+  });
+  it('keeps an unusual course name whole and works without a due date', () => {
+    expect(withSubtitles('Reading', ['Reading', 'DATASCI 3000B'])).toBe('Reading · DATASCI 3000B');
+    expect(withSubtitles('Quiz', ['Quiz'])).toBe('Quiz');
   });
 });
