@@ -28,6 +28,8 @@ const CONTENT_SCRIPT_FILE = '/content-scripts/content.js'; // WXT output path fo
 export function startRuntime(brain: Brain) {
   const queue = createSerialQueue((err) => console.error('[barry] event failed', err));
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Tabs mid-explosion: never push views to them (a hidden view would cut the animation). */
+  const closing = new Set<TabId>();
 
   // ---- state ----------------------------------------------------------------------------
 
@@ -48,7 +50,9 @@ export function startRuntime(brain: Brain) {
   async function pushViews(state: BarryState, tabIds: TabId[]) {
     const now = Date.now();
     await Promise.all(
-      tabIds.map((id) => sendToTab(id, { type: 'view', view: brain.viewFor(state, id, now) })),
+      tabIds
+        .filter((id) => !closing.has(id))
+        .map((id) => sendToTab(id, { type: 'view', view: brain.viewFor(state, id, now) })),
     );
   }
 
@@ -56,11 +60,22 @@ export function startRuntime(brain: Brain) {
 
   async function runEffect(effect: BarryEffect) {
     switch (effect.type) {
-      case 'explodeAndClose':
-        await Promise.all(effect.tabIds.map((id) => sendToTab(id, { type: 'effect', effect })));
+      case 'explodeAndClose': {
+        const ids = [...new Set(effect.tabIds)];
+        ids.forEach((id) => closing.add(id));
+        await Promise.all(ids.map((id) => sendToTab(id, { type: 'effect', effect })));
         await new Promise((r) => setTimeout(r, EXPLODE_MS));
-        await Promise.all(effect.tabIds.map((id) => browser.tabs.remove(id).catch(() => {})));
+        // One call for every tab and window; closed tabs raise onRemoved -> tabClosed via the queue.
+        try {
+          await browser.tabs.remove(ids);
+        } catch {
+          // Some were already closed (the call may have aborted): remove the rest one by one.
+          await Promise.all(ids.map((id) => browser.tabs.remove(id).catch(() => {})));
+        }
+        // Tabs that survived (remove failed) should show views again.
+        ids.forEach((id) => closing.delete(id));
         return;
+      }
       case 'playSound':
       case 'showSuggestion':
         await sendToTab(effect.tabId, { type: 'effect', effect });
@@ -132,6 +147,7 @@ export function startRuntime(brain: Brain) {
     }
   });
   browser.tabs.onRemoved.addListener((tabId) => {
+    closing.delete(tabId);
     dispatch({ type: 'tabClosed', now: Date.now(), tabId });
   });
   browser.windows.onFocusChanged.addListener(async (windowId) => {
@@ -147,6 +163,12 @@ export function startRuntime(brain: Brain) {
   browser.runtime.onStartup.addListener(() => {
     void seedOpenTabs();
   });
+
+  // ---- worker (re)start -----------------------------------------------------------------
+  // The worker may have been killed mid-Reach. Everything lives in storage, so a tick with
+  // the real `now` recomputes the phase, re-pushes views to all known open tabs (the overlay
+  // derives arm progress from reachStartedAt) and re-arms the deadline timer.
+  void dispatch({ type: 'tick', now: Date.now() });
 
   // ---- messages -------------------------------------------------------------------------
 
