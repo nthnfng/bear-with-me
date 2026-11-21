@@ -138,7 +138,7 @@ describe('max chud Confrontation', () => {
     const s = run(confronted(), dev({ kind: 'setChudMeter', value: 1 }), eat(1), eat(1)).state;
     expect(view(s, 1, T0)).toMatchObject({
       pose: 'chud-point',
-      line: "♪ I'm a chud ♪",
+      line: "♪ You're a chud ♪",
       placement: 'face',
     });
   });

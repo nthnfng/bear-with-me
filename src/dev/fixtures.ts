@@ -44,7 +44,7 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
     chudPoint: {
       ...confrontation,
       pose: 'chud-point',
-      line: "♪ I'm a chud ♪",
+      line: "♪ You're a chud ♪",
       chudMeter: 1,
     },
     backToIt: { ...confrontation, pose: 'close-tab', showBackToIt: false, line: null },

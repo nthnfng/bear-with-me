@@ -640,7 +640,7 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
 /** How long the "Okay... -_-" pose lingers on the tab a Slack pass interrupted. */
 export const OKAY_MS = 4000;
 
-const chudLine = "♪ I'm a chud ♪";
+const chudLine = "♪ You're a chud ♪";
 const warningLine = 'Wrap it up!';
 const reachLine = 'Closing restricted tabs 💣';
 

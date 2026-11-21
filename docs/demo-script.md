@@ -67,7 +67,7 @@ Note: an injected block survives the 5 minute calendar refresh. Inject it with a
 ### 8. The Snooze sequence, Get up and the chud dance (about 25 s at demo tuning)
 - Barry, from the 5th Push (timed from the Snooze start): knocked down `got-owned` (5 s), `get-up` (0.6 s), standing `default` (2 s), `suspicious` with `ow` (1 s), `grieved` with `my arm hurts i guess ill leave u alone` (2.2 s), then `tired` in the corner until the Snooze ends. The Chud meter fills the whole time.
 - Presenter: click tired Barry (**Get up**). He does one `happy` jump (1 s), then the Snooze ends and the Arm comes back like a normal Snooze end. Clicking him before he is tired does nothing. The Chud meter only counts the Snooze time actually used (Get up stops it).
-- Max chud: with the meter pre-set to 0.9 it fills about 3 s in. The next Confrontation (visit a Restricted tab) is the `chud-point` dance with the line `♪ I'm a chud ♪`; in an Arm fight the Arm's body is `chud`.
+- Max chud: with the meter pre-set to 0.9 it fills about 3 s in. The next Confrontation (visit a Restricted tab) is the `chud-point` dance with the line `♪ You're a chud ♪`; in an Arm fight the Arm's body is `chud`.
 - Sound: `ow` on the 5th Push, `chudSong` ("I'm a chud") on arrival while the meter is full, once per arrival; it outlives tab switches.
 - Presenter: "The longer I slack, the bigger the chud." Point at the meter.
 - When the Snooze ends (or after Get up) the Reach comes straight back (no warning). Either Push 5 more times, or let it land to close the tabs. Landing: explosion on every Restricted tab and close.
