@@ -11,7 +11,7 @@ export const DEFAULT_TUNING: Tuning = {
   fatPerEat: 1,
   defaultSlackPassMs: 15 * MIN,
   snoozeMs: 5 * MIN,
-  warningMs: 30 * SEC,
+  warningMs: 15 * SEC,
   reachMs: 8 * SEC,
   maxPushes: 5,
   chudFullMs: 15 * MIN, // three full Snoozes

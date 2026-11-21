@@ -2,7 +2,7 @@
 
 Flow: calendar block, YouTube burst, chomps and growth through the sprite tiers, "Back to it?" explosion, Slack pass, Arm fight, 5 Pushes, the Snooze sequence (knocked down, getting up, "ow", tired), Get up, max chud dance and song.
 
-Timings assume the demo tuning (popup Dev panel "Demo speed" button, or `barry.dev({kind:'setTuning', tuning:{snoozeMs:20000, chudFullMs:60000, lockBackInMs:60000, idleAfterSec:15}})`). Warning is still 30 s and a Reach 8 s unless you shorten them (see "Optional stage tuning").
+Timings assume the demo tuning (popup Dev panel "Demo speed" button, or `barry.dev({kind:'setTuning', tuning:{snoozeMs:20000, chudFullMs:60000, lockBackInMs:60000, idleAfterSec:15}})`). Warning is 15 s and a Reach 8 s at normal speed, unless you shorten them (see "Optional stage tuning").
 
 ## Before going on stage
 
@@ -50,8 +50,8 @@ Note: an injected block survives the 5 minute calendar refresh. Inject it with a
 - Sound: none.
 - Say: "I earned a break on purpose." To save stage time, talk through it and keep using the page; the countdown is visible. (Total Slack pass 60 s, then the warning.)
 
-### 6. Warning then the Arm fight starts (30 s warning, then 8 s per Reach)
-- Barry: when the Slack pass ends, `suspicious-tap` pose, line `Wrap it up!` with a countdown for the 30 s warning (10 s if you shortened it). Then the `close-tab` pose, line `Closing restricted tabs 💣`, and the arm stretches from the corner toward the Restricted tab(s) at the top of the window. The popup shows "Pushes left".
+### 6. Warning then the Arm fight starts (15 s warning, then 8 s per Reach)
+- Barry: when the Slack pass ends, `suspicious-tap` pose, line `Wrap it up!` with a countdown for the 15 s warning (10 s at Demo speed). Then the `close-tab` pose, line `Closing restricted tabs 💣`, and the arm stretches from the corner toward the Restricted tab(s) at the top of the window. The popup shows "Pushes left".
 - Presenter: starts clicking Barry's arm or body.
 - Sound: nothing until the first Push.
 - If the Chud meter is full at this point, the Arm's body is `chud` and the song starts (arrival sound) - do not let this happen early.

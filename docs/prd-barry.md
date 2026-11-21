@@ -155,7 +155,7 @@ All behavior rules live in one pure module with no Chrome APIs, DOM, or real clo
   - "Back to it?" closes the current tab with an explosion and isn't counted as an eaten interaction.
   - Closing the restricted tab, by Barry or by hand, resets fatness to normal and returns to Focused.
 - **Slacking:** a chosen slack pass is running. Starting one while Confronting shows "Okay... -_-", resets fatness, and sends Barry to his corner. On restricted tabs Barry stays in the corner showing the chud meter and time left, and no interactions are eaten.
-- **Warning:** a slack pass has expired. This is a short heads-up (configurable, default ~30s).
+- **Warning:** a slack pass has expired. This is a short heads-up (configurable, default 15s).
 - **Reaching:** the arm reach start time is set, and every restricted tab renders the same arm progress from it. The speech line is "Closing restricted tabs 💣".
   - Each push (on the arm or body) plays a punch and restarts the reach.
   - When the arm reaches its target, every open restricted tab closes with an explosion each. Fatness and pushes reset, and the phase returns to Focused.
