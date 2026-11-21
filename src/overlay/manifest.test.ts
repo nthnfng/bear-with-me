@@ -12,7 +12,7 @@ describe('asset manifest', () => {
       expect(manifest.poses[p], p).toBeDefined();
       expect(file(manifest.poses[p].file), p).toBe(true);
     }
-    expect(manifest.poses.studious.anchors.hand).toBeDefined();
+    expect(manifest.poses['close-tab'].paw).toBeDefined();
   });
   it('has every sound with existing files', () => {
     for (const s of SOUNDS) {
@@ -20,13 +20,8 @@ describe('asset manifest', () => {
       for (const f of manifest.sounds[s]) expect(file(f), f).toBe(true);
     }
   });
-  it('has arm, explosion and cave files', () => {
-    for (const f of [
-      manifest.arm.segment,
-      manifest.arm.fist,
-      manifest.explosion.file,
-      manifest.cave,
-    ])
+  it('has chud bar, clock and cave files', () => {
+    for (const f of [manifest.chudBar.file, manifest.clockIcon.file, manifest.cave])
       expect(file(f), f).toBe(true);
     expect(manifest.explosion.durationMs).toBeGreaterThan(0);
   });

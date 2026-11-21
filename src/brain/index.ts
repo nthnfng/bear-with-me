@@ -30,6 +30,8 @@ export function initialState(): BarryState {
     slackPassEndsAt: null,
     okayStartedAt: null,
     snoozeEndsAt: null,
+    snoozeStartedAt: null,
+    gotUpAt: null,
     warningEndsAt: null,
     reachStartedAt: null,
     pushes: 0,
@@ -170,6 +172,8 @@ function apply(
         return { state: land(state, effects) };
       }
       return { state };
+    case 'gotUp':
+      return { state }; // Phase 5 lane A
   }
 }
 
@@ -493,8 +497,7 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
       visible: true,
       placement: 'face',
       position: state.position,
-      pose: full ? 'chud' : 'confrontation',
-      scale: Math.min(1 + state.fatness * state.tuning.scalePerFat, state.tuning.maxScale),
+      pose: full ? 'chud' : 'suspicious',
       line: full
         ? chudLine
         : block
@@ -562,7 +565,7 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
       return {
         ...shared,
         breakEndsAt: state.slackPassEndsAt,
-        ...(okay ? { pose: 'okay' as const, line: 'Okay... -_-' } : {}),
+        ...(okay ? { pose: 'suspicious' as const, line: 'Okay... -_-' } : {}),
       };
     }
     case 'warning':
@@ -581,7 +584,7 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
     case 'snoozing':
       return {
         ...shared,
-        pose: 'beaten',
+        pose: 'got-owned',
         line: snoozeLine(state.tuning.snoozeMs),
         breakEndsAt: state.snoozeEndsAt,
       };

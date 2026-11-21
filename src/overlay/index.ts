@@ -32,6 +32,7 @@ const SOUND_FLASH: Record<SoundId, string> = {
   ow: 'OW!',
   chudSong: '♪',
   burst: 'RAAAH!',
+  explosion: 'BOOM!',
 };
 
 const CORNER_PX = 150;
@@ -127,8 +128,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   arm.addEventListener('click', push);
   sprite.addEventListener('click', push);
 
-  armBody.style.backgroundImage = `url("${assetUrl(manifest.arm.segment)}")`;
-  fist.style.backgroundImage = `url("${assetUrl(manifest.arm.fist)}")`;
   const ARM_H = 40;
   const FIST_PX = 80;
   armBody.style.height = `${ARM_H}px`;
@@ -145,9 +144,9 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     if (!view || !view.visible || !view.reach) return;
     const progress = reachProgress(Date.now(), view.reach);
     armProgress = progress;
-    const [fw, fh] = manifest.frameSize;
+    const { w: fw, h: fh, paw } = manifest.poses[view.pose];
     const rect = sprite.getBoundingClientRect();
-    const handAnchor = manifest.poses.studious.anchors.hand ?? [fw * 0.9, fh * 0.55];
+    const handAnchor = paw ?? [fw * 0.9, fh * 0.55];
     const hand = anchorToViewport(rect, handAnchor, [fw, fh]);
     const tabX = tabViewportX(view.tabSlot, {
       outerWidth: window.outerWidth,
@@ -258,25 +257,25 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     const bursting =
       view.visible &&
       view.placement === 'face' &&
-      view.pose === 'confrontation' &&
-      !(prev?.visible && prev.placement === 'face' && prev.pose === 'confrontation');
+      view.pose === 'suspicious' &&
+      !(prev?.visible && prev.placement === 'face' && prev.pose === 'suspicious');
     const shrinking =
       prev !== null &&
       view.visible &&
       prev.visible &&
       prev.placement === 'face' &&
-      prev.pose === 'confrontation' &&
+      prev.placement === 'face' &&
       view.placement === 'corner' &&
-      view.pose === 'okay';
+      view.pose === 'suspicious';
     const firstRect = shrinking ? sprite.getBoundingClientRect() : null;
     prev = current = view;
     root.hidden = !view.visible;
 
     barry.className = `barry ${view.placement} ${view.position}${view.reach ? ' fighting' : ''}`;
-    setWobble(view.visible && view.pose === 'beaten');
+    setWobble(view.visible && view.pose === 'got-owned');
     const px = view.placement === 'face' ? FACE_PX : CORNER_PX;
     const pose = manifest.poses[view.pose];
-    const [fw, fh] = manifest.frameSize;
+    const { w: fw, h: fh } = pose;
     const key = `${view.pose}|${px}`;
     if (key !== spriteKey) {
       spriteKey = key;
@@ -286,15 +285,9 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       sprite.style.backgroundSize = `${pose.frames * 100}% 100%`;
       sprite.style.animation =
         pose.frames > 1
-          ? `frames ${pose.frames / pose.fps}s steps(${pose.frames - 1}) infinite`
+          ? `frames ${(pose.frames * (pose.frameMs ?? 200)) / 1000}s steps(${pose.frames - 1}) infinite`
           : '';
     }
-    sprite.style.transform = view.scale === 1 ? '' : `scale(${view.scale})`;
-    // Keep the bubble clear of a scaled-up face sprite.
-    bubble.style.marginBottom =
-      view.placement === 'face' ? `${(px * (view.scale - 1)) / 2 + 6}px` : '';
-    button.style.marginTop =
-      view.placement === 'face' ? `${(px * (view.scale - 1)) / 2 + 10}px` : '';
 
     bubble.hidden = view.line === null;
     if (view.line !== null) bubble.textContent = view.line;
@@ -363,9 +356,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     const el = document.createElement('div');
     el.className = 'explosion';
     el.style.setProperty('--ms', `${manifest.explosion.durationMs}ms`);
-    const img = document.createElement('img');
-    img.src = assetUrl(manifest.explosion.file);
-    el.appendChild(img);
     root.appendChild(el);
     if (!reducedMotion()) sprite.animate(
       [{ translate: '0 0' }, { translate: '-6px 0' }, { translate: '6px 0' }, { translate: '0 0' }],

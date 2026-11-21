@@ -101,12 +101,11 @@ describe('Confrontation arrival', () => {
     expect(brain.viewFor(s, 1, T0)).toMatchObject({
       visible: true,
       placement: 'face',
-      pose: 'confrontation',
+      pose: 'suspicious',
       line: "You planned ETF prep ,':/",
       showBackToIt: true,
       eatInput: true,
       pauseMedia: true,
-      scale: 1,
     });
   });
 
@@ -118,7 +117,7 @@ describe('Confrontation arrival', () => {
       act(1),
     ).state;
     const v = brain.viewFor(s, 1, T0);
-    expect(v.pose).toBe('confrontation');
+    expect(v.pose).toBe('suspicious');
     expect(v.line).toBeTruthy();
     expect(v.line).not.toContain('undefined');
   });
@@ -137,13 +136,11 @@ describe('eating', () => {
     const r = run(s, eat(1));
     expect(r.state.fatness).toBe(1);
     expect(r.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'chomp' }]);
-    expect(brain.viewFor(r.state, 1, T0).scale).toBeCloseTo(1 + DEFAULT_TUNING.scalePerFat);
     s = run(r.state, {
       type: 'dev',
       now: T0,
       command: { kind: 'setFatness', fatness: 1000 },
     }).state;
-    expect(brain.viewFor(s, 1, T0).scale).toBe(DEFAULT_TUNING.maxScale);
   });
 
   it('only counts while confronting on that tab', () => {
@@ -169,7 +166,6 @@ describe('fatness lifetime', () => {
     s = run(s, nav(2, 'https://reddit.com/'), act(2)).state;
     expect(s.phase).toBe('confronting');
     expect(s.fatness).toBe(3);
-    expect(brain.viewFor(s, 2, T0).scale).toBeGreaterThan(1.1);
   });
 
   it('persists on a non-Restricted tab while a Restricted tab is open, view goes calm', () => {
@@ -179,7 +175,6 @@ describe('fatness lifetime', () => {
     expect(brain.viewFor(s, 2, T0)).toMatchObject({
       placement: 'corner',
       pose: 'studious',
-      scale: 1,
     });
     s = run(s, act(1)).state;
     expect(s.phase).toBe('confronting');
@@ -415,14 +410,13 @@ describe('Slack pass', () => {
     expect(brain.viewFor(s, 1, T0 + 5)).toMatchObject({
       visible: true,
       placement: 'corner',
-      pose: 'okay',
+      pose: 'suspicious',
       line: 'Okay... -_-',
       eatInput: false,
       pauseMedia: false,
       chudMeter: 0,
       breakEndsAt: T0 + 5 + SLACK,
       reach: null,
-      scale: 1,
     });
     // eating does nothing now
     expect(run(s, eat(1)).state.fatness).toBe(0);
@@ -430,7 +424,7 @@ describe('Slack pass', () => {
 
   it('okay lingers OKAY_MS on the interrupted tab only, then studious', () => {
     const s = run(lockedIn(), slack(SLACK)).state;
-    expect(brain.viewFor(s, 1, T0 + OKAY_MS - 1).pose).toBe('okay');
+    expect(brain.viewFor(s, 1, T0 + OKAY_MS - 1).pose).toBe('suspicious');
     const later = brain.viewFor(s, 1, T0 + OKAY_MS);
     expect(later).toMatchObject({ pose: 'studious', line: null, breakEndsAt: T0 + SLACK });
     expect(brain.viewFor(s, 2, T0).pose).toBe('studious');
@@ -632,7 +626,7 @@ describe('Snooze', () => {
     expect(r.state).toMatchObject({ phase: 'snoozing', pushes: 0, snoozeEndsAt: now + SNOOZE });
     expect(brain.viewFor(r.state, 2, now)).toMatchObject({
       placement: 'corner',
-      pose: 'beaten',
+      pose: 'got-owned',
       line: "Ow... T-T my hand hurts so I'll leave you alone for 5 minutes...",
       breakEndsAt: now + SNOOZE,
       chudMeter: 0,

@@ -11,7 +11,7 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
   const confrontation: TabView = {
     ...corner,
     placement: 'face',
-    pose: 'confrontation',
+    pose: 'suspicious',
     line: "You planned ETF prep ,':/",
     showBackToIt: true,
     eatInput: true,
@@ -24,11 +24,11 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
     chillMeter: { ...corner, pose: 'chill', chudMeter: 0.65 },
     studious: { ...corner, pose: 'studious' },
     confrontation,
-    confrontationFatter: { ...confrontation, scale: 1.4 },
-    confrontationFattest: { ...confrontation, scale: 2 },
+    confrontationFatter: { ...confrontation, pose: 'fat-2' },
+    confrontationFattest: { ...confrontation, pose: 'fat-4' },
     slackPassStarting: {
       ...corner,
-      pose: 'okay',
+      pose: 'suspicious',
       line: 'Okay... -_-',
       chudMeter: 0.2,
       breakEndsAt: now + 15 * MIN,
@@ -59,7 +59,7 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
     },
     snoozing: {
       ...corner,
-      pose: 'beaten',
+      pose: 'got-owned',
       line: "Ow... T-T my hand hurts so I'll leave you alone for 5 minutes...",
       chudMeter: 0.5,
       breakEndsAt: now + 5 * MIN,

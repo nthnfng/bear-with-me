@@ -1,69 +1,188 @@
 {
-  "frameSize": [256, 256],
   "poses": {
+    "chill-mug": {
+      "file": "sprites/barry-chill-mug.png",
+      "w": 17,
+      "h": 20,
+      "frames": 13,
+      "frameMs": 220
+    },
     "chill": {
-      "file": "sprites/chill.svg",
-      "frames": 1,
-      "fps": 1,
-      "anchors": {
-        "bubble": [128, 10]
-      }
+      "file": "sprites/barry-chill.png",
+      "w": 29,
+      "h": 18,
+      "frames": 1
+    },
+    "thinking": {
+      "file": "sprites/barry-thinking.png",
+      "w": 17,
+      "h": 20,
+      "frames": 1
     },
     "studious": {
-      "file": "sprites/studious.svg",
-      "frames": 1,
-      "fps": 1,
-      "anchors": {
-        "bubble": [128, 10],
-        "hand": [236, 150]
-      }
+      "file": "sprites/barry-studious.png",
+      "w": 18,
+      "h": 20,
+      "frames": 14,
+      "frameMs": 180
     },
-    "confrontation": {
-      "file": "sprites/confrontation.svg",
-      "frames": 1,
-      "fps": 1,
-      "anchors": {
-        "bubble": [128, 10]
-      }
+    "suspicious": {
+      "file": "sprites/barry-suspicious.png",
+      "w": 17,
+      "h": 20,
+      "frames": 1
     },
-    "okay": {
-      "file": "sprites/okay.svg",
-      "frames": 1,
-      "fps": 1,
-      "anchors": {
-        "bubble": [128, 10]
-      }
+    "suspicious-tap": {
+      "file": "sprites/barry-suspicious-tap.png",
+      "w": 17,
+      "h": 20,
+      "frames": 6,
+      "frameMs": 130
     },
-    "beaten": {
-      "file": "sprites/beaten.svg",
+    "fat-1": {
+      "file": "sprites/barry-fat-1.png",
+      "w": 22,
+      "h": 25,
       "frames": 1,
-      "fps": 1,
-      "anchors": {
-        "bubble": [128, 10]
-      }
+      "paw": [
+        2,
+        13
+      ]
+    },
+    "fat-2": {
+      "file": "sprites/barry-fat-2.png",
+      "w": 28,
+      "h": 28,
+      "frames": 1,
+      "paw": [
+        2,
+        14
+      ]
+    },
+    "fat-3": {
+      "file": "sprites/barry-fat-3.png",
+      "w": 35,
+      "h": 33,
+      "frames": 1,
+      "paw": [
+        2,
+        16
+      ]
+    },
+    "fat-4": {
+      "file": "sprites/barry-fat-4.png",
+      "w": 42,
+      "h": 38,
+      "frames": 1,
+      "paw": [
+        2,
+        17
+      ]
     },
     "chud": {
-      "file": "sprites/chud.svg",
+      "file": "sprites/barry-chud.png",
+      "w": 50,
+      "h": 50,
       "frames": 1,
-      "fps": 1,
-      "anchors": {
-        "bubble": [128, 10]
-      }
+      "paw": [
+        3,
+        34
+      ]
+    },
+    "chud-point": {
+      "file": "sprites/barry-chud-point.png",
+      "w": 50,
+      "h": 50,
+      "frames": 1
+    },
+    "close-tab": {
+      "file": "sprites/barry-close-tab.png",
+      "w": 17,
+      "h": 20,
+      "frames": 1,
+      "paw": [
+        2,
+        14
+      ]
+    },
+    "got-owned": {
+      "file": "sprites/barry-got-owned.png",
+      "w": 30,
+      "h": 14,
+      "frames": 1
+    },
+    "get-up": {
+      "file": "sprites/barry-get-up.png",
+      "w": 29,
+      "h": 17,
+      "frames": 1
+    },
+    "get-up-2": {
+      "file": "sprites/barry-get-up-2.png",
+      "w": 28,
+      "h": 19,
+      "frames": 1
+    },
+    "default": {
+      "file": "sprites/barry-default.png",
+      "w": 17,
+      "h": 20,
+      "frames": 1
+    },
+    "grieved": {
+      "file": "sprites/barry-grieved.png",
+      "w": 17,
+      "h": 20,
+      "frames": 1
+    },
+    "tired": {
+      "file": "sprites/barry-tired.png",
+      "w": 18,
+      "h": 23,
+      "frames": 1
+    },
+    "happy": {
+      "file": "sprites/barry-happy.png",
+      "w": 21,
+      "h": 21,
+      "frames": 1
     }
   },
-  "arm": {
-    "segment": "sprites/arm-segment.svg",
-    "fist": "sprites/arm-fist.svg"
+  "scale": {
+    "corner": 4,
+    "face": 8
+  },
+  "chudBar": {
+    "file": "sprites/chud-bar.png",
+    "w": 35,
+    "h": 5
+  },
+  "clockIcon": {
+    "file": "sprites/icon-clock.png",
+    "w": 7,
+    "h": 7
   },
   "sounds": {
-    "chomp": ["sounds/roblox-eating-sound.mp3"],
-    "punch": ["sounds/slap.mp3"],
-    "ow": ["sounds/oof.mp3"],
-    "chudSong": ["sounds/im-a-chud.mp3"],
-    "burst": ["sounds/rahhh.mp3"]
+    "chomp": [
+      "sounds/roblox-eating-sound.mp3"
+    ],
+    "punch": [
+      "sounds/slap.mp3"
+    ],
+    "ow": [
+      "sounds/oof.mp3"
+    ],
+    "chudSong": [
+      "sounds/im-a-chud.mp3"
+    ],
+    "burst": [
+      "sounds/rahhh.mp3"
+    ],
+    "explosion": [
+      "sounds/explosion.mp3"
+    ]
   },
   "explosion": {
-    "file": "sprites/explosion.svg",
     "durationMs": 1000
   },
   "cave": "sprites/cave.svg"
