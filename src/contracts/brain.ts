@@ -67,6 +67,8 @@ export interface BarryState {
 
   /** Start of the last free gap a todo was suggested for (once per gap). */
   lastGapSuggested: Millis | null;
+  /** True once any scheduleUpdated has arrived (even an empty one). Free-gap suggestions wait for it. */
+  scheduleKnown: boolean;
   /** `now` of the last processed event; time-based growth integrates from here. */
   lastNow: Millis | null;
   /**
@@ -153,6 +155,21 @@ export interface TabView {
   /** The arm stretching out of corner Barry. Progress = (now - startedAt) / durationMs. Null = no arm. */
   reach: { startedAt: Millis; durationMs: number } | null;
   pushesLeft: number | null;
+  /**
+   * Where this tab sits in its window's tab strip, so the Arm can reach for it.
+   * The brain always leaves this null; the runtime fills it in before sending the view.
+   */
+  tabSlot: TabSlot | null;
+}
+
+/** A tab's place in its window's horizontal tab strip. Pinned tabs sit first and are narrow. */
+export interface TabSlot {
+  /** 0-based index among all tabs in the window (pinned included). */
+  index: number;
+  /** Tabs in the window, pinned included. */
+  count: number;
+  /** Pinned tabs in the window. */
+  pinned: number;
 }
 
 export const HIDDEN_VIEW: TabView = {
@@ -169,6 +186,7 @@ export const HIDDEN_VIEW: TabView = {
   breakEndsAt: null,
   reach: null,
   pushesLeft: null,
+  tabSlot: null,
 };
 
 /** The brain's public surface. Implemented in src/brain (Workstream A). */

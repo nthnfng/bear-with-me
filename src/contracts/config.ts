@@ -22,6 +22,14 @@ export const DEFAULT_TUNING: Tuning = {
   freeGapMinMs: 20 * MIN,
 };
 
+/** Fast timings for playtesting and the stage demo. The dev panel applies them via setTuning. */
+export const DEMO_TUNING: Partial<Tuning> = {
+  snoozeMs: 20 * SEC,
+  chudFullMs: 60 * SEC,
+  lockBackInMs: 60 * SEC,
+  idleAfterSec: 15,
+};
+
 export const DEFAULT_BLOCKLIST: BlocklistEntry[] = [
   'youtube.com',
   'reddit.com',

@@ -36,6 +36,7 @@ export function initialState(): BarryState {
     chudMeter: 0,
     studyingSince: null,
     lastGapSuggested: null,
+    scheduleKnown: false,
     lastNow: null,
     arrivedTabs: [],
     position: 'right',
