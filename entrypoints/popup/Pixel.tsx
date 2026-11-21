@@ -23,14 +23,15 @@ export function Sprite({
   since?: number;
   className?: string;
 }) {
-  const [frame, setFrame] = useState(0);
+  // Ticking only triggers re-renders; the frame is computed from `since` during render,
+  // so a new strip never paints with the old frame index.
+  const [, setTick] = useState(0);
   useEffect(() => {
-    setFrame(0);
     if (sprite.frames <= 1 || !sprite.frameMs) return;
-    const start = Date.now();
-    const id = setInterval(() => setFrame(frameAt(sprite, Date.now() - start)), sprite.frameMs! / 2);
+    const id = setInterval(() => setTick((t) => t + 1), sprite.frameMs! / 2);
     return () => clearInterval(id);
   }, [sprite.file, sprite.frames, sprite.frameMs, since]);
+  const frame = frameAt(sprite, Date.now() - since);
   return (
     <div
       className={`sprite ${className ?? ''}`}
@@ -48,7 +49,14 @@ export function ChudBar({ meter }: { meter: number }) {
   const S = CHUD_SCALE;
   const { w, h, file } = manifest.chudBar;
   return (
-    <div className="chudbar" style={{ width: w * S, height: h * S }}>
+    <div
+      className="chudbar"
+      role="meter"
+      aria-label="Chud meter"
+      aria-valuemin={0}
+      aria-valuemax={1}
+      aria-valuenow={meter}
+      style={{ width: w * S, height: h * S }}>
       <div
         className="track"
         style={{ left: CHUD_FILL.x * S, top: CHUD_FILL.y * S, width: CHUD_FILL.w * S, height: CHUD_FILL.h * S }}

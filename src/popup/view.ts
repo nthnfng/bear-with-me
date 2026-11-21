@@ -318,3 +318,10 @@ export function chudSteps(meter: number): number {
 export function chudFillWidth(meter: number): number {
   return Math.round((chudSteps(meter) / CHUD_STEPS) * CHUD_FILL.w);
 }
+
+/** Saved state merged over the defaults, so fields added since it was saved are never undefined. Mirrors the runtime's loadState. */
+export function withStateDefaults(saved: BarryState | null | undefined): BarryState | null {
+  if (!saved) return null;
+  const init = brain.initialState();
+  return { ...init, ...saved, tuning: { ...init.tuning, ...saved.tuning } };
+}

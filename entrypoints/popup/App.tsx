@@ -13,6 +13,7 @@ import {
   speedPreset,
   secondsToMs,
   tuningSeconds,
+  withStateDefaults,
 } from '@/src/popup/view';
 import { ChudMeter, SettingsSections } from './Settings';
 import { HeaderPose } from './Pixel';
@@ -26,8 +27,8 @@ function useBarryState() {
   const [state, setState] = useState<BarryState | null>(null);
   useEffect(() => {
     let alive = true;
-    storage.getItem<BarryState>(STORAGE_KEYS.state).then((s) => alive && setState(s));
-    const unwatch = storage.watch<BarryState>(STORAGE_KEYS.state, (s) => setState(s));
+    storage.getItem<BarryState>(STORAGE_KEYS.state).then((s) => alive && setState(withStateDefaults(s)));
+    const unwatch = storage.watch<BarryState>(STORAGE_KEYS.state, (s) => setState(withStateDefaults(s)));
     return () => {
       alive = false;
       unwatch();
