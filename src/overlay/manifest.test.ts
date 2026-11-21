@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { POSES, SOUNDS, type AssetManifest } from '../contracts';
-import manifestJson from '../../public/assets/manifest.json';
+import manifestJson from '../assets/manifest.json';
 
 const manifest = manifestJson as unknown as AssetManifest;
 const file = (p: string) => existsSync(`public/assets/${p}`);

@@ -96,7 +96,7 @@ Barry cannot appear on `chrome://` pages, the Chrome Web Store, `file://` pages 
 | `src/overlay/` | D | Content-script renderer for Barry on pages. |
 | `entrypoints/popup/` | E | React popup. |
 | `src/picker/` | F | Todo list element picker. |
-| `public/assets/` | G | Sprites, explosion GIF, sounds, `manifest.json`. |
+| `public/assets/` | G | Sprites, explosion GIF, sounds. (`manifest.json` lives in `src/assets/` so JS can import it.) |
 | `src/dev/` | all | Fixture TabViews for building the overlay and popup without the brain. |
 | `entrypoints/` | | WXT entrypoints; keep them thin and delegate to `src/`. |
 

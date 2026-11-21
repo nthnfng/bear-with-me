@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AssetManifest, PoseSprite } from '@/src/contracts';
-import manifestJson from '../../public/assets/manifest.json';
+import manifestJson from '../../src/assets/manifest.json';
 import { chudSignSegments, frameAt, spriteBox } from '@/src/popup/view';
 import { PAPER_COLORS, paperPaths } from '@/src/popup/paper';
 import type { PaperPaths } from '@/src/popup/paper';
