@@ -70,3 +70,12 @@ describe('buildSelector', () => {
     expect(buildSelector(li2, count)).toBe('body > ul > li:nth-of-type(2)');
   });
 });
+
+import { pageSpecificSelector } from './selector';
+describe('pageSpecificSelector', () => {
+  it('handles Google Docs only', () => {
+    expect(pageSpecificSelector('docs.google.com', '/document/d/x/edit')).toBe('.kix-paragraphrenderer');
+    expect(pageSpecificSelector('docs.google.com', '/spreadsheets/d/x')).toBeNull();
+    expect(pageSpecificSelector('example.com', '/document/')).toBeNull();
+  });
+});

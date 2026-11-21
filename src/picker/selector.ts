@@ -16,6 +16,7 @@ export interface ElLike {
 /** Item selectors for apps whose DOM we know. Picking inside one selects all of them. */
 export const KNOWN_ITEM_SELECTORS = [
   '.notion-to_do-block', // Notion to_do block
+  'd2l-list-item', // Brightspace list rows (Lit web components)
   '.task_list_item', // Todoist task row
   'li[data-item-id]', // Todoist (data-item-id)
   '[data-testid="task-list-item"]',
@@ -62,19 +63,27 @@ function nthPart(el: ElLike): string {
   const tag = el.tagName.toLowerCase();
   const same = el.siblings().filter((s) => s.tagName === el.tagName);
   if (same.length <= 1) return tag;
-  return `${tag}:nth-of-type(${same.indexOf(el) + 1})`;
+  const at = same.indexOf(el);
+  return at < 0 ? tag : `${tag}:nth-of-type(${at + 1})`;
 }
 
 /**
  * Builds a selector for `el`. `count(selector)` returns how many elements in the document match;
  * a candidate is accepted only if it matches exactly one (or, for known list items, at least one).
  */
-export function buildSelector(el: ElLike, count: (selector: string) => number): string {
-  // 1. Known list apps: pick the whole list of items.
+export function knownItemSelector(el: ElLike): string | null {
   let node: ElLike | null = el;
-  for (let i = 0; node && i <= MAX_ANCESTOR_STEPS; i++, node = node.parentElement) {
+  for (let i = 0; node && i <= MAX_ANCESTOR_STEPS * 2; i++, node = node.parentElement) {
     for (const sel of KNOWN_ITEM_SELECTORS) if (node.matches(sel)) return sel;
   }
+  return null;
+}
+
+export function buildSelector(el: ElLike, count: (selector: string) => number): string {
+  // 1. Known list apps: pick the whole list of items.
+  const known = knownItemSelector(el);
+  if (known) return known;
+  let node: ElLike | null = el;
   // 2. A stable attribute on the element itself, then on a close ancestor.
   node = el;
   for (let i = 0; node && i <= MAX_ANCESTOR_STEPS; i++, node = node.parentElement) {
@@ -98,6 +107,15 @@ export function buildSelector(el: ElLike, count: (selector: string) => number): 
     if (count(candidate) === 1) return candidate;
   }
   return parts.join(' > ');
+}
+
+/**
+ * Sites whose DOM we cannot pick from by pointing. Google Docs paints text on a canvas, so the
+ * click lands on a canvas tile; the readable text (when present) lives in .kix-paragraphrenderer.
+ */
+export function pageSpecificSelector(host: string, path: string): string | null {
+  if (host === 'docs.google.com' && path.startsWith('/document/')) return '.kix-paragraphrenderer';
+  return null;
 }
 
 export function makeSourceId(): string {

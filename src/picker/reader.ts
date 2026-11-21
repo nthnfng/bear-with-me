@@ -2,6 +2,7 @@
 
 import { storage } from 'wxt/utils/storage';
 import { STORAGE_KEYS, type ContentMessage, type Settings, type TodoSource } from '../contracts';
+import { queryAllPiercing, queryDeep } from './deep';
 import {
   collectCandidates,
   createChangeGate,
@@ -13,6 +14,7 @@ import {
 export const DEBOUNCE_MS = 800;
 export const MIN_GAP_MS = 2000;
 export const MAX_REREADS = 100;
+export const POLL_MS = 5000;
 
 /** Wraps a real Element in the NodeLike shape. */
 export function asNode(el: Element): NodeLike {
@@ -23,11 +25,13 @@ export function asNode(el: Element): NodeLike {
     },
     className: typeof el.className === 'string' ? el.className : '',
     matches: (s) => el.matches(s),
-    querySelectorAll: (s) => Array.from(el.querySelectorAll(s)).map(asNode),
+    querySelectorAll: (s) => queryAllPiercing(el, s).map(asNode),
     getAttribute: (n) => el.getAttribute(n),
     hasCheckedBox: () =>
       (el instanceof HTMLInputElement && el.type === 'checkbox' && el.checked) ||
-      !!el.querySelector('input[type="checkbox"]:checked'),
+      !!el.querySelector(
+        'input[type="checkbox"]:checked, [aria-checked="true"], [data-checked="true"]',
+      ),
     isStruckThrough: () => {
       try {
         const own = getComputedStyle(el).textDecorationLine;
@@ -44,7 +48,7 @@ export function asNode(el: Element): NodeLike {
 export function readSource(source: TodoSource, root: ParentNode = document): string[] {
   let els: Element[] = [];
   try {
-    els = Array.from(root.querySelectorAll(source.selector));
+    els = queryDeep(root, source.selector);
   } catch {
     return []; // bad selector saved earlier
   }
@@ -94,6 +98,10 @@ export function startTodoReader(send: (msg: ContentMessage) => void): TodoReader
   const mo = new MutationObserver(onMutation);
   mo.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   window.addEventListener('popstate', onMutation);
+  // MutationObserver cannot see inside shadow roots (Brightspace), so also re-check on a slow tick.
+  const poll = setInterval(() => {
+    if (matchSources(sources, location.origin, location.pathname).length > 0) schedule();
+  }, POLL_MS);
 
   const apply = (s: Settings | null) => {
     sources = s?.todoSources ?? [];
@@ -110,6 +118,7 @@ export function startTodoReader(send: (msg: ContentMessage) => void): TodoReader
     },
     destroy() {
       mo.disconnect();
+      clearInterval(poll);
       window.removeEventListener('popstate', onMutation);
       unwatch();
       if (timer) clearTimeout(timer);

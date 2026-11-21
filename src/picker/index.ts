@@ -1,7 +1,15 @@
 // Element picker: highlight under the cursor in a shadow-root overlay, click saves, Esc cancels.
 
 import type { ContentMessage, TodoSource } from '../contracts';
-import { buildSelector, makeSourceId, type ElLike } from './selector';
+import { composedParent, deepElementFromPoint, joinDeep } from './deep';
+import {
+  buildSelector,
+  knownItemSelector,
+  makeSourceId,
+  pageSpecificSelector,
+  type ElLike,
+} from './selector';
+import { ancestorChain, stepInChain, suggestContainer } from './widen';
 
 export interface PickerOptions {
   send(msg: ContentMessage): void;
@@ -9,7 +17,19 @@ export interface PickerOptions {
   onSaved?(source: TodoSource): void;
 }
 
+const wrappers = new WeakMap<Element, ElLike>();
+
+/** One wrapper per element, so siblings().indexOf(self) works (identity matters for nth-of-type). */
 export function asElLike(el: Element): ElLike {
+  let w = wrappers.get(el);
+  if (!w) {
+    w = makeElLike(el);
+    wrappers.set(el, w);
+  }
+  return w;
+}
+
+function makeElLike(el: Element): ElLike {
   return {
     tagName: el.tagName,
     id: el.id,
@@ -23,7 +43,38 @@ export function asElLike(el: Element): ElLike {
   } as ElLike;
 }
 
+/** Selector for `el`, with " >>> " segments for each open shadow root it sits inside. */
+function deepSelectorFor(el: Element, deepest: Element | null): string {
+  // Known apps: pick every row, whichever part of the list was highlighted.
+  if (deepest && deepest.getRootNode() === document) {
+    const known = knownItemSelector(asElLike(deepest));
+    if (known) return known;
+  }
+  const segments: string[] = [];
+  let node: Element | null = el;
+  for (let i = 0; node && i < 10; i++) {
+    const root = node.getRootNode() as Document | ShadowRoot;
+    segments.unshift(
+      buildSelector(asElLike(node), (s) => {
+        try {
+          return root.querySelectorAll(s).length;
+        } catch {
+          return 0;
+        }
+      }),
+    );
+    node = root instanceof ShadowRoot ? root.host : null;
+  }
+  return joinDeep(segments);
+}
+
 let active = false;
+let stopActive: (() => void) | null = null;
+
+/** Cancel a running picker (used when another frame saved a source). */
+export function stopActivePicker(): void {
+  stopActive?.();
+}
 
 export function startPicker(opts: PickerOptions): void {
   if (active) return;
@@ -39,14 +90,28 @@ export function startPicker(opts: PickerOptions): void {
     .tip { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 2147483647;
       background: #222; color: #fff; font: 600 14px system-ui, sans-serif; padding: 8px 14px;
       border-radius: 999px; pointer-events: none; }
-  </style><div class="box"></div><div class="tip">Click your task list. Esc to cancel.</div>`;
+  </style><div class="box"></div><div class="tip">Click your task list. Up/Down (or Shift + wheel) grows or shrinks the box. Esc cancels.</div>`;
   const box = shadow.querySelector('.box') as HTMLElement;
+  if (window !== window.top) shadow.querySelector('.tip')?.remove(); // one tip, in the top frame
   document.documentElement.appendChild(host);
+  stopActive = () => stop();
 
+  // `deepest` is the element under the cursor; `target` is what we highlight: by default the
+  // list holding it, then widened or narrowed with the arrow keys or Shift + wheel.
+  let deepest: Element | null = null;
   let target: Element | null = null;
-  const pick = (x: number, y: number): Element | null => {
-    const el = document.elementFromPoint(x, y);
-    return el && el !== host && !host.contains(el) ? el : null;
+  let chain: Element[] = [];
+  const pick = (x: number, y: number): Element | null =>
+    deepElementFromPoint(x, y, (el) => el === host || host.contains(el));
+  const setDeepest = (el: Element | null) => {
+    if (el === deepest) return;
+    deepest = el;
+    chain = el ? ancestorChain(el, composedParent) : [];
+    target = el ? suggestContainer(el, composedParent) : null;
+  };
+  const step = (delta: number) => {
+    if (target) target = stepInChain(chain, target, delta);
+    draw();
   };
   const draw = () => {
     if (!target) {
@@ -62,10 +127,13 @@ export function startPicker(opts: PickerOptions): void {
   };
   const stop = () => {
     active = false;
+    stopActive = null;
     for (const t of ['mousemove', 'click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup'])
       window.removeEventListener(t, handlers[t]!, true);
     window.removeEventListener('keydown', onKey, true);
     window.removeEventListener('scroll', draw, true);
+    window.removeEventListener('wheel', onWheel, true);
+    clearTimeout(giveUp);
     host.remove();
   };
 
@@ -75,21 +143,17 @@ export function startPicker(opts: PickerOptions): void {
   };
   const onMove = (e: Event) => {
     const m = e as MouseEvent;
-    target = pick(m.clientX, m.clientY);
+    setDeepest(pick(m.clientX, m.clientY));
     draw();
   };
   const onClick = (e: Event) => {
     swallow(e);
     const m = e as MouseEvent;
-    const el = pick(m.clientX, m.clientY) ?? target;
+    setDeepest(pick(m.clientX, m.clientY) ?? deepest);
+    const el = target;
     if (!el) return;
-    const selector = buildSelector(asElLike(el), (s) => {
-      try {
-        return document.querySelectorAll(s).length;
-      } catch {
-        return 0;
-      }
-    });
+    const selector =
+      pageSpecificSelector(location.hostname, location.pathname) ?? deepSelectorFor(el, deepest);
     const source: TodoSource = {
       id: makeSourceId(),
       origin: location.origin,
@@ -101,10 +165,22 @@ export function startPicker(opts: PickerOptions): void {
     opts.onSaved?.(source);
   };
   const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      swallow(e);
+      step(e.key === 'ArrowUp' ? 1 : -1);
+      return;
+    }
     if (e.key !== 'Escape') return;
     swallow(e);
     stop();
   };
+  const onWheel = (e: WheelEvent) => {
+    if (!e.shiftKey) return; // plain wheel still scrolls the page
+    swallow(e);
+    step((e.deltaY || e.deltaX) < 0 ? 1 : -1);
+  };
+  // Pickers run in every frame; stop if nothing is chosen (or another frame took the pick).
+  const giveUp = setTimeout(stop, 60_000);
 
   const handlers: Record<string, (e: Event) => void> = {
     mousemove: onMove,
@@ -117,4 +193,5 @@ export function startPicker(opts: PickerOptions): void {
   for (const [t, h] of Object.entries(handlers)) window.addEventListener(t, h, true);
   window.addEventListener('keydown', onKey, true);
   window.addEventListener('scroll', draw, true);
+  window.addEventListener('wheel', onWheel, { capture: true, passive: false });
 }

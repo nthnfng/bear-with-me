@@ -83,6 +83,8 @@ export const ITEM_SELECTOR = [
   '.notion-to_do-block',
   '.task_list_item',
   '[data-item-id]',
+  'd2l-list-item',
+  '.kix-paragraphrenderer',
 ].join(',');
 
 export function isChecked(n: NodeLike): boolean {

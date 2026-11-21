@@ -51,6 +51,14 @@ export function ChudMeter({ meter }: { meter: number }) {
   );
 }
 
+function sourceStatus(s: { id: string; origin: string }, todos: { sourceId: string }[]): string {
+  const n = todos.filter((t) => t.sourceId === s.id).length;
+  if (n > 0) return `${n} item${n === 1 ? '' : 's'} read`;
+  if (s.origin === 'https://docs.google.com')
+    return 'Saved, but no items found. In Docs turn on Tools > Accessibility > screen reader support, then reload.';
+  return 'Saved, but no items found yet. Open that page and make sure the list is visible.';
+}
+
 export function SettingsSections({
   state,
   now,
@@ -237,6 +245,8 @@ export function SettingsSections({
                   <span title={s.selector}>
                     {s.origin.replace(/^https?:\/\//, '')}
                     {s.path}
+                    <br />
+                    <small className="hint">{sourceStatus(s, state.todos)}</small>
                   </span>
                   <button
                     className="x"
