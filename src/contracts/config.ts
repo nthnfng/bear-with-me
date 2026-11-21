@@ -9,8 +9,8 @@ const MIN = 60 * SEC;
 
 export const DEFAULT_TUNING: Tuning = {
   fatPerEat: 1,
-  scalePerFat: 0.06,
-  maxScale: 2,
+  scalePerFat: 0.1,
+  maxScale: 2.5,
   defaultSlackPassMs: 15 * MIN,
   snoozeMs: 5 * MIN,
   warningMs: 30 * SEC,
@@ -24,6 +24,8 @@ export const DEFAULT_TUNING: Tuning = {
 
 /** Fast timings for playtesting and the stage demo. The dev panel applies them via setTuning. */
 export const DEMO_TUNING: Partial<Tuning> = {
+  warningMs: 10 * SEC,
+  reachMs: 6 * SEC,
   snoozeMs: 20 * SEC,
   chudFullMs: 60 * SEC,
   lockBackInMs: 60 * SEC,

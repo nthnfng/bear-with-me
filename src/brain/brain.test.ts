@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BarryEvent, BarryState, TabId } from '../contracts';
+import { DEFAULT_TUNING } from '../contracts';
 import { OKAY_MS, brain, initialState } from '.';
 
 const YT = 'https://www.youtube.com/watch?v=1';
@@ -136,13 +137,13 @@ describe('eating', () => {
     const r = run(s, eat(1));
     expect(r.state.fatness).toBe(1);
     expect(r.last).toEqual([{ type: 'playSound', tabId: 1, sound: 'chomp' }]);
-    expect(brain.viewFor(r.state, 1, T0).scale).toBeCloseTo(1.06);
+    expect(brain.viewFor(r.state, 1, T0).scale).toBeCloseTo(1 + DEFAULT_TUNING.scalePerFat);
     s = run(r.state, {
       type: 'dev',
       now: T0,
       command: { kind: 'setFatness', fatness: 1000 },
     }).state;
-    expect(brain.viewFor(s, 1, T0).scale).toBe(2);
+    expect(brain.viewFor(s, 1, T0).scale).toBe(DEFAULT_TUNING.maxScale);
   });
 
   it('only counts while confronting on that tab', () => {
