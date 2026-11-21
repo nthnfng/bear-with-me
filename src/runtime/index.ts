@@ -4,6 +4,7 @@
 // - pushes viewFor() to tabs after each event and executes BarryEffects
 // - schedules a precise wake-up at brain.nextDeadline(), with the alarm as a safety net
 
+import { windowsEmptiedBy } from './windowsEmptiedBy';
 import { storage } from 'wxt/utils/storage';
 import {
   STORAGE_KEYS,
@@ -65,6 +66,13 @@ export function startRuntime(brain: Brain) {
         ids.forEach((id) => closing.add(id));
         await Promise.all(ids.map((id) => sendToTab(id, { type: 'effect', effect })));
         await new Promise((r) => setTimeout(r, EXPLODE_MS));
+        // Chrome closes a window with its last tab: keep each such window open with a fresh tab.
+        const allTabs = await browser.tabs.query({});
+        await Promise.all(
+          windowsEmptiedBy(allTabs, ids).map((windowId) =>
+            browser.tabs.create({ windowId, active: true }).catch(() => {}),
+          ),
+        );
         // One call for every tab and window; closed tabs raise onRemoved -> tabClosed via the queue.
         try {
           await browser.tabs.remove(ids);
