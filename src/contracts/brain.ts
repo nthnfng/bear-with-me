@@ -167,8 +167,6 @@ export interface TabView {
   /** True only during a Confrontation. Pages work normally during an Arm fight. */
   eatInput: boolean;
   pauseMedia: boolean;
-  /** 0..1, or null to hide the meter. */
-  chudMeter: number | null;
   /** The renderer counts down to this; null hides the countdown. */
   breakEndsAt: Millis | null;
   /** The arm stretching out of corner Barry. Progress = (now - startedAt) / durationMs. Null = no arm. */
@@ -202,7 +200,6 @@ export const HIDDEN_VIEW: TabView = {
   showBackToIt: false,
   eatInput: false,
   pauseMedia: false,
-  chudMeter: null,
   breakEndsAt: null,
   reach: null,
   pushesLeft: null,

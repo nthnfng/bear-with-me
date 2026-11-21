@@ -169,7 +169,6 @@ describe('other poses', () => {
     expect(view(s, 3, t)).toMatchObject({
       pose: 'chill',
       breakEndsAt: T0 + 10 + MIN,
-      chudMeter: null,
       poseSince: T0 + 10,
     });
     expect(view(s, 2, t).pose).toBe('studious');

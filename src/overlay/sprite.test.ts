@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chudFillWidth,
-  chudSteps,
   fitScale,
   frameIndex,
   frameOffset,
@@ -43,16 +41,6 @@ describe('fitScale', () => {
   it('steps down on short viewports but never below 2', () => {
     expect(fitScale(8, 50, 600)).toBe(6);
     expect(fitScale(8, 50, 100)).toBe(2);
-  });
-});
-
-describe('chud bar', () => {
-  it('fills in 10 steps', () => {
-    expect(chudSteps(0)).toBe(0);
-    expect(chudSteps(0.64)).toBe(6);
-    expect(chudSteps(1.5)).toBe(10);
-    expect(chudFillWidth(1, 4)).toBe(33 * 4);
-    expect(chudFillWidth(0.5, 4)).toBe(Math.round(16.5) * 4);
   });
 });
 

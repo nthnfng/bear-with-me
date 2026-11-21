@@ -83,8 +83,6 @@ describe('Chud meter fill', () => {
     const t = s.lastNow!;
     const r = run(s, tick(t + T.snoozeMs / 5)).state;
     expect(r.chudMeter).toBeCloseTo(T.snoozeMs / 5 / T.chudFullMs);
-    // the meter lives in the popup only, never on the page
-    expect(brain.viewFor(s, 1, t + MIN).chudMeter).toBeNull();
   });
 
   it('stops at the Snooze end and the meter carries across Lock In ending', () => {
@@ -195,7 +193,6 @@ describe('Full Chud meter', () => {
     expect(brain.viewFor(c, 1, T0)).toMatchObject({
       pose: 'chud-point',
       placement: 'face',
-      chudMeter: null,
       eatInput: true,
     });
     let r = run(working(), setChud(1), act(1), {

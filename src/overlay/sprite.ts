@@ -36,15 +36,6 @@ export function fitScale(base: number, h: number, viewportH: number, maxFraction
   return s;
 }
 
-/** Chud meter 0..1 -> filled steps 0..10. */
-export function chudSteps(meter: number): number {
-  return Math.round(Math.min(1, Math.max(0, meter)) * 10);
-}
-
-/** The Chud bar's inner track is 33 art px wide; the orange fill covers steps/10 of it. */
-export function chudFillWidth(meter: number, s: number, trackArtPx = 33): number {
-  return Math.round((chudSteps(meter) / 10) * trackArtPx) * s;
-}
 
 export const GET_UP_STEP_MS = 300;
 /** Local in-between frames while the view's pose is `get-up`. */

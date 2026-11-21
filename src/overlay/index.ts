@@ -18,13 +18,12 @@ import type {
 } from '../contracts';
 import manifestJson from '../../public/assets/manifest.json';
 import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
-import { SUGGESTION_MS, clamp01, formatCountdown, pushesLabel, suggestionText } from './hud';
+import { SUGGESTION_MS, formatCountdown, pushesLabel, suggestionText } from './hud';
 import { createInputEater } from './input-eater';
 import { createMediaPauser } from './media-pauser';
 import {
   GET_UP_STEP_MS,
   SWAY_MS,
-  chudFillWidth,
   fitScale,
   frameIndex,
   frameOffset,
@@ -90,7 +89,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
         <div class="bubble" hidden></div>
         <div class="hud">
           <div class="pill pushes" hidden></div>
-          <div class="chudbar" hidden><div class="track"></div><div class="fill"></div><div class="outline"></div></div>
         </div>
         <div class="stage"><div class="sprite"></div><div class="stars" hidden>✦</div></div>
         <button class="btn" hidden>Back to it?</button>
@@ -110,10 +108,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   const armBar = q('.armbar');
   const armFist = q('.armfist');
   const pushesEl = q('.pushes');
-  const chudBar = q('.chudbar');
-  const chudTrack = q('.chudbar .track');
-  const chudFill = q('.chudbar .fill');
-  const chudOutline = q('.chudbar .outline');
   const suggestEl = q('.suggest');
   const suggestText = q('.suggesttext');
   // One Back to it per Confrontation: the brain takes both of a double click, so hide after the first.
@@ -125,19 +119,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     send({ type: 'backToIt' });
   });
   document.documentElement.appendChild(host);
-
-  // Chud bar: outline PNG at the corner scale, with the track and fill underneath (demo style).
-  const bar = manifest.chudBar;
-  chudBar.style.width = `${bar.w * S_CORNER}px`;
-  chudBar.style.height = `${bar.h * S_CORNER}px`;
-  chudOutline.style.backgroundImage = `url("${assetUrl(bar.file)}")`;
-  chudOutline.style.backgroundSize = '100% 100%';
-  for (const el of [chudTrack, chudFill]) {
-    el.style.left = `${S_CORNER}px`;
-    el.style.top = `${S_CORNER}px`;
-    el.style.height = `${(bar.h - 2) * S_CORNER}px`;
-  }
-  chudTrack.style.width = `${(bar.w - 2) * S_CORNER}px`;
 
   // Events from our own UI (the button) must never be eaten. The shadow root is closed, so
   // from outside the path only shows the host; the host itself has pointer-events: none and
@@ -655,13 +636,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     const showPushes = view.pushesLeft !== null;
     pushesEl.hidden = !showPushes;
     if (showPushes) pushesEl.textContent = pushesLabel(view.pushesLeft!);
-    const showMeter = view.chudMeter !== null;
-    chudBar.hidden = !showMeter;
-    if (showMeter) {
-      const m = clamp01(view.chudMeter!);
-      chudFill.style.width = `${chudFillWidth(m, S_CORNER)}px`;
-      chudBar.title = `Chud meter ${Math.round(m * 100)}%`;
-    }
     syncArm(view);
     // A suggestion belongs to chill Barry; any other pose drops it.
     if (view.pose !== 'chill-mug') hideSuggestion();

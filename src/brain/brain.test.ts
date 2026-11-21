@@ -414,7 +414,6 @@ describe('Slack pass', () => {
       line: 'Okay... -_-',
       eatInput: false,
       pauseMedia: false,
-      chudMeter: null,
       breakEndsAt: T0 + 5 + SLACK,
       reach: null,
     });
@@ -448,7 +447,6 @@ describe('Slack pass', () => {
       placement: 'corner',
       eatInput: false,
       pauseMedia: false,
-      chudMeter: null,
     });
   });
 
@@ -457,7 +455,6 @@ describe('Slack pass', () => {
     expect(brain.viewFor(s, 3, T0)).toMatchObject({
       pose: 'studious',
       breakEndsAt: null,
-      chudMeter: null,
       reach: null,
     });
   });
@@ -629,7 +626,6 @@ describe('Snooze', () => {
       pose: 'got-owned',
       line: null,
       breakEndsAt: now + SNOOZE,
-      chudMeter: null,
       reach: null,
       eatInput: false,
     });

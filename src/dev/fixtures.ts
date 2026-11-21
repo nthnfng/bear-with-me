@@ -23,16 +23,15 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
     ...corner,
     pose: 'close-tab',
     line: 'Closing restricted tabs 💣',
-    chudMeter: 0.2,
     reach: { startedAt: now, durationMs: 8 * SEC },
     pushesLeft: 5,
   };
-  const snooze: TabView = { ...corner, chudMeter: 0.5 };
+  const snooze: TabView = { ...corner };
   return {
     hidden: HIDDEN_VIEW,
     // Chill
     chill: { ...corner, pose: 'chill-mug' },
-    chillMeter: { ...corner, pose: 'chill-mug', chudMeter: 0.65 },
+    chillMeter: { ...corner, pose: 'chill-mug' },
     // Lock In
     studious: { ...corner, pose: 'studious' },
     confrontation,
@@ -45,7 +44,6 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
       ...confrontation,
       pose: 'chud-point',
       line: "♪ You're a chud ♪",
-      chudMeter: 1,
     },
     backToIt: { ...confrontation, pose: 'close-tab', showBackToIt: false, line: null },
     // Slack pass
@@ -53,20 +51,18 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
       ...corner,
       pose: 'suspicious',
       line: 'Okay... -_-',
-      chudMeter: 0.2,
       breakEndsAt: now + 15 * MIN,
     },
-    slackPass: { ...corner, pose: 'chill', chudMeter: 0.2, breakEndsAt: now + 12 * MIN },
+    slackPass: { ...corner, pose: 'chill', breakEndsAt: now + 12 * MIN },
     warning: {
       ...corner,
       pose: 'suspicious-tap',
       line: 'Wrap it up!',
-      chudMeter: 0.2,
       breakEndsAt: now + 30 * SEC,
     },
     // Arm fight
     reaching,
-    reachingChud: { ...reaching, pose: 'chud', chudMeter: 1 },
+    reachingChud: { ...reaching, pose: 'chud' },
     reachingLastPush: {
       ...reaching,
       reach: { startedAt: now - 4 * SEC, durationMs: 8 * SEC },

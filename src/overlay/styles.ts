@@ -54,7 +54,7 @@ export const CSS = `
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -12px; width: 12px; height: 12px;
   background: #fff; border-right: 4px solid var(--ink); border-bottom: 4px solid var(--ink);
   rotate: 45deg; translate: -50% 0; }
-.bubble[hidden], .btn[hidden], .suggest[hidden], .pill[hidden], .chudbar[hidden], .arm[hidden],
+.bubble[hidden], .btn[hidden], .suggest[hidden], .pill[hidden], .arm[hidden],
 .stars[hidden] { display: none; }
 .bubble.popin, .suggest.popin { animation: pop .3s cubic-bezier(.34,1.56,.64,1); transform-origin: 50% 100%; }
 .bubble img { image-rendering: pixelated; width: 21px; height: 21px; vertical-align: -4px; margin-right: 4px; }
@@ -76,10 +76,6 @@ export const CSS = `
 .hud { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 6px; }
 .pill { background: var(--ink); color: #fff; padding: 3px 10px; font-size: 13px; font-weight: 700; }
 .pushes { background: #c43c2c; }
-.chudbar { position: relative; image-rendering: pixelated; }
-.chudbar .track { position: absolute; background: #86b04a; }
-.chudbar .fill { position: absolute; background: #d88a4a; transition: width .3s; }
-.chudbar .outline { position: absolute; inset: 0; background-repeat: no-repeat; image-rendering: pixelated; }
 
 /* the stretchy arm: drawn in code (white bar + dark outline); a wide invisible hit area for punching */
 .arm { position: fixed; width: 0; height: 0; transform-origin: 0 50%; pointer-events: none; }

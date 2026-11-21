@@ -11,10 +11,6 @@ export function pushesLabel(n: number): string {
   return n === 1 ? '1 push left' : `${n} pushes left`;
 }
 
-export function clamp01(v: number): number {
-  return Math.min(1, Math.max(0, v));
-}
-
 export const SUGGESTION_MS = 4_000;
 
 export function suggestionText(freeMinutes: number | null, todo: string): string {
