@@ -32,6 +32,7 @@ for (const name of Object.keys(views)) select.add(new Option(name, name));
 let currentName = 'hidden';
 const show = () => {
   currentName = select.value;
+  eats = Math.max(0, TIERS.indexOf(currentName));
   overlay.render(fixtureViews(Date.now())[select.value]!);
 };
 select.onchange = show;
@@ -52,7 +53,7 @@ for (const row of POSE_ROWS) {
   b.textContent = row.label;
   b.onclick = () => {
     timers.splice(0).forEach(clearTimeout);
-    eats = 0;
+    eats = Math.max(0, TIERS.indexOf(row.view));
     select.value = currentName = row.view;
     overlay.render(fixtureViews(Date.now())[row.view]!);
     if (row.effect === 'explodeAndClose') overlay.playEffect({ type: 'explodeAndClose', tabIds: [0] });

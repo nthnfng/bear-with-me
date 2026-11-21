@@ -116,7 +116,14 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   const chudOutline = q('.chudbar .outline');
   const suggestEl = q('.suggest');
   const suggestText = q('.suggesttext');
-  button.addEventListener('click', () => send({ type: 'backToIt' }));
+  // One Back to it per Confrontation: the brain takes both of a double click, so hide after the first.
+  let backSentSince: number | null = null;
+  button.addEventListener('click', () => {
+    if (backSentSince !== null) return;
+    backSentSince = current?.poseSince ?? 0;
+    button.hidden = true;
+    send({ type: 'backToIt' });
+  });
   document.documentElement.appendChild(host);
 
   // Chud bar: outline PNG at the corner scale, with the track and fill underneath (demo style).
@@ -600,6 +607,10 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       countdownTimer = undefined;
       bubbleKey = '';
       poseKey = '';
+      if (flipTimer) clearInterval(flipTimer);
+      flipTimer = undefined;
+      displayPose = null;
+      backSentSince = null;
       eater.set(false);
       media.set(false);
       return;
@@ -620,6 +631,8 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
           const look = poseLook(view.pose, view.placement, prevPose);
           let entrance: EntranceAnim = fresh ? look.entrance : '';
           // The local chomp already squashed him a moment ago; don't squash twice.
+          // Already showing this pose locally (e.g. the get-up sequence ended on default): no second bounce.
+          if (displayPose === view.pose && prevPose !== view.pose) entrance = '';
           if (entrance === 'chomp' && Date.now() - lastChompAt < 400) entrance = '';
           if (view.pose === 'tired' && fresh && prevPose === 'grieved') {
             // Squash flat, then spring into the seated pose.
@@ -633,7 +646,8 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
         paintSprite(displayPose, displaySince, view.placement);
       }
       if (firstRect) shrinkFrom(firstRect);
-      button.hidden = !view.showBackToIt;
+      if (!view.showBackToIt || (backSentSince !== null && view.poseSince !== backSentSince)) backSentSince = null;
+      button.hidden = !view.showBackToIt || backSentSince !== null;
     }
     syncFx();
     renderBubble(view);
