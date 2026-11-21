@@ -8,6 +8,7 @@ import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTar
 import { SUGGESTION_MS, clamp01, formatCountdown, pushesLabel, suggestionText } from './hud';
 import { createInputEater } from './input-eater';
 import { createMediaPauser } from './media-pauser';
+import { isMacPlatform, tabViewportX } from './tabstrip';
 import { CSS } from './styles';
 
 export interface Overlay {
@@ -148,10 +149,12 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     const rect = sprite.getBoundingClientRect();
     const handAnchor = manifest.poses.studious.anchors.hand ?? [fw * 0.9, fh * 0.55];
     const hand = anchorToViewport(rect, handAnchor, [fw, fh]);
-    const { length, angleDeg } = armVector(
-      hand,
-      reachTarget(window.innerWidth, window.innerHeight),
-    );
+    const tabX = tabViewportX(view.tabSlot, {
+      outerWidth: window.outerWidth,
+      innerWidth: window.innerWidth,
+      isMac: isMacPlatform(navigator as never),
+    });
+    const { length, angleDeg } = armVector(hand, reachTarget(window.innerWidth, hand, tabX));
     const len = length * progress;
     arm.style.left = `${hand.x}px`;
     arm.style.top = `${hand.y}px`;
@@ -206,11 +209,57 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
         { transformOrigin: '0 0', translate: `${dx}px ${dy}px`, scale: String(s) },
         { transformOrigin: '0 0', translate: '0 0', scale: '1' },
       ],
-      { duration: 600, easing: 'cubic-bezier(.3,.9,.3,1)' },
+      { duration: reducedMotion() ? 0 : 600, easing: 'cubic-bezier(.3,.9,.3,1)' },
+    );
+  }
+
+  const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /** Barry bursts onto the page: pops from small with an overshoot. */
+  function burstIn() {
+    if (reducedMotion()) return;
+    sprite.animate(
+      [
+        { scale: '0.1', rotate: '-12deg', opacity: 0 },
+        { scale: '1.25', rotate: '6deg', opacity: 1, offset: 0.55 },
+        { scale: '0.95', rotate: '-2deg', opacity: 1, offset: 0.8 },
+        { scale: '1', rotate: '0deg', opacity: 1 },
+      ],
+      { duration: 550, easing: 'cubic-bezier(.2,.8,.3,1)' },
+    );
+    const f = document.createElement('div');
+    f.className = 'burstflash';
+    root.appendChild(f);
+    setTimeout(() => f.remove(), 500);
+  }
+
+  /** Beaten Snooze pose: a flop, then a slow dizzy wobble until the pose changes. */
+  let wobbleAnim: Animation | null = null;
+  function setWobble(on: boolean) {
+    if (!on || reducedMotion()) {
+      wobbleAnim?.cancel();
+      wobbleAnim = null;
+      return;
+    }
+    if (wobbleAnim) return;
+    wobbleAnim = sprite.animate(
+      [
+        { rotate: '0deg', translate: '0 -14px', offset: 0 },
+        { rotate: '-7deg', translate: '0 0', offset: 0.12 },
+        { rotate: '5deg', translate: '0 0', offset: 0.5 },
+        { rotate: '-5deg', translate: '0 0', offset: 0.8 },
+        { rotate: '-7deg', translate: '0 0', offset: 1 },
+      ],
+      { duration: 1400, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' },
     );
   }
 
   function render(view: TabView) {
+    const bursting =
+      view.visible &&
+      view.placement === 'face' &&
+      view.pose === 'confrontation' &&
+      !(prev?.visible && prev.placement === 'face' && prev.pose === 'confrontation');
     const shrinking =
       prev !== null &&
       view.visible &&
@@ -224,7 +273,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     root.hidden = !view.visible;
 
     barry.className = `barry ${view.placement} ${view.position}${view.reach ? ' fighting' : ''}`;
-    sprite.classList.toggle('beaten', view.pose === 'beaten');
+    setWobble(view.visible && view.pose === 'beaten');
     const px = view.placement === 'face' ? FACE_PX : CORNER_PX;
     const pose = manifest.poses[view.pose];
     const [fw, fh] = manifest.frameSize;
@@ -252,6 +301,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     button.hidden = !view.showBackToIt;
 
     if (firstRect) shrinkFrom(firstRect);
+    else if (bursting) burstIn();
 
     const showPushes = view.visible && view.pushesLeft !== null;
     pushesEl.hidden = !showPushes;
@@ -317,6 +367,10 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     img.src = assetUrl(manifest.explosion.file);
     el.appendChild(img);
     root.appendChild(el);
+    if (!reducedMotion()) sprite.animate(
+      [{ translate: '0 0' }, { translate: '-6px 0' }, { translate: '6px 0' }, { translate: '0 0' }],
+      { duration: 120, iterations: 3 },
+    );
     // Left in place: the background closes the tab shortly after.
   }
 
@@ -344,7 +398,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       if (suggestTimer) clearTimeout(suggestTimer);
       chudAudio?.pause();
       window.removeEventListener('resize', onResize);
-      eater.set(false);
+      eater.destroy();
       media.set(false);
       host.remove();
     },

@@ -10,7 +10,8 @@ export const CSS = `
 .barry.corner.right { right: 8px; }
 .barry.corner.middle { left: 50%; transform: translateX(-50%); }
 .barry.face { left: 50%; top: 50%; transform: translate(-50%, -50%); }
-.sprite { background-repeat: no-repeat; image-rendering: auto; transform-origin: center bottom; }
+.sprite { background-repeat: no-repeat; image-rendering: auto; transform-origin: center bottom;
+  transition: transform 500ms cubic-bezier(.3,.9,.3,1); }
 .face .sprite { transform-origin: center center; }
 @keyframes frames { from { background-position: 0 0; } to { background-position: 100% 0; } }
 .bubble { max-width: 320px; background: #fff; color: #222; border: 3px solid #222;
@@ -30,8 +31,6 @@ export const CSS = `
 .fist { position: absolute; background-size: 100% 100%; background-repeat: no-repeat;
   pointer-events: auto; cursor: pointer; }
 .fighting .sprite { pointer-events: auto; cursor: pointer; }
-.sprite.beaten { animation: wobble 500ms ease-in-out infinite; transform-origin: center bottom; }
-@keyframes wobble { 0%, 100% { rotate: -4deg; } 50% { rotate: 4deg; } }
 .hud { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 4px; }
 .pill { background: #222; color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 13px;
   font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -57,5 +56,17 @@ export const CSS = `
 .explosion img { width: min(90vw, 90vh); height: min(90vw, 90vh); animation: boom var(--ms) ease-out forwards; }
 @keyframes boom { 0% { transform: scale(0.1) rotate(-10deg); opacity: 1; }
   60% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+  85% { transform: scale(1.5) rotate(0); opacity: 1; }
   100% { transform: scale(1.6) rotate(0); opacity: 0; } }
+
+.burstflash { position: fixed; inset: 0; background: radial-gradient(circle, rgba(255,255,255,.85), rgba(255,235,59,.35) 45%, transparent 70%);
+  animation: burstflash 450ms ease-out forwards; pointer-events: none; }
+@keyframes burstflash { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sprite { transition: none; }
+  .burstflash { display: none; }
+  .flash { animation: none; opacity: 1; }
+  .explosion img { animation: boomfade var(--ms) linear forwards; }
+  @keyframes boomfade { from { opacity: 1; } to { opacity: 0; } }
+}
 `;

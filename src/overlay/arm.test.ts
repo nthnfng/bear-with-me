@@ -30,8 +30,12 @@ describe('geometry', () => {
   it('points right for a hand level with the target', () => {
     expect(armVector({ x: 0, y: 10 }, { x: 30, y: 10 }).angleDeg).toBeCloseTo(0);
   });
-  it('targets the top-right', () => {
-    expect(reachTarget(1000, 800, 20)).toEqual({ x: 980, y: 20 });
+  it('targets above the top edge at the tab x', () => {
+    expect(reachTarget(1000, { x: 900, y: 700 }, 300)).toEqual({ x: 300, y: -20 });
+  });
+  it('falls back to straight up from the hand, clamped to the viewport', () => {
+    expect(reachTarget(1000, { x: 900, y: 700 }, null)).toEqual({ x: 900, y: -20 });
+    expect(reachTarget(1000, { x: 1200, y: 700 }, null).x).toBe(1000);
   });
 });
 

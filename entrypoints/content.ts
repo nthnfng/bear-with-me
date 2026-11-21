@@ -13,7 +13,11 @@ export default defineContentScript({
   matches: ['<all_urls>'],
   // Todo lists often live in iframes (Brightspace); the reader and picker run in every frame.
   allFrames: true,
-  runAt: 'document_idle',
+  // document_start so the input eater's capture listeners are registered before the page's own
+  // (YouTube's key handlers); same-target capture listeners fire in registration order. The
+  // reader waits for the DOM below. One script (not a tiny early one + the overlay) keeps the
+  // runtime's inject-into-existing-tabs path a single file.
+  runAt: 'document_start',
   main() {
     const send = (msg: ContentMessage) => {
       browser.runtime.sendMessage(msg).catch(() => {
@@ -27,12 +31,20 @@ export default defineContentScript({
     const isTop = window === window.top;
     // Only the top frame draws Barry; subframes just read lists and run the picker.
     const overlay = isTop ? mountOverlay({ send }) : null;
-    const reader = startTodoReader(send);
+    let reader: ReturnType<typeof startTodoReader> | null = null;
+    let torndown = false;
+    const startReader = () => {
+      if (!torndown) reader = startTodoReader(send);
+    };
+    if (document.readyState === 'loading')
+      document.addEventListener('DOMContentLoaded', startReader, { once: true });
+    else startReader();
     document.addEventListener(
       TAKEOVER,
       () => {
         overlay?.destroy();
-        reader.destroy();
+        torndown = true;
+        reader?.destroy();
       },
       { once: true },
     );
@@ -41,7 +53,7 @@ export default defineContentScript({
       if (msg.type === 'view') overlay?.render(msg.view);
       if (msg.type === 'effect') overlay?.playEffect(msg.effect);
       if (msg.type === 'startPicker')
-        startPicker({ send, onSaved: (source) => reader.captureNow(source) });
+        startPicker({ send, onSaved: (source) => reader?.captureNow(source) });
     });
 
     // A source saved in another frame ends this frame's picker too. Only a NEW source counts:

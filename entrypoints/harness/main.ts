@@ -32,8 +32,13 @@ select.value = 'hidden';
 // Arm fight controls. Harness-only state; the real brain owns this in the extension.
 let fightPushes = 5;
 const timers: number[] = [];
+const num = (id: string) => Number((document.getElementById(id) as HTMLInputElement).value);
+const tabSlot = () =>
+  (document.getElementById('tabnull') as HTMLInputElement).checked
+    ? null
+    : { index: num('tabindex'), count: num('tabcount'), pinned: num('tabpinned') };
 const renderNow = (name: string, patch: Partial<TabView> = {}) =>
-  overlay.render({ ...fixtureViews(Date.now())[name]!, ...patch });
+  overlay.render({ ...fixtureViews(Date.now())[name]!, ...(name.startsWith('reach') || name === 'reaching' ? { tabSlot: tabSlot() } : {}), ...patch });
 document.querySelectorAll<HTMLElement>('[data-fight]').forEach((b) => {
   b.onclick = () => {
     timers.splice(0).forEach(clearTimeout);

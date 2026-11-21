@@ -35,9 +35,17 @@ export function anchorToViewport(
   };
 }
 
-/** The close button is in the top-right corner of the viewport. */
-export function reachTarget(vw: number, _vh: number, inset = 28): Pt {
-  return { x: vw - inset, y: inset };
+/** How far above the viewport's top edge the hand aims, so it exits the page. */
+export const REACH_ABOVE_PX = 20;
+
+/**
+ * The Reach grabs the tab: up out of the top edge at the tab's x. `tabX` comes from
+ * tabViewportX; null (no slot, or estimate off-screen) falls back to straight up from the
+ * hand, which reads as "reaching for the tab strip" without claiming a wrong tab.
+ */
+export function reachTarget(vw: number, hand: Pt, tabX: number | null): Pt {
+  const x = tabX ?? hand.x;
+  return { x: Math.min(Math.max(x, 0), vw), y: -REACH_ABOVE_PX };
 }
 
 /** Length in px and angle (CSS rotate, clockwise, 0 = pointing right) from hand to target. */
