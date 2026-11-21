@@ -152,7 +152,7 @@ Write the test first for each item, in this order. The order matches the demo cr
 
 **Owner:** 1 person (can share with WS-G if the artist codes). **Depends on:** WS-0. Build against mocked storage first.
 
-- [ ] Status header: Barry hibernating in the cave or showing his current pose, the current and next block, the slack countdown, and the chud meter.
+- [ ] Status header: the cave (when Barry is hidden) or his current pose, the current and next block, the slack countdown, and the chud meter.
 - [ ] Mode control: Auto, Chill, Lock In.
 - [ ] Slack pass: choose a duration and start it.
 - [ ] Barry settings: cave toggle (disabled with a tooltip while he's on a restricted site in Lock In) and position picker (L / M / R).
@@ -183,21 +183,19 @@ Write the test first for each item, in this order. The order matches the demo cr
 
 **Owner:** 1 person (the artist). **Depends on:** only the asset conventions from WS-0.
 
-- [ ] **Conventions (fix these in WS-0):** frame size (e.g. 256×256), horizontal strip sheets, fps per pose, and anchor points per pose and tier (`hand`, `mouth`, `bubble`), all described in `public/assets/manifest.json`.
-- [ ] Sprites, in demo priority order:
-  1. In-your-face (3 tiers)
-  2. Eating (3 tiers)
-  3. Arm-reaching body + stretchable arm segment + hand/fist
-  4. Beaten
-  5. Studious with glasses
-  6. "Okay... -_-" shrink
-  7. Very-fat chud singing and pointing
-  8. Popcorn
-  9. Sign/suggestion
-  10. Cave with hibernating Barry
-  11. Toolbar icons (16/32/48/128) per state
+- [ ] **Conventions (fix these in WS-0):** frame size (e.g. 256×256), horizontal strip sheets, fps per pose, and anchor points per pose (`hand` on studious for the arm, `bubble` for speech), all described in `public/assets/manifest.json`. Shapes are in `src/contracts/assets.ts`.
+- [ ] Sprites, in demo priority order. One sprite per pose; there are no size tiers, because the code scales Confrontation Barry up as Fatness grows.
+  1. Confrontation: in your face, already drawn fat
+  2. Reach arm: a segment that tiles along its length, plus the fist. It's just the arm, stretching out of corner Barry.
+  3. Beaten Barry
+  4. Studious with glasses (also the body the arm comes out of)
+  5. "Okay... -_-"
+  6. Chud: the fattest Barry, pointing
+  7. Chill, relaxing in the corner
+  8. Cave, for the popup. Barry walks in and disappears, so there's no Barry-in-cave sprite.
+  9. Toolbar icons (16/32/48/128)
 - [ ] Explosion GIF (~1s, transparent background).
-- [ ] Sounds: chomp (a few variants), punch, the "I'm a chud" jingle (~5s, loopable), and optionally a burst-in sting.
+- [ ] Sounds: chomp (a few variants, plays for each eaten interaction; there's no eating animation), punch (each Push), ow (5th Push), the "I'm a chud" song (~5s), burst (Barry bursting onto the page).
 - [ ] Swap placeholders for real assets as each one is finished. No code changes should be needed if the manifest is followed.
 
 **Done when:** no placeholder rectangles are left on the demo path.
@@ -242,7 +240,7 @@ Write the test first for each item, in this order. The order matches the demo cr
 | 2–10 | **A**: items 1–5 | **C**: persistence, tabs, view push (stub brain) · **B**: CORS check | **D**: shadow host, renderer, eater, media pause | **G**: in-your-face + eating sprites |
 | 10–12 | **Integration 1: the demo core works end to end** (fake block → YouTube → burst in → eat → Back to it → explode) | | | |
 | 12–20 | **A**: items 6–9 (slack, reach, beaten) | **B**: parser + fetcher · **C**: deadlines, explodeAndClose | **D**: arm reach, explosion, sounds, chud meter widget | **G**: arm, beaten, studious · **E**: popup core |
-| 20–28 | **A**: items 10–15 | **F**: picker + reader | **D**: animations, polish on real sites | **E**: dev panel, blocklist, ICS UI · **G**: chud, popcorn, cave, sounds |
+| 20–28 | **A**: items 10–15 | **F**: picker + reader | **D**: animations, polish on real sites | **E**: dev panel, blocklist, ICS UI · **G**: chud, chill, cave, sounds |
 | 28–30 | **Integration 2: everything** | | | |
 | 30–34 | Bug bash on real sites | **H**: demo profile, recording | Polish | **H**: slides, README |
 | 34–36 | Feature freeze, rehearse the demo twice | | | |

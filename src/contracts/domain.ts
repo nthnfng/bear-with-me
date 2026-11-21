@@ -10,7 +10,6 @@ export type Mode = 'chill' | 'lockIn';
 /** 'auto' follows the calendar; the others force a Mode. */
 export type ModeOverride = 'auto' | Mode;
 
-export type FatTier = 'slim' | 'chubby' | 'chud';
 export type Position = 'left' | 'middle' | 'right';
 export type EatKind = 'click' | 'scroll' | 'key' | 'unpause';
 
@@ -47,8 +46,9 @@ export interface BlocklistEntry {
 /** Every tunable number, so playtesting never touches logic. Defaults in config.ts. */
 export interface Tuning {
   fatPerEat: number;
-  /** Fatness at which each tier starts. Below `chubby` is slim. */
-  tierThresholds: { chubby: number; chud: number };
+  /** Confrontation sprite scale = 1 + fatness * scalePerFat, capped at maxScale. */
+  scalePerFat: number;
+  maxScale: number;
   defaultSlackPassMs: number;
   snoozeMs: number;
   /** Heads-up between a break ending and the first Reach. Only after a Slack pass. */

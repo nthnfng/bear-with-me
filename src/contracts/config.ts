@@ -9,7 +9,8 @@ const MIN = 60 * SEC;
 
 export const DEFAULT_TUNING: Tuning = {
   fatPerEat: 1,
-  tierThresholds: { chubby: 5, chud: 12 },
+  scalePerFat: 0.06,
+  maxScale: 2,
   defaultSlackPassMs: 15 * MIN,
   snoozeMs: 5 * MIN,
   warningMs: 30 * SEC,

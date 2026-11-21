@@ -9,6 +9,7 @@
 > - **The Chud meter is long-lived.** It fills only during Snoozes, never drains gradually, and carries across blocks and days. It resets to 0 only when the user **Locks back in**: 10 unbroken minutes of Studying (Lock In, no break running, no restricted tab active, user not idle). Idle time (away, screen locked, asleep) doesn't count, using Chrome's idle detection.
 > - **While the Chud meter is full,** every Confrontation and Arm fight uses chud Barry and plays "I'm a chud" on arrival, until the user Locks back in.
 > - Lock In ending mid-fight drops any Slack pass or Snooze, but leaves the Chud meter alone.
+> - **Poses** (one sprite each, no size tiers): chill (no popcorn), studious, confrontation (already fat; scaled up in code as Fatness grows), okay, beaten, chud (fattest Barry, pointing), plus the Reach arm on its own, coming out of corner Barry. There's no eating animation (just the chomp sound), no sign pose (free-time suggestions are a speech bubble from chill Barry), and no hibernating sprite (Barry goes into the cave and disappears). **Sounds:** chomp, punch, ow, chud song, burst.
 > - So the "Long-term progression" out-of-scope item no longer covers the Chud meter, and the open questions about when the Chud meter resets and what happens once it's full are answered.
 
 ## Problem Statement

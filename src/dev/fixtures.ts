@@ -8,39 +8,23 @@ const MIN = 60 * SEC;
 
 export function fixtureViews(now: Millis): Record<string, TabView> {
   const corner: TabView = { ...HIDDEN_VIEW, visible: true };
+  const confrontation: TabView = {
+    ...corner,
+    placement: 'face',
+    pose: 'confrontation',
+    line: "You planned ETF prep ,':/",
+    showBackToIt: true,
+    eatInput: true,
+    pauseMedia: true,
+  };
   return {
     hidden: HIDDEN_VIEW,
-    chillPopcorn: { ...corner, pose: 'popcorn' },
-    lockInStudious: { ...corner, pose: 'studious' },
-    confrontSlim: {
-      ...corner,
-      placement: 'face',
-      pose: 'face',
-      line: "You planned ETF prep ,':/",
-      showBackToIt: true,
-      eatInput: true,
-      pauseMedia: true,
-    },
-    confrontChubby: {
-      ...corner,
-      placement: 'face',
-      pose: 'face',
-      tier: 'chubby',
-      line: "You planned ETF prep ,':/",
-      showBackToIt: true,
-      eatInput: true,
-      pauseMedia: true,
-    },
-    eatingChud: {
-      ...corner,
-      placement: 'face',
-      pose: 'eating',
-      tier: 'chud',
-      line: "You planned ETF prep ,':/",
-      showBackToIt: true,
-      eatInput: true,
-      pauseMedia: true,
-    },
+    chill: { ...corner, pose: 'chill' },
+    chillSuggestion: { ...corner, pose: 'chill', line: "You've got 40 free minutes. Lab report?" },
+    studious: { ...corner, pose: 'studious' },
+    confrontation,
+    confrontationFatter: { ...confrontation, scale: 1.4 },
+    confrontationFattest: { ...confrontation, scale: 2 },
     slackPassStarting: {
       ...corner,
       pose: 'okay',
@@ -51,14 +35,14 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
     slackPass: { ...corner, pose: 'studious', chudMeter: 0.2, breakEndsAt: now + 12 * MIN },
     warning: {
       ...corner,
-      pose: 'reaching',
+      pose: 'studious',
       line: 'Wrapping up?',
       chudMeter: 0.2,
       breakEndsAt: now + 30 * SEC,
     },
     reaching: {
       ...corner,
-      pose: 'reaching',
+      pose: 'studious',
       line: 'Closing restricted tabs 💣',
       chudMeter: 0.2,
       reach: { startedAt: now, durationMs: 8 * SEC },
@@ -66,7 +50,7 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
     },
     reachingLastPush: {
       ...corner,
-      pose: 'reaching',
+      pose: 'studious',
       line: 'Closing restricted tabs 💣',
       chudMeter: 0.2,
       reach: { startedAt: now - 4 * SEC, durationMs: 8 * SEC },
@@ -80,17 +64,11 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
       breakEndsAt: now + 5 * MIN,
     },
     chudFull: {
-      ...corner,
-      placement: 'face',
+      ...confrontation,
       pose: 'chud',
-      tier: 'chud',
       line: "I'm a chud 🎵",
-      showBackToIt: true,
-      eatInput: true,
-      pauseMedia: true,
       chudMeter: 1,
       singChud: true,
     },
-    freeGapSign: { ...corner, pose: 'sign', line: "You've got 40 free minutes. Lab report?" },
   };
 }

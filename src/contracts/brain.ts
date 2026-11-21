@@ -6,7 +6,6 @@ import type {
   BlocklistEntry,
   CalendarBlock,
   EatKind,
-  FatTier,
   Millis,
   ModeOverride,
   Position,
@@ -80,7 +79,7 @@ type Ev<T extends string, P = {}> = { type: T; now: Millis } & P;
 export type DevCommand =
   | { kind: 'injectBlock'; title: string; durationMs: number }
   | { kind: 'setTuning'; tuning: Partial<Tuning> }
-  | { kind: 'setFatTier'; tier: FatTier }
+  | { kind: 'setFatness'; fatness: number }
   | { kind: 'setChudMeter'; value: number }
   | { kind: 'triggerFreeGap' }
   | { kind: 'reset' };
@@ -112,6 +111,7 @@ export type BarryEffect =
   | { type: 'playSound'; tabId: TabId; sound: SoundId }
   /** Explosion on each tab, then close them. */
   | { type: 'explodeAndClose'; tabIds: TabId[] }
+  /** Shown as a speech bubble from chill Barry in his corner. */
   | { type: 'showSuggestion'; tabId: TabId; todo: Todo; freeMinutes: number }
   | { type: 'setBadge'; pose: PoseId; text: string };
 
@@ -129,7 +129,8 @@ export interface TabView {
   placement: 'corner' | 'face';
   position: Position;
   pose: PoseId;
-  tier: FatTier;
+  /** Sprite scale from Fatness (1 = as drawn). Only grows during a Confrontation. */
+  scale: number;
   /** Speech bubble text, or null for none. */
   line: string | null;
   showBackToIt: boolean;
@@ -140,7 +141,7 @@ export interface TabView {
   chudMeter: number | null;
   /** The renderer counts down to this; null hides the countdown. */
   breakEndsAt: Millis | null;
-  /** Reach progress = (now - startedAt) / durationMs. Null = no arm. */
+  /** The arm stretching out of corner Barry. Progress = (now - startedAt) / durationMs. Null = no arm. */
   reach: { startedAt: Millis; durationMs: number } | null;
   pushesLeft: number | null;
   /** Play the chud song once when this view first appears. */
@@ -152,7 +153,7 @@ export const HIDDEN_VIEW: TabView = {
   placement: 'corner',
   position: 'right',
   pose: 'studious',
-  tier: 'slim',
+  scale: 1,
   line: null,
   showBackToIt: false,
   eatInput: false,
