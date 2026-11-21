@@ -1,9 +1,70 @@
 {
+  "frameSize": [256, 256],
+  "poses": {
+    "chill": {
+      "file": "sprites/chill.svg",
+      "frames": 1,
+      "fps": 1,
+      "anchors": {
+        "bubble": [128, 10]
+      }
+    },
+    "studious": {
+      "file": "sprites/studious.svg",
+      "frames": 1,
+      "fps": 1,
+      "anchors": {
+        "bubble": [128, 10],
+        "hand": [236, 150]
+      }
+    },
+    "confrontation": {
+      "file": "sprites/confrontation.svg",
+      "frames": 1,
+      "fps": 1,
+      "anchors": {
+        "bubble": [128, 10]
+      }
+    },
+    "okay": {
+      "file": "sprites/okay.svg",
+      "frames": 1,
+      "fps": 1,
+      "anchors": {
+        "bubble": [128, 10]
+      }
+    },
+    "beaten": {
+      "file": "sprites/beaten.svg",
+      "frames": 1,
+      "fps": 1,
+      "anchors": {
+        "bubble": [128, 10]
+      }
+    },
+    "chud": {
+      "file": "sprites/chud.svg",
+      "frames": 1,
+      "fps": 1,
+      "anchors": {
+        "bubble": [128, 10]
+      }
+    }
+  },
+  "arm": {
+    "segment": "sprites/arm-segment.svg",
+    "fist": "sprites/arm-fist.svg"
+  },
   "sounds": {
     "chomp": ["sounds/roblox-eating-sound.mp3"],
     "punch": ["sounds/slap.mp3"],
     "ow": ["sounds/oof.mp3"],
     "chudSong": ["sounds/im-a-chud.mp3"],
     "burst": ["sounds/rahhh.mp3"]
-  }
+  },
+  "explosion": {
+    "file": "sprites/explosion.svg",
+    "durationMs": 1000
+  },
+  "cave": "sprites/cave.svg"
 }

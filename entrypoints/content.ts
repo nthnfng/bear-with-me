@@ -6,17 +6,24 @@ export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
   main() {
-    const overlay = mountOverlay();
+    const send = (msg: ContentMessage) => {
+      browser.runtime.sendMessage(msg).catch(() => {
+        // Background not ready yet; it re-sends views on its own after waking.
+      });
+    };
+    // After an extension reload, the previous content script is orphaned but its listeners
+    // (input eater, media pause) keep running. Tell it to tear down, then claim the page.
+    const TAKEOVER = 'barry:takeover';
+    document.dispatchEvent(new CustomEvent(TAKEOVER));
+    const overlay = mountOverlay({ send });
+    document.addEventListener(TAKEOVER, () => overlay.destroy(), { once: true });
 
     browser.runtime.onMessage.addListener((msg: BackgroundMessage) => {
       if (msg.type === 'view') overlay.render(msg.view);
+      if (msg.type === 'effect') overlay.playEffect(msg.effect);
       if (msg.type === 'startPicker') startPicker();
-      // TODO(WS-D): msg.type === 'effect' (explosion, sounds, suggestions)
     });
 
-    const hello: ContentMessage = { type: 'hello' };
-    browser.runtime.sendMessage(hello).catch(() => {
-      // Background not ready yet; it re-sends views on its own after waking.
-    });
+    send({ type: 'hello' });
   },
 });

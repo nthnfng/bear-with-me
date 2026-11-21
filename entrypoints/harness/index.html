@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Barry overlay harness</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 16px;
+        max-width: 760px;
+      }
+      #panel {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        width: 300px;
+        background: #fffbe6;
+        border: 2px solid #333;
+        padding: 8px;
+        font-size: 12px;
+        z-index: 1000;
+        max-height: 90vh;
+        overflow: auto;
+      }
+      #log {
+        height: 160px;
+        overflow: auto;
+        background: #111;
+        color: #9f9;
+        padding: 4px;
+        font-family: monospace;
+      }
+      main {
+        margin-left: 330px;
+      }
+      .filler p {
+        margin: 0 0 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <strong>Barry harness</strong>
+      <div>
+        View:
+        <select id="views"></select>
+      </div>
+      <div>
+        Effects:
+        <button data-effect="chomp">chomp</button>
+        <button data-effect="burst">burst</button>
+        <button data-effect="explosion">explosion</button>
+      </div>
+      <div>Sent messages (<a href="#" id="clear">clear</a>):</div>
+      <div id="log"></div>
+    </div>
+    <main>
+      <h1>Page under Barry</h1>
+      <p>
+        <button class="logbtn">Page button A</button>
+        <button class="logbtn">Page button B</button>
+        <a href="#x" class="logbtn">link</a>
+      </p>
+      <video id="video" controls loop muted width="320"></video>
+      <audio id="audio" controls loop></audio>
+      <p><button id="addvideo">Add another video later</button></p>
+      <div class="filler" id="filler"></div>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
