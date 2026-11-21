@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Barry the Bear: animation demo</title>
+<link rel="stylesheet" href="../src/barry.css">
+<link rel="stylesheet" href="demo.css">
+</head>
+</head>
+<body>
+<div class="wrap">
+  <div class="browser" id="browser">
+    <div class="tabbar"><div class="tab"><span id="tabTitle">YouTube</span><span id="tabX">✕</span></div>
+      <button id="extIcon" title="Barry extension" onclick="togglePopup()">🐻</button></div>
+    <div id="popup">
+      <div class="caveScene"><div class="cave"></div><div class="mouth"></div>
+        <div class="sprite" id="caveBarry"></div><div class="zzz">z z Z</div></div>
+      <button id="caveBtn" onclick="caveButton()">send barry back</button>
+    </div>
+    <div class="page" id="page">
+      <div class="video" id="video">▶ playing: "1 hour of cat videos"</div>
+      <p style="font-size:13px">(during burst-in: click, scroll or press keys on this page to get eaten)</p>
+    </div>
+    <div class="closed" id="closedMsg">tab closed 💥</div>
+    <div id="chudBar"><div class="track"></div><div class="fill"></div><div class="sprite" id="chudBarImg"></div></div>
+    <div id="arm"></div>
+    <div id="barry"><div class="bubble" id="bubble"></div><div class="sprite" id="body"></div></div>
+  </div>
+
+  <div class="panel">
+    <h3>Chill</h3>
+    <button onclick="chillIdle()">chill idle</button>
+    <button onclick="freeGap()">free-gap suggestion</button>
+    <h3>Lock In</h3>
+    <button onclick="lockInOnTask()">on task (studious)</button>
+    <button onclick="burstIn()">open YouTube → burst in</button>
+    <button onclick="chompButton()">eat a click (chomp)</button>
+    <p class="hint">or click / scroll the page · each chomp = fatter · 5th = chud</p>
+    <h3>Slack pass</h3>
+    <button onclick="slackStart()">start slack pass</button>
+    <button onclick="slackWarning()">warning (30s left)</button>
+    <button onclick="armReach(true)">slack over → arm reach</button>
+    <p class="hint">click the arm to punch (5 = got owned → sits tired)</p>
+    <button onclick="getUp()">tell tired Barry to get up</button>
+    <h3>Other</h3>
+    <button onclick="setChud(state.chud + 1)">+10% chud meter</button>
+    <p class="hint">"I’m a chud" only plays when the bar is fully orange</p>
+    <button onclick="togglePopup()">open extension popup (🐻)</button>
+    <button class="alt" onclick="reset()">reset</button>
+    
+  </div>
+</div>
+
+<script src="../src/sprites.js"></script>
+<script src="../src/engine.js"></script>
+<script src="../src/triggers.js"></script>
+</body>
+</html>

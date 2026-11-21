@@ -1,0 +1,109 @@
+/* ============================================================
+   barry.css: Barry's look + every CSS animation class
+   ------------------------------------------------------------
+   Animation classes (applied with playAnim(el, "name")):
+     breathe   idle squash from the feet
+     tap       little steps() bob
+     pop       burst in: scale 0 → overshoot → 1
+     chomp     quick squash per eaten click
+     hit       white flash + shake (punch)
+     squash / unsquash   flatten, then spring into a new pose
+     slowjump  one slow happy jump
+     bounce    max-chud dance bounce
+     hop       walking bounce (cave)
+   Pixel rule: .sprite uses image-rendering: pixelated so art never blurs.
+   ============================================================ */
+
+/* every sprite is a div with a PNG background, scaled with crisp pixels */
+.sprite { image-rendering: pixelated; background-repeat:no-repeat; transform-origin:50% 100%; }
+#barry { position:absolute; bottom:12px; left:560px; transition: left .9s ease-in-out, bottom .5s; z-index:5; }
+#barry.hidden { display:none; }
+#barry .sprite { cursor:pointer; }
+
+/* idle: breathe (squash from the feet) */
+.breathe { animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.04, .95); } }
+
+/* chill: little tap-tap bob, steps() keeps it pixel-snappy */
+.tap { animation: tap .5s steps(1) infinite; }
+@keyframes tap { 50% { transform: translateY(-4px) scale(1.02,.98); } }
+
+/* burst in: pop from the bottom with overshoot */
+.pop { animation: pop .45s cubic-bezier(.34,1.56,.64,1); }
+@keyframes pop { 0% { transform: scale(0); } 60% { transform: scale(1.25,.85); } 100% { transform: scale(1); } }
+
+/* chomp: quick squash */
+.chomp { animation: chomp .18s ease-out; }
+@keyframes chomp { 50% { transform: scale(1.15,.85); } }
+
+/* punch: white flash + shake */
+.hit { animation: hit .3s steps(2); }
+@keyframes hit { 0% { filter: brightness(3); translate: -6px 0; } 50% { filter:none; translate: 6px 0; } 100% { translate: 0 0; } }
+
+/* squash flat, then stretch up: used to swap between poses (grieved → tired, tired → up) */
+.squash { animation: squash .15s ease-in forwards; }
+@keyframes squash { to { transform: scale(1.25, .7); } }
+.unsquash { animation: unsquash .35s cubic-bezier(.34,1.56,.64,1); }
+@keyframes unsquash { 0% { transform: scale(1.25, .7); } 60% { transform: scale(.9, 1.12); } 100% { transform: scale(1); } }
+
+/* one slow happy jump */
+.slowjump { animation: slowjump .9s ease-in-out; }
+@keyframes slowjump { 0%,100% { translate: 0 0; } 45% { translate: 0 -28px; } }
+
+/* max chud: bounce while singing */
+.bounce { animation: bounce .4s steps(2) infinite; }
+@keyframes bounce { 50% { transform: translateY(-8px) scale(.96,1.04); } }
+
+/* speech bubble (CSS, so it stretches to any text) */
+.bubble { position:absolute; left:50%; translate:-50% 0; background:#fff; color:#1e1a16;
+          border:4px solid #1e1a16; padding:6px 10px; font:600 13px/1.3 ui-monospace, monospace;
+          white-space:nowrap; z-index:6; display:none; }
+.bubble::after { content:""; position:absolute; left:calc(50% + var(--tail, 0px)); bottom:-12px; width:12px; height:12px;
+                 background:#fff; border-right:4px solid #1e1a16; border-bottom:4px solid #1e1a16; rotate:45deg; translate:-50% 0; }
+.bubble button { margin-left:8px; font:700 12px ui-monospace, monospace; border:3px solid #1e1a16; background:#86b04a; cursor:pointer; }
+.bubble img { image-rendering:pixelated; width:21px; vertical-align:-4px; }
+
+/* the stretchy arm: drawn in code (white bar + dark outline) */
+#arm { position:absolute; height:8px; background:#fff; border:4px solid #1e1a16; transform-origin: 0 50%;
+       width:0; display:none; z-index:7; cursor:pointer; border-radius:4px; }
+
+/* chud bar: outline PNG + coloured fill drawn by code */
+#chudBar { position:absolute; top:52px; left:14px; z-index:6; display:none; }
+#chudBar .fill { position:absolute; top:4px; left:4px; height:12px; background:#d88a4a; transition: width .3s; }
+#chudBar .track { position:absolute; top:4px; left:4px; height:12px; width:132px; background:#86b04a; }
+
+/* floating text: "chomp!", stars, notes, zzz */
+.float { position:absolute; font:700 14px ui-monospace, monospace; color:#1e1a16; pointer-events:none; z-index:8;
+         animation: floatUp .8s ease-out forwards; }
+@keyframes floatUp { to { translate: 0 -40px; opacity:0; } }
+.spin { position:absolute; font-size:18px; animation: spin 1s linear infinite; z-index:8; }
+@keyframes spin { to { rotate: 360deg; } }
+
+/* explosion particles */
+.boom { position:absolute; width:12px; height:12px; z-index:9; transition: transform .6s ease-out, opacity .6s; }
+
+/* hop = bounce while walking (steps keeps it pixel-snappy) */
+.hop { animation: hop .3s steps(2) infinite; }
+@keyframes hop { 50% { translate: 0 -10px; } }
+
+/* extension icon in the toolbar + its popup */
+#extIcon { margin-left:auto; margin-right:10px; align-self:center; background:#fff; border:0; border-radius:6px;
+           padding:4px 8px; cursor:pointer; font-size:16px; }
+#popup { position:absolute; top:44px; right:8px; width:240px; background:#2b2530; color:#eee; border-radius:10px;
+         box-shadow:0 8px 24px #0006; padding:12px; z-index:20; display:none; font-size:13px; }
+.caveScene { position:relative; height:120px; background:#3a3340; border-radius:8px; overflow:hidden; }
+.caveScene .cave { position:absolute; left:120px; bottom:0; width:100px; height:80px; background:#6b5f73;
+                   border-radius:50px 50px 0 0; }
+.caveScene .mouth { position:absolute; left:140px; bottom:0; width:60px; height:50px; background:#120f15;
+                    border-radius:30px 30px 0 0; }
+#caveBarry { position:absolute; bottom:6px; left:10px; transition: left 1.4s linear, opacity .4s, scale .4s; }
+.caveScene .zzz { left:170px; bottom:50px; display:none; }
+#caveBtn { width:100%; margin-top:10px; padding:8px; border:0; border-radius:6px; background:#8fb24a; font-weight:700; cursor:pointer; }
+
+/* (old) popup cave */
+.popup { margin-top:10px; height:130px; border-radius:10px; background:#2b2530; position:relative; overflow:hidden; display:none; }
+.popup .cave { position:absolute; left:50%; bottom:-40px; translate:-50% 0; width:240px; height:150px;
+               background:#463c4c; border-radius:120px 120px 0 0; }
+.popup .sleeper { position:absolute; left:50%; bottom:14px; translate:-50% 0; }
+.zzz { position:absolute; left:58%; bottom:70px; font:700 14px ui-monospace, monospace; color:#e8e2ea; animation: zzz 2s ease-out infinite; }
+@keyframes zzz { 0%{opacity:0; translate:0 0} 30%{opacity:1} 100%{opacity:0; translate:16px -30px} }
