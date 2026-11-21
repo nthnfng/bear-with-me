@@ -1,5 +1,16 @@
 # PRD: Barry the Bear: a priority-tracking Chrome extension
 
+> **Decisions made after this draft (2026-11-21).** These override anything below that disagrees. Canonical terms are in [CONTEXT.md](../CONTEXT.md); the code-level shapes are in `src/contracts/`.
+>
+> - **Terms:** "restricted site/tab" (not distracting/blocklisted). The automatic 5-minute break after the 5th Push is a **Snooze** (not an "extended slack pass"). **Reach / Push / Arm fight** name the end-of-break sequence.
+> - **Slack passes only exist in Lock In.** The popup button is disabled in Chill.
+> - **During an Arm fight the page works normally.** Only Barry's arm and body take clicks; nothing is eaten.
+> - **Fatness** lasts until *no* restricted tab is open anywhere (or a Slack pass starts). Closing one of several doesn't reset it.
+> - **The Chud meter is long-lived.** It fills only during Snoozes, never drains gradually, and carries across blocks and days. It resets to 0 only when the user **Locks back in**: 10 unbroken minutes of Studying (Lock In, no break running, no restricted tab active, user not idle). Idle time (away, screen locked, asleep) doesn't count, using Chrome's idle detection.
+> - **While the Chud meter is full,** every Confrontation and Arm fight uses chud Barry and plays "I'm a chud" on arrival, until the user Locks back in.
+> - Lock In ending mid-fight drops any Slack pass or Snooze, but leaves the Chud meter alone.
+> - So the "Long-term progression" out-of-scope item no longer covers the Chud meter, and the open questions about when the Chud meter resets and what happens once it's full are answered.
+
 ## Problem Statement
 
 I plan my day carefully. I block 4–6pm in Google Calendar for "ETF prep" and keep a todo list in Notion. Then I open YouTube "for one video" and look up an hour later. Every todo app knows what I *should* be doing. None of them notice what I'm *actually* doing, so nothing catches me when I drift off. Site blockers are too blunt: they're either off, or they lock me out of things I sometimes legitimately need, so I end up turning them off. I want something that notices the gap between my plan and my browser at the moment it happens, and nudges me back in a way that's fun rather than punishing.
