@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
-import { clamp01, formatCountdown, pushesLabel } from './hud';
+import { formatCountdown, pushesLabel } from './hud';
 
 describe('reachProgress', () => {
   const r = { startedAt: 1000, durationMs: 8000 };
@@ -30,8 +30,12 @@ describe('geometry', () => {
   it('points right for a hand level with the target', () => {
     expect(armVector({ x: 0, y: 10 }, { x: 30, y: 10 }).angleDeg).toBeCloseTo(0);
   });
-  it('targets the top-right', () => {
-    expect(reachTarget(1000, 800, 20)).toEqual({ x: 980, y: 20 });
+  it('targets above the top edge at the tab x', () => {
+    expect(reachTarget(1000, { x: 900, y: 700 }, 300)).toEqual({ x: 300, y: -20 });
+  });
+  it('falls back to straight up from the hand, clamped to the viewport', () => {
+    expect(reachTarget(1000, { x: 900, y: 700 }, null)).toEqual({ x: 900, y: -20 });
+    expect(reachTarget(1000, { x: 1200, y: 700 }, null).x).toBe(1000);
   });
 });
 
@@ -55,8 +59,18 @@ describe('hud text', () => {
     expect(pushesLabel(1)).toBe('1 push left');
     expect(pushesLabel(5)).toBe('5 pushes left');
   });
-  it('clamps', () => {
-    expect(clamp01(2)).toBe(1);
-    expect(clamp01(-1)).toBe(0);
+});
+
+import { suggestionText } from './hud';
+describe('suggestionText', () => {
+  it('words the free minutes and todo', () => {
+    expect(suggestionText(40, 'Lab report')).toBe(
+      "You've got 40 free minutes. How about: Lab report?",
+    );
+    expect(suggestionText(1, 'x')).toContain('1 free minute.');
+    expect(suggestionText(180, 'x')).toBe("You've got 3 free hours. How about: x?");
+    expect(suggestionText(null, 'Lab report')).toBe(
+      "You're free right now. How about: Lab report?",
+    );
   });
 });

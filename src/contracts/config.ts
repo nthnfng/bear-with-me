@@ -9,17 +9,25 @@ const MIN = 60 * SEC;
 
 export const DEFAULT_TUNING: Tuning = {
   fatPerEat: 1,
-  scalePerFat: 0.06,
-  maxScale: 2,
   defaultSlackPassMs: 15 * MIN,
   snoozeMs: 5 * MIN,
-  warningMs: 30 * SEC,
+  warningMs: 15 * SEC,
   reachMs: 8 * SEC,
   maxPushes: 5,
   chudFullMs: 15 * MIN, // three full Snoozes
   lockBackInMs: 10 * MIN,
   idleAfterSec: 5 * 60,
   freeGapMinMs: 20 * MIN,
+};
+
+/** Fast timings for playtesting and the stage demo. The dev panel applies them via setTuning. */
+export const DEMO_TUNING: Partial<Tuning> = {
+  warningMs: 10 * SEC,
+  reachMs: 6 * SEC,
+  snoozeMs: 20 * SEC,
+  chudFullMs: 60 * SEC,
+  lockBackInMs: 60 * SEC,
+  idleAfterSec: 15,
 };
 
 export const DEFAULT_BLOCKLIST: BlocklistEntry[] = [

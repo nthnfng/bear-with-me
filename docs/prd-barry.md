@@ -9,7 +9,8 @@
 > - **The Chud meter is long-lived.** It fills only during Snoozes, never drains gradually, and carries across blocks and days. It resets to 0 only when the user **Locks back in**: 10 unbroken minutes of Studying (Lock In, no break running, no restricted tab active, user not idle). Idle time (away, screen locked, asleep) doesn't count, using Chrome's idle detection.
 > - **While the Chud meter is full,** every Confrontation and Arm fight uses chud Barry and plays "I'm a chud" on arrival, until the user Locks back in.
 > - Lock In ending mid-fight drops any Slack pass or Snooze, but leaves the Chud meter alone.
-> - **Poses** (one sprite each, no size tiers): chill (no popcorn), studious, confrontation (already fat; scaled up in code as Fatness grows), okay, beaten, chud (fattest Barry, pointing), plus the Reach arm on its own, coming out of corner Barry. There's no eating animation (just the chomp sound), no sign pose (free-time suggestions are a speech bubble from chill Barry), and no hibernating sprite (Barry goes into the cave and disappears). **Sounds:** chomp, punch, ow, chud song, burst.
+> - **Poses** (Phase 5: real sprite art; supersedes the earlier "one sprite, scaled in code"): Fatness is **sprite tiers**, not scaling: 0 eats `suspicious`, 1 to 4 `fat-1` to `fat-4`, 5 or more `chud`; a full Chud meter makes the Confrontation the `chud-point` dance ("♪ You're a chud ♪"). Also chill (`chill-mug` in Chill, lounging `chill` on a Slack pass), `studious`, `thinking` (free-time suggestion), `suspicious-tap` (warning, "Wrap it up!"), `close-tab` (Reach and Back to it, `chud` as the Reach body when the meter is full), and the Snooze sequence below. Eating has no animation of its own beyond the overlay's chomp squash and sound. No hibernating sprite (Barry goes into the cave and disappears). **Sounds:** chomp, punch, ow, chud song, burst, explosion.
+> - **The Snooze is a timed sequence, and Barry can be told to get up (Phase 5).** After the 5th Push: knocked down `got-owned` 5 s, `get-up` 0.6 s, standing `default` 2 s, `suspicious` "ow" 1 s, `grieved` "my arm hurts i guess ill leave u alone" 2.2 s, then `tired` until the Snooze ends. Clicking tired Barry (or the popup button) is **Get up**: one `happy` jump (1 s), then the Snooze ends like a normal Snooze end and the Arm comes back. The Chud meter only counts the Snooze time actually used. A Snooze shorter than the sequence just ends early.
 > - So the "Long-term progression" out-of-scope item no longer covers the Chud meter, and the open questions about when the Chud meter resets and what happens once it's full are answered.
 
 ## Problem Statement
@@ -25,7 +26,7 @@ Barry has two modes:
 - **Chill mode** (outside scheduled blocks): Barry sits in a bottom corner eating popcorn and never steps in. When a free gap in the calendar opens up, he suggests an untimed todo to fill it.
 - **Lock In mode** (during a scheduled calendar block, or forced on from the popup): while the user is on task, Barry sits in his corner looking studious, with glasses. Opening a blocklisted site makes him burst onto the page, right in the user's face: "You planned ETF prep ,':/" with a **Back to it?** button. He pauses any playing media. Every interaction with the page other than closing it gets *eaten* (with a chomp), and Barry gets fatter and more annoying with each one. Clicking "Back to it?" makes Barry stretch his arm, close the tab, and the tab explodes.
 
-When the user wants a guilt-free break, they turn on a **slack pass** in the popup (e.g. 15 minutes). When it runs out, Barry warns them and then slowly reaches his arm across the screen: "Closing restricted tabs 💣". The user can punch his arm or body to push it back, up to 5 times. If the arm gets there, every open restricted tab closes, each with its own explosion. After the 5th push Barry is beaten up and sad ("Ow... T-T my hand hurts so I'll leave you alone for 5 minutes..."), and an automatic 5-minute **extended slack pass** begins. Afterwards his arm comes back, and the fight can repeat.
+When the user wants a guilt-free break, they turn on a **slack pass** in the popup (e.g. 15 minutes). When it runs out, Barry warns them and then slowly reaches his arm across the screen: "Closing restricted tabs 💣". The user can punch his arm or body to push it back, up to 5 times. If the arm gets there, every open restricted tab closes, each with its own explosion. After the 5th push Barry is knocked down, gets up, says "ow" and "my arm hurts i guess ill leave u alone", and sits tired while an automatic 5-minute **extended slack pass** (the Snooze) runs; the user can click tired Barry to end it early (Get up). Afterwards his arm comes back, and the fight can repeat.
 
 Two separate measures:
 
@@ -85,7 +86,7 @@ Users who don't want Barry on screen can send him to his **cave** (the extension
 33. As a user in Lock In, I want scrolling on the page eaten too, so that scroll-only feeds (Reddit, X, Shorts) don't slip past Barry.
 34. As a user in Lock In, I want unpausing media to count as an eaten click, so that resuming a video has a visible cost.
 35. As a user, I want Barry to visibly get fatter and more annoying with each eaten interaction, so that ignoring him has a funny, escalating consequence.
-36. As a user, I want Barry's fatness shown in three sizes (slim, chubby, chud), so that changes are obvious at a glance.
+36. As a user, I want Barry's fatness shown as sprite tiers (suspicious, fat-1 to fat-4, chud), so that changes are obvious at a glance.
 37. As a user who switches to a second distracting tab, I want the same (already fat) Barry there, so that switching tabs doesn't reset him.
 38. As a user, I want Barry to leave once I've closed the distracting tab and return to his corner (or chosen position) as studious Barry with glasses, back to normal size, so that he doesn't follow me onto my work.
 39. As a user, I want the cave option unavailable while Barry is on a restricted site in Lock In, so that hiding him can't be used to dodge him.
@@ -101,7 +102,7 @@ Users who don't want Barry on screen can send him to his **cave** (the extension
 46. As a user with several restricted tabs open, I want Barry's arm to stay at the same point when I switch between them, so that switching tabs doesn't restart or dodge the reach.
 47. As a user, I want to click Barry's arm or body to push the arm back, with a punch sound, so that I get a playful last-second fight.
 48. As a user, I want every open restricted tab to close at once, each with its own explosion, if Barry's arm reaches its target, so that the pass ends decisively.
-49. As a user who pushes the arm back a 5th time, I want Barry to become beaten up and sad ("Ow... T-T my hand hurts so I'll leave you alone for 5 minutes...") and start an automatic 5-minute extended slack pass, so that I can escape at the cost of feeling guilty.
+49. As a user who pushes the arm back a 5th time, I want Barry to be knocked down, get up, say "ow" and "my arm hurts i guess ill leave u alone", and sit tired while an automatic 5-minute extended slack pass runs, and to be able to click him to get up early (one happy jump, then the Arm comes back), and start an automatic 5-minute extended slack pass, so that I can escape at the cost of feeling guilty.
 50. As a user, I want Barry to recover after the extended slack pass and start stretching his arm again, so that the escape is temporary.
 51. As a user, I want to be able to keep fighting Barry off as many times as I like, so that I'm never fully locked out.
 
@@ -144,7 +145,7 @@ All behavior rules live in one pure module with no Chrome APIs, DOM, or real clo
 
 - **Events in:** clock tick (current time); schedule updated (calendar blocks); todos updated (untimed items); active tab changed (URL, title, tab id); tab opened / navigated / closed (so the brain knows every open restricted tab); interaction eaten (click / scroll / unpause); "Back to it?" clicked; slack pass started (duration); Barry pushed (arm or body); arm reached target; mode override set (auto / chill / lockIn); blocklist entry added / removed / toggled; position set; cave toggled; dev commands.
 - **State:** mode override; effective mode; blocklist entries (domain plus an enabled flag); cached blocks and todos; the set of open restricted tab ids; Lock In phase (below); fatness (a number) and its derived tier; slack pass (kind: chosen or extended, and end time); arm reach start time; pushes used in the current fight; chud meter (a number) and whether it's maxed; last free gap suggested; corner position; cave flag.
-- **Commands out:** show Barry on a tab (pose, fatness tier, speech line, chud meter value, slack time left); return Barry to corner or cave; pause media on a tab; play sound (chomp / punch / chud song); sync arm reach on a tab (start time, duration); close a set of tabs, each with an explosion; show free-gap suggestion; update toolbar icon/badge.
+- **Commands out:** show Barry on a tab (pose, fatness tier, speech line, slack time left; the chud meter shows only in the popup); return Barry to corner or cave; pause media on a tab; play sound (chomp / punch / chud song); sync arm reach on a tab (start time, duration); close a set of tabs, each with an explosion; show free-gap suggestion; update toolbar icon/badge.
 - **Mode resolution:** override chill/lockIn → that mode; auto → Lock In if a non-all-day calendar block covers now, otherwise Chill. Dev-injected fake blocks count as normal blocks. Slack passes don't change the mode; they change the Lock In phase.
 - **"Distracting" / "restricted"** means a tab's host matches an *enabled* blocklist entry, including subdomains. A toggled-off entry stays off until the user turns it back on. LLM-based on-task classification is deliberately deferred, and the "is this restricted?" decision is a single function so it can be swapped in later.
 
@@ -154,16 +155,16 @@ All behavior rules live in one pure module with no Chrome APIs, DOM, or real clo
   - "Back to it?" closes the current tab with an explosion and isn't counted as an eaten interaction.
   - Closing the restricted tab, by Barry or by hand, resets fatness to normal and returns to Focused.
 - **Slacking:** a chosen slack pass is running. Starting one while Confronting shows "Okay... -_-", resets fatness, and sends Barry to his corner. On restricted tabs Barry stays in the corner showing the chud meter and time left, and no interactions are eaten.
-- **Warning:** a slack pass has expired. This is a short heads-up (configurable, default ~30s).
+- **Warning:** a slack pass has expired. This is a short heads-up (configurable, default 15s).
 - **Reaching:** the arm reach start time is set, and every restricted tab renders the same arm progress from it. The speech line is "Closing restricted tabs 💣".
   - Each push (on the arm or body) plays a punch and restarts the reach.
   - When the arm reaches its target, every open restricted tab closes with an explosion each. Fatness and pushes reset, and the phase returns to Focused.
-- **Beaten:** the 5th push sets the beaten pose with "Ow... T-T my hand hurts so I'll leave you alone for 5 minutes..." and starts a 5-minute *extended* slack pass. Pushes reset to 0. When it ends, the phase goes straight back to Reaching with no second warning, and the fight can repeat indefinitely.
+- **Beaten (Snooze):** the 5th push starts the timed Snooze sequence (knocked down, get-up, standing, "ow", "my arm hurts i guess ill leave u alone", tired) inside a 5-minute *extended* slack pass. Get up in the tired stage ends it after a short happy jump. Pushes reset to 0. When it ends, the phase goes straight back to Reaching with no second warning, and the fight can repeat indefinitely.
 - If no restricted tab is open when a slack pass ends, the pass simply ends and the phase is Focused.
 - If Lock In ends (the block ends or the override changes to Chill) during any phase, the phase resets to Focused and the slack pass is cleared.
 
 #### Fatness
-- Each eaten interaction adds a fixed amount. Fatness maps to 3 tiers (slim / chubby / chud) through configurable thresholds.
+- Each eaten interaction adds a fixed amount. Fatness maps to sprite tiers by whole eats: 0 suspicious, 1 to 4 fat-1 to fat-4, 5 or more chud (no scaling).
 - It's shared across restricted tabs within a confrontation and resets to normal when the restricted tab is closed or a slack pass starts. It doesn't carry across confrontations, blocks, or days.
 
 #### Chud meter

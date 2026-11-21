@@ -24,6 +24,8 @@
         max-height: 90vh;
         overflow: auto;
       }
+      #poses button { display: block; width: 100%; text-align: left; margin: 1px 0; font-size: 11px; }
+      #poses .grp { margin-top: 6px; font-weight: 700; text-transform: uppercase; opacity: 0.7; }
       #log {
         height: 160px;
         overflow: auto;
@@ -47,6 +49,7 @@
         View:
         <select id="views"></select>
       </div>
+      <div id="poses"></div>
       <div>
         Effects:
         <button data-effect="chomp">chomp</button>
@@ -55,12 +58,29 @@
       </div>
       <div>
         Arm fight:
+        Tab <input id="tabindex" type="number" min="0" value="2" style="width: 3em" /> of
+        <input id="tabcount" type="number" min="1" value="8" style="width: 3em" />, pinned
+        <input id="tabpinned" type="number" min="0" value="1" style="width: 3em" />
+        <label><input id="tabnull" type="checkbox" /> no slot</label><br />
         <button data-fight="reach">reach (now)</button>
         <button data-fight="push">simulate push</button>
         <button data-fight="snooze">snoozing</button>
         <button data-fight="okay">confront &rarr; okay</button>
         <button data-effect="punch">punch</button>
         <button data-effect="ow">ow</button>
+      </div>
+      <div>
+        Todos:
+        <button id="suggest">suggestion bubble</button>
+        <button id="picker">start picker</button>
+        <button id="chudsong">chud arrives (playSound chudSong)</button>
+      </div>
+      <div id="picktarget">
+        <ul id="demo-list">
+          <li>Write lab report</li>
+          <li>Email TA</li>
+          <li class="done" aria-checked="true">Already done</li>
+        </ul>
       </div>
       <div>Sent messages (<a href="#" id="clear">clear</a>):</div>
       <div id="log"></div>

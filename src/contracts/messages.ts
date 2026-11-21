@@ -11,6 +11,7 @@ export type ContentMessage =
   | { type: 'backToIt' }
   | { type: 'pushed' }
   | { type: 'reachLanded'; reachStartedAt: Millis }
+  | { type: 'gotUp' }
   | { type: 'pickerSaved'; source: TodoSource }
   | { type: 'todosCaptured'; sourceId: string; items: string[] };
 
@@ -24,6 +25,7 @@ export type BackgroundMessage =
 export type PopupMessage =
   | { type: 'setModeOverride'; override: ModeOverride }
   | { type: 'startSlackPass'; durationMs: number }
+  | { type: 'gotUp' }
   | { type: 'setCave'; cave: boolean }
   | { type: 'setPosition'; position: Position }
   | { type: 'setMuted'; muted: boolean }

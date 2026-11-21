@@ -11,6 +11,14 @@ export function pushesLabel(n: number): string {
   return n === 1 ? '1 push left' : `${n} pushes left`;
 }
 
-export function clamp01(v: number): number {
-  return Math.min(1, Math.max(0, v));
+export const SUGGESTION_MS = 4_000;
+
+export function suggestionText(freeMinutes: number | null, todo: string): string {
+  if (freeMinutes === null) return `You're free right now. How about: ${todo}?`;
+  const n = Math.max(1, Math.round(freeMinutes));
+  if (n >= 120) {
+    const h = Math.round(n / 60);
+    return `You've got ${h} free hours. How about: ${todo}?`;
+  }
+  return `You've got ${n} free minute${n === 1 ? '' : 's'}. How about: ${todo}?`;
 }
