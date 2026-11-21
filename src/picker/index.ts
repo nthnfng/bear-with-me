@@ -13,9 +13,13 @@ import {
 import { ancestorChain, stepInChain, suggestContainer } from './widen';
 import { W2D_SELECTOR, W2D_TAG } from './brightspace';
 
+/** True if `el` is inside the Work To Do widget, or anywhere on its tile (header included). */
 function insideW2D(el: Element | null): boolean {
   for (let n = el, i = 0; n && i < 80; n = composedParent(n), i++) {
     if (n.tagName.toLowerCase() === W2D_TAG) return true;
+    const isTile = n.matches('.d2l-widget, [role="region"]');
+    if (isTile && n.querySelector(W2D_TAG)) return true;
+    if (isTile) return false;
   }
   return false;
 }
@@ -180,7 +184,9 @@ export function startPicker(opts: PickerOptions): void {
     // Docs: any click saves the marker (the text is read from the export, not the DOM).
     const docsMarker = pageSpecificSelector(location.hostname, location.pathname);
     // Brightspace Work To Do: any click inside the widget saves its marker.
-    const marker = docsMarker ?? (insideW2D(deepest ?? el) ? W2D_SELECTOR : null);
+    const marker =
+      docsMarker ??
+      (insideW2D(deepest) || insideW2D(el) || !!el?.querySelector(W2D_TAG) ? W2D_SELECTOR : null);
     if (!el && !marker) return;
     const source: TodoSource = {
       id: makeSourceId(),
