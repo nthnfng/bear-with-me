@@ -50,6 +50,8 @@ export interface BarryState {
   fatness: number;
   /** End of the running Slack pass ('slackPass' phase). */
   slackPassEndsAt: Millis | null;
+  /** When a Slack pass started mid-Confrontation: Barry says "Okay... -_-" for a moment. */
+  okayStartedAt: Millis | null;
   /** End of the running Snooze ('snoozing' phase). */
   snoozeEndsAt: Millis | null;
   warningEndsAt: Millis | null;

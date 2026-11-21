@@ -28,6 +28,7 @@ export function initialState(): BarryState {
     phase: 'clear',
     fatness: 0,
     slackPassEndsAt: null,
+    okayStartedAt: null,
     snoozeEndsAt: null,
     warningEndsAt: null,
     reachStartedAt: null,
@@ -122,8 +123,7 @@ function apply(
           ...state,
           phase: 'slackPass',
           slackPassEndsAt: event.now + event.durationMs,
-          // The "Okay... -_-" marker (see OKAY_MS): only set if it began mid-Confrontation.
-          reachStartedAt: wasConfronting ? event.now : null,
+          okayStartedAt: wasConfronting ? event.now : null,
           fatness: 0,
         },
         keepFatness: true,
@@ -171,6 +171,7 @@ function toClear(state: BarryState): BarryState {
     ...state,
     phase: 'clear',
     slackPassEndsAt: null,
+    okayStartedAt: null,
     warningEndsAt: null,
     reachStartedAt: null,
     snoozeEndsAt: null,
@@ -213,7 +214,7 @@ function advance(start: BarryState, now: Millis, effects: BarryEffect[]): BarryS
         phase: 'warning',
         warningEndsAt: state.slackPassEndsAt + t.warningMs,
         slackPassEndsAt: null,
-        reachStartedAt: null,
+        okayStartedAt: null,
       };
     } else if (state.phase === 'warning' && state.warningEndsAt !== null) {
       if (now < state.warningEndsAt) break;
@@ -378,9 +379,9 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
     case 'slackPass': {
       if (state.cave) return { ...HIDDEN_VIEW, position: state.position };
       const okay =
-        state.reachStartedAt !== null &&
+        state.okayStartedAt != null &&
         tabId === state.activeTabId &&
-        now < state.reachStartedAt + OKAY_MS;
+        now < state.okayStartedAt + OKAY_MS;
       return {
         ...shared,
         breakEndsAt: state.slackPassEndsAt,
