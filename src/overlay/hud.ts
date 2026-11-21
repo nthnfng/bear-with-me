@@ -14,3 +14,10 @@ export function pushesLabel(n: number): string {
 export function clamp01(v: number): number {
   return Math.min(1, Math.max(0, v));
 }
+
+export const SUGGESTION_MS = 20_000;
+
+export function suggestionText(freeMinutes: number, todo: string): string {
+  const n = Math.max(1, Math.round(freeMinutes));
+  return `You've got ${n} free minute${n === 1 ? '' : 's'}. How about: ${todo}?`;
+}

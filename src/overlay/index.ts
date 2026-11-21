@@ -5,7 +5,7 @@ import { browser } from 'wxt/browser';
 import type { AssetManifest, BarryEffect, ContentMessage, SoundId, TabView } from '../contracts';
 import manifestJson from '../../public/assets/manifest.json';
 import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
-import { clamp01, formatCountdown, pushesLabel } from './hud';
+import { SUGGESTION_MS, clamp01, formatCountdown, pushesLabel, suggestionText } from './hud';
 import { createInputEater } from './input-eater';
 import { createMediaPauser } from './media-pauser';
 import { CSS } from './styles';
@@ -49,6 +49,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     <div class="root" hidden>
       <div class="arm" hidden><div class="armbody"></div><div class="fist"></div></div>
       <div class="barry corner right">
+        <div class="suggest" hidden><span class="suggesttext"></span><button class="x" aria-label="Dismiss">×</button></div>
         <div class="bubble" hidden></div>
         <div class="hud">
           <div class="pill pushes" hidden></div>
@@ -71,6 +72,8 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   const countdownEl = shadow.querySelector('.countdown') as HTMLElement;
   const meterEl = shadow.querySelector('.meter') as HTMLElement;
   const meterFill = shadow.querySelector('.meterfill') as HTMLElement;
+  const suggestEl = shadow.querySelector('.suggest') as HTMLElement;
+  const suggestText = shadow.querySelector('.suggesttext') as HTMLElement;
   button.addEventListener('click', () => send({ type: 'backToIt' }));
   document.documentElement.appendChild(host);
 
@@ -86,6 +89,31 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   const media = createMediaPauser({
     reportUnpause: () => send({ type: 'eaten', kind: 'unpause' }),
   });
+
+  // Suggestion bubble (chill Barry). Dismissible, auto-hides.
+  let suggestion: string | null = null;
+  let suggestTimer: ReturnType<typeof setTimeout> | undefined;
+  function hideSuggestion() {
+    suggestion = null;
+    if (suggestTimer) clearTimeout(suggestTimer);
+    suggestTimer = undefined;
+    suggestEl.hidden = true;
+  }
+  (suggestEl.querySelector('.x') as HTMLElement).addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideSuggestion();
+  });
+  function showSuggestion(text: string) {
+    suggestion = text;
+    suggestText.textContent = text;
+    suggestEl.hidden = !(current?.visible ?? false);
+    if (suggestTimer) clearTimeout(suggestTimer);
+    suggestTimer = setTimeout(hideSuggestion, SUGGESTION_MS);
+  }
+
+  // Chud song: once per arrival (singChud rising edge), not per view push.
+  let singing = false;
+  let chudAudio: HTMLAudioElement | null = null;
 
   let spriteKey = '';
   let prev: TabView | null = null;
@@ -231,10 +259,19 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     if (showPushes) pushesEl.textContent = pushesLabel(view.pushesLeft!);
     const showMeter = view.visible && view.chudMeter !== null;
     meterEl.hidden = !showMeter;
-    if (showMeter) meterFill.style.width = `${clamp01(view.chudMeter!) * 100}%`;
+    if (showMeter) {
+      const m = clamp01(view.chudMeter!);
+      meterFill.style.width = `${m * 100}%`;
+      meterEl.classList.toggle('full', m >= 1);
+      meterEl.title = `Chud meter ${Math.round(m * 100)}%`;
+    }
     syncCountdown(view);
     syncArm(view);
-    // TODO(Phase 3): fancy chud meter, view.singChud song.
+    if (view.singChud && !singing) playChudSong();
+    singing = view.singChud;
+    // A suggestion belongs to chill Barry; any other pose or a hidden tab drops it.
+    if (!view.visible || view.pose !== 'chill') hideSuggestion();
+    else if (suggestion !== null) suggestEl.hidden = false;
 
     eater.set(view.visible && view.eatInput);
     media.set(view.visible && view.pauseMedia);
@@ -258,6 +295,18 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     }
   }
 
+  function playChudSong() {
+    const variants = manifest.sounds.chudSong;
+    const file = variants[Math.floor(Math.random() * variants.length)]!;
+    try {
+      chudAudio?.pause();
+      chudAudio = new Audio(assetUrl(file));
+      chudAudio.play().catch(() => flash(SOUND_FLASH.chudSong));
+    } catch {
+      flash(SOUND_FLASH.chudSong);
+    }
+  }
+
   function explode() {
     root.hidden = false;
     const el = document.createElement('div');
@@ -275,13 +324,15 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     playEffect(effect) {
       switch (effect.type) {
         case 'playSound':
+          // The chud song is driven by view.singChud; ignore a duplicate effect while singing.
+          if (effect.sound === 'chudSong' && singing) break;
           playSound(effect.sound);
           break;
         case 'explodeAndClose':
           explode();
           break;
         case 'showSuggestion':
-          // TODO(Phase 3): speech bubble from chill Barry.
+          showSuggestion(suggestionText(effect.freeMinutes, effect.todo.text));
           break;
         case 'setBadge':
           break; // background-only
@@ -290,6 +341,8 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     destroy() {
       if (rafId) cancelAnimationFrame(rafId);
       if (countdownTimer) clearInterval(countdownTimer);
+      if (suggestTimer) clearTimeout(suggestTimer);
+      chudAudio?.pause();
       window.removeEventListener('resize', onResize);
       eater.set(false);
       media.set(false);

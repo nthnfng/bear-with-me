@@ -21,6 +21,7 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
     hidden: HIDDEN_VIEW,
     chill: { ...corner, pose: 'chill' },
     chillSuggestion: { ...corner, pose: 'chill', line: "You've got 40 free minutes. Lab report?" },
+    chillMeter: { ...corner, pose: 'chill', chudMeter: 0.65 },
     studious: { ...corner, pose: 'studious' },
     confrontation,
     confrontationFatter: { ...confrontation, scale: 1.4 },
@@ -63,6 +64,7 @@ export function fixtureViews(now: Millis): Record<string, TabView> {
       chudMeter: 0.5,
       breakEndsAt: now + 5 * MIN,
     },
+    chudMeterFull: { ...corner, pose: 'studious', chudMeter: 1, line: 'Almost a chud...' },
     chudFull: {
       ...confrontation,
       pose: 'chud',

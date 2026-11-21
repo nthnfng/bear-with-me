@@ -5,6 +5,8 @@ import { browser } from 'wxt/browser';
 import type { ContentMessage, TabView } from '@/src/contracts';
 import { fixtureViews } from '@/src/dev/fixtures';
 import { mountOverlay } from '@/src/overlay';
+import { startPicker } from '@/src/picker';
+import { readSource } from '@/src/picker/reader';
 
 const log = document.getElementById('log')!;
 const send = (msg: ContentMessage) => {
@@ -116,4 +118,26 @@ document.getElementById('addvideo')!.onclick = () => {
   v.src = silentWav();
   document.querySelector('main')!.insertBefore(v, filler);
   v.play().catch(() => {});
+};
+
+// Todos: suggestion bubble, picker (on the demo list in the panel or the page), chud arrival.
+document.getElementById('suggest')!.onclick = () => {
+  renderNow('chill');
+  overlay.playEffect({
+    type: 'showSuggestion',
+    tabId: 0,
+    freeMinutes: 40,
+    todo: { text: 'Write lab report', sourceId: 'demo' },
+  });
+};
+document.getElementById('picker')!.onclick = () =>
+  startPicker({
+    send,
+    onSaved: (source) =>
+      send({ type: 'todosCaptured', sourceId: source.id, items: readSource(source) }),
+  });
+// Re-pushing the same chud view must not replay the song; hide first to reset the edge.
+document.getElementById('chudsong')!.onclick = () => {
+  renderNow('hidden');
+  renderNow('chudFull');
 };

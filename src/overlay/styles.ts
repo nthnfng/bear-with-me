@@ -16,7 +16,7 @@ export const CSS = `
 .bubble { max-width: 320px; background: #fff; color: #222; border: 3px solid #222;
   border-radius: 14px; padding: 8px 12px; font-size: 15px; font-weight: 600; line-height: 1.25;
   text-align: center; margin-bottom: 6px; }
-.bubble[hidden], .btn[hidden] { display: none; }
+.bubble[hidden], .btn[hidden], .suggest[hidden] { display: none; }
 .face .bubble { font-size: 22px; max-width: 460px; }
 .btn { pointer-events: auto; cursor: pointer; margin-top: 10px; font: inherit; font-size: 20px;
   font-weight: 700; padding: 10px 22px; border-radius: 999px; border: 3px solid #222;
@@ -39,7 +39,14 @@ export const CSS = `
 .pill[hidden], .meter[hidden] { display: none; }
 .meter { width: 90px; height: 10px; border: 2px solid #222; border-radius: 6px; background: #fff;
   overflow: hidden; }
-.meterfill { height: 100%; background: #8d6e63; }
+.meterfill { height: 100%; background: #8d6e63; transition: width 400ms ease; }
+.meter.full { border-color: #b71c1c; }
+.meter.full .meterfill { background: #d32f2f; }
+.suggest { position: relative; max-width: 300px; background: #fff8e1; color: #222; border: 3px solid #222;
+  border-radius: 14px; padding: 8px 28px 8px 12px; font-size: 14px; font-weight: 600;
+  line-height: 1.25; text-align: left; margin-bottom: 6px; pointer-events: auto; }
+.suggest .x { position: absolute; top: 2px; right: 4px; border: 0; background: transparent;
+  font: inherit; font-size: 18px; line-height: 1; cursor: pointer; color: #555; padding: 2px 4px; }
 .flash { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
   font-size: 72px; font-weight: 900; color: #ff5722; -webkit-text-stroke: 3px #222;
   animation: flash 700ms ease-out forwards; pointer-events: none; }

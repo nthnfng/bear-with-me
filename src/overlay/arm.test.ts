@@ -60,3 +60,13 @@ describe('hud text', () => {
     expect(clamp01(-1)).toBe(0);
   });
 });
+
+import { suggestionText } from './hud';
+describe('suggestionText', () => {
+  it('words the free minutes and todo', () => {
+    expect(suggestionText(40, 'Lab report')).toBe(
+      "You've got 40 free minutes. How about: Lab report?",
+    );
+    expect(suggestionText(1, 'x')).toContain('1 free minute.');
+  });
+});

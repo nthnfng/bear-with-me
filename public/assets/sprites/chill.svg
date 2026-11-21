@@ -8,5 +8,5 @@
 
 
 <path d="M108 178Q128 196 148 178" stroke="#222" fill="none" stroke-width="5" stroke-linecap="round"/>
-
+<rect x="196" y="176" width="36" height="34" rx="6" fill="#fff" stroke="#222" stroke-width="5"/><path d="M232 184q16 4 0 18" stroke="#222" fill="none" stroke-width="5"/><path d="M206 164q6-8 0-16M220 164q6-8 0-16" stroke="#90a4ae" fill="none" stroke-width="4" stroke-linecap="round"/>
 </svg>

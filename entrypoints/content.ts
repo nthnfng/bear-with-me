@@ -1,6 +1,7 @@
 import type { BackgroundMessage, ContentMessage } from '@/src/contracts';
 import { mountOverlay } from '@/src/overlay';
 import { startPicker } from '@/src/picker';
+import { startTodoReader } from '@/src/picker/reader';
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -16,12 +17,21 @@ export default defineContentScript({
     const TAKEOVER = 'barry:takeover';
     document.dispatchEvent(new CustomEvent(TAKEOVER));
     const overlay = mountOverlay({ send });
-    document.addEventListener(TAKEOVER, () => overlay.destroy(), { once: true });
+    const reader = startTodoReader(send);
+    document.addEventListener(
+      TAKEOVER,
+      () => {
+        overlay.destroy();
+        reader.destroy();
+      },
+      { once: true },
+    );
 
     browser.runtime.onMessage.addListener((msg: BackgroundMessage) => {
       if (msg.type === 'view') overlay.render(msg.view);
       if (msg.type === 'effect') overlay.playEffect(msg.effect);
-      if (msg.type === 'startPicker') startPicker();
+      if (msg.type === 'startPicker')
+        startPicker({ send, onSaved: (source) => reader.captureNow(source) });
     });
 
     send({ type: 'hello' });

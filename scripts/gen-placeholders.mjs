@@ -49,7 +49,12 @@ ${extra}
 `;
 }
 const poses = {
-  chill: bear({ eyes: 'happy', mouth: 'smile' }),
+  // Chill: relaxed, a mug and a little "~" of steam so it reads apart from the others.
+  chill: bear({
+    eyes: 'happy',
+    mouth: 'smile',
+    extra: `<rect x="196" y="176" width="36" height="34" rx="6" fill="#fff" stroke="#222" stroke-width="5"/><path d="M232 184q16 4 0 18" stroke="#222" fill="none" stroke-width="5"/><path d="M206 164q6-8 0-16M220 164q6-8 0-16" stroke="#90a4ae" fill="none" stroke-width="4" stroke-linecap="round"/>`,
+  }),
   // Paw at the hand anchor (236,150): the Reach arm comes out from here.
   studious: bear({
     glasses: true,
@@ -68,7 +73,15 @@ const poses = {
     mouth: 'frown',
     extra: `<rect x="150" y="60" width="50" height="16" rx="4" fill="#fff" stroke="#999" stroke-width="3" transform="rotate(-20 175 68)"/><circle cx="62" cy="150" r="10" fill="#7e57c2" opacity=".6"/>`,
   }),
-  chud: bear({ body: 26, eyes: 'wide', mouth: 'open', fur: '#a1887f' }),
+  // Chud: the fattest, smug, pointing at the user (finger at the right edge), with a chin strap.
+  chud: bear({
+    body: 26,
+    eyes: 'wide',
+    brows: true,
+    mouth: 'open',
+    fur: '#a1887f',
+    extra: `<path d="M70 196Q128 240 186 196" stroke="#3e2723" fill="none" stroke-width="8" stroke-linecap="round"/><rect x="196" y="140" width="56" height="20" rx="10" fill="#a1887f" stroke="${DARK}" stroke-width="6"/><circle cx="104" cy="206" r="0"/>`,
+  }),
 };
 for (const [name, svg] of Object.entries(poses)) writeFileSync(`${out}/${name}.svg`, svg);
 const w = (f, s) => writeFileSync(`${out}/${f}`, s);
