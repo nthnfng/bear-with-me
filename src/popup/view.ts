@@ -137,4 +137,4 @@ export function tuningSeconds(t: Tuning) {
   };
 }
 
-export const SLACK_PRESETS_MIN = [5, 10, 15] as const;
+export const SLACK_PRESETS_MIN = [1, 5, 10, 15] as const;
