@@ -384,3 +384,33 @@ describe('Get up', () => {
     expect(view(s, 1, t + 250).pose).toBe('got-owned');
   });
 });
+
+describe('review fixes', () => {
+  it('a legacy Snooze without snoozeStartedAt still gets stages and Get up', () => {
+    const s = { ...snoozing(), snoozeStartedAt: null };
+    expect(view(s, 1, SN0 + 100).pose).toBe('got-owned');
+    const tired =
+      SN0 +
+      SNOOZE_KNOCKED_MS +
+      SNOOZE_GET_UP_MS +
+      SNOOZE_STANDING_MS +
+      SNOOZE_OW_MS +
+      SNOOZE_GRIEVED_MS +
+      10;
+    expect(view(s, 1, tired)).toMatchObject({ pose: 'tired', canGetUp: true });
+    const r = run(s, gotUp(tired));
+    expect(r.state.gotUpAt).toBe(tired);
+  });
+  it('gotUpAt undefined (raw old storage) is treated as unset', () => {
+    const s = { ...snoozing(), snoozeStartedAt: null, gotUpAt: undefined } as unknown as BarryState;
+    expect(view(s, 1, SN0 + 100).pose).toBe('got-owned');
+  });
+  it('retuning mid-warning keeps the warning poseSince', () => {
+    const s = run(confronted(), slack(MIN), tick(T0 + MIN)).state;
+    expect(s.phase).toBe('warning');
+    const before = view(s, 1, T0 + MIN + 10).poseSince;
+    const s2 = run(s, tune({ warningMs: T.warningMs + 5000 }, T0 + MIN + 20)).state;
+    expect(view(s2, 1, T0 + MIN + 30).poseSince).toBe(before);
+    expect(before).toBe(T0 + MIN);
+  });
+});

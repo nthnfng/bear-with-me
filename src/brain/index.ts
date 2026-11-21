@@ -34,6 +34,7 @@ export function initialState(): BarryState {
     snoozeStartedAt: null,
     gotUpAt: null,
     warningEndsAt: null,
+    warningStartedAt: null,
     slackPassStartedAt: null,
     confrontSince: null,
     fightStartedAt: null,
@@ -184,7 +185,7 @@ function apply(
       // Only tired Barry can be told to get up. Past the Snooze's end it has already ended.
       if (
         state.phase !== 'snoozing' ||
-        state.gotUpAt !== null ||
+        state.gotUpAt != null ||
         state.snoozeEndsAt === null ||
         event.now >= state.snoozeEndsAt ||
         snoozeStage(state, event.now) !== 'tired'
@@ -217,6 +218,7 @@ function toClear(state: BarryState): BarryState {
     slackPassEndsAt: null,
     okayStartedAt: null,
     warningEndsAt: null,
+    warningStartedAt: null,
     slackPassStartedAt: null,
     fightStartedAt: null,
     reachStartedAt: null,
@@ -261,6 +263,7 @@ function advance(start: BarryState, now: Millis, effects: BarryEffect[]): BarryS
         ...state,
         phase: 'warning',
         warningEndsAt: state.slackPassEndsAt + t.warningMs,
+        warningStartedAt: state.slackPassEndsAt,
         slackPassEndsAt: null,
         okayStartedAt: null,
       };
@@ -274,6 +277,7 @@ function advance(start: BarryState, now: Millis, effects: BarryEffect[]): BarryS
         reachStartedAt: state.warningEndsAt,
         fightStartedAt: state.warningEndsAt,
         warningEndsAt: null,
+        warningStartedAt: null,
         slackPassStartedAt: null,
       };
     } else if (state.phase === 'reaching' && state.reachStartedAt !== null) {
@@ -390,17 +394,24 @@ function stageStarts(): { stage: SnoozeStage; at: number }[] {
 }
 
 /** The Snooze stage at `now` and when it began, or null outside a Snooze. */
+/** When the Snooze began; a pre-Phase-5 save has no `snoozeStartedAt`, so derive it from the end. */
+function snoozeStart(state: BarryState): Millis | null {
+  if (state.snoozeStartedAt != null) return state.snoozeStartedAt;
+  return state.snoozeEndsAt === null ? null : state.snoozeEndsAt - state.tuning.snoozeMs;
+}
+
 function snoozeStageAt(
   state: BarryState,
   now: Millis,
 ): { stage: SnoozeStage; since: Millis } | null {
-  if (state.phase !== 'snoozing' || state.snoozeStartedAt === null) return null;
-  if (state.gotUpAt !== null && now >= state.gotUpAt)
+  const start = snoozeStart(state);
+  if (state.phase !== 'snoozing' || start === null) return null;
+  if (state.gotUpAt != null && now >= state.gotUpAt)
     return { stage: 'happy', since: state.gotUpAt };
-  const elapsed = now - state.snoozeStartedAt;
+  const elapsed = now - start;
   let cur = stageStarts()[0]!;
   for (const st of stageStarts()) if (elapsed >= st.at) cur = st;
-  return { stage: cur.stage, since: state.snoozeStartedAt + cur.at };
+  return { stage: cur.stage, since: start + cur.at };
 }
 function snoozeStage(state: BarryState, now: Millis): SnoozeStage | null {
   return snoozeStageAt(state, now)?.stage ?? null;
@@ -420,7 +431,7 @@ function liveChud(state: BarryState, now: Millis): number {
     state.phase !== 'snoozing' ||
     state.snoozeEndsAt === null ||
     state.lastNow === null ||
-    state.gotUpAt !== null // Barry got up: no more Snooze time is used
+    state.gotUpAt != null // Barry got up: no more Snooze time is used
   ) {
     return state.chudMeter;
   }
@@ -674,7 +685,9 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
       return {
         ...shared,
         pose: 'suspicious-tap',
-        poseSince: state.warningEndsAt === null ? 0 : state.warningEndsAt - state.tuning.warningMs,
+        poseSince:
+          state.warningStartedAt ??
+          (state.warningEndsAt === null ? 0 : state.warningEndsAt - state.tuning.warningMs),
         line: warningLine,
         breakEndsAt: state.warningEndsAt,
       };
@@ -711,7 +724,7 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
       return {
         ...shared,
         pose,
-        poseSince: at?.since ?? state.snoozeStartedAt ?? 0,
+        poseSince: at?.since ?? snoozeStart(state) ?? 0,
         line,
         canGetUp: stage === 'tired',
         breakEndsAt: state.snoozeEndsAt,
@@ -750,19 +763,20 @@ function okayDeadline(state: BarryState): Millis | null {
 
 /** Next Snooze stage boundary after the last event and before the Snooze ends (views re-push then). */
 function snoozeStageDeadline(state: BarryState): Millis | null {
+  const start = snoozeStart(state);
   if (
     state.phase !== 'snoozing' ||
-    state.snoozeStartedAt === null ||
+    start === null ||
     state.snoozeEndsAt === null ||
     state.lastNow === null ||
-    state.gotUpAt !== null
+    state.gotUpAt != null
   ) {
     return null;
   }
   const last = state.lastNow;
   const end = state.snoozeEndsAt;
   const next = stageStarts()
-    .map((st) => state.snoozeStartedAt! + st.at)
+    .map((st) => start + st.at)
     .filter((t) => t > last && t < end);
   return next.length ? Math.min(...next) : null;
 }
@@ -779,7 +793,7 @@ function chudFullDeadline(state: BarryState): Millis | null {
     state.phase !== 'snoozing' ||
     state.lastNow === null ||
     state.chudMeter >= 1 ||
-    state.gotUpAt !== null
+    state.gotUpAt != null
   )
     return null;
   const at = state.lastNow + Math.ceil((1 - state.chudMeter) * state.tuning.chudFullMs);

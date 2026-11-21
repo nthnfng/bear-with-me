@@ -59,6 +59,8 @@ export interface BarryState {
   /** When the user clicked tired Barry (Get up). The Snooze then ends after a short happy jump. */
   gotUpAt: Millis | null;
   warningEndsAt: Millis | null;
+  /** When the current warning began (stable under retuning); null outside a warning. */
+  warningStartedAt: Millis | null;
   /** Start of the running Slack pass ('slackPass' phase). Chill Barry's pose run starts here. */
   slackPassStartedAt: Millis | null;
   /** When the current Confrontation pose (Fatness tier or chud-point) began; shared start for its poseSince. */
