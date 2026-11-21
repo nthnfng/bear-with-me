@@ -15,7 +15,7 @@ import type {
 } from '../contracts';
 import { DEFAULT_TUNING, DEMO_TUNING } from '../contracts';
 import { currentBlock, resolveMode } from '../brain/helpers';
-import { brain, caveAllowed } from '../brain';
+import { brain, caveAllowed, snoozeStage } from '../brain';
 
 export interface Countdown {
   label: string;
@@ -34,9 +34,14 @@ export interface PopupView {
   currentBlock: CalendarBlock | null;
   nextBlock: CalendarBlock | null;
   countdown: Countdown | null;
-  pushesLeft: number | null;
+  /** Under the countdown while tired Barry can be told to get up, else null. */
+  countdownHint: string | null;
   slackAllowed: boolean;
   slackHint: string | null;
+  /** A Slack pass is running: the chips change its length and Stop Slacking shows. */
+  onSlackPass: boolean;
+  /** Length of the running Slack pass in whole minutes (its chip is highlighted), else null. */
+  slackCurrentMin: number | null;
 }
 
 export const MODE_LABEL: Record<Mode, string> = { chill: 'Chill', lockIn: 'Lock In' };
@@ -51,7 +56,7 @@ export function nextBlock(state: Pick<BarryState, 'blocks'>, now: Millis): Calen
   return best;
 }
 
-export function countdownFor(state: BarryState): Countdown | null {
+export function countdownFor(state: BarryState, now: Millis): Countdown | null {
   switch (state.phase) {
     case 'slackPass':
       return state.slackPassEndsAt === null
@@ -66,7 +71,8 @@ export function countdownFor(state: BarryState): Countdown | null {
         ? null
         : { label: 'Arm lands in', target: state.reachStartedAt + state.tuning.reachMs };
     case 'snoozing':
-      return state.snoozeEndsAt === null
+      // Hidden while Barry collapses and gets up; shown once he sits tired.
+      return state.snoozeEndsAt === null || snoozeStage(state, now) !== 'tired'
         ? null
         : { label: 'Snooze ends in', target: state.snoozeEndsAt };
     default:
@@ -94,8 +100,28 @@ export function headlineFor(mode: Mode, state: Pick<BarryState, 'phase'>): strin
 
 export function slackPassStatus(mode: Mode, phase: BarryState['phase']) {
   if (mode === 'chill') return { allowed: false, hint: 'Barry only cares in Lock In.' };
-  if (phase === 'slackPass') return { allowed: false, hint: 'Already on a break.' };
   return { allowed: true, hint: null };
+}
+
+/** Length of the running Slack pass in minutes, or null when not on one. */
+export function slackCurrentMin(
+  state: Pick<BarryState, 'phase' | 'slackPassStartedAt' | 'slackPassEndsAt'>,
+): number | null {
+  if (state.phase !== 'slackPass') return null;
+  if (state.slackPassStartedAt === null || state.slackPassEndsAt === null) return null;
+  return Math.round((state.slackPassEndsAt - state.slackPassStartedAt) / 60_000);
+}
+
+/** What changing the running Slack pass to `min` minutes (counted from its start) would do. */
+export function slackChangePreview(
+  state: Pick<BarryState, 'slackPassStartedAt'>,
+  min: number,
+  now: Millis,
+): string {
+  if (state.slackPassStartedAt === null) return '';
+  const left = state.slackPassStartedAt + min * 60_000 - now;
+  if (left <= 0) return 'This ends your break now.';
+  return `${min} min total, ${formatCountdown(left)} left.`;
 }
 
 export function popupView(state: BarryState, now: Millis): PopupView {
@@ -111,13 +137,15 @@ export function popupView(state: BarryState, now: Millis): PopupView {
     override: state.modeOverride,
     currentBlock: currentBlock(state, now),
     nextBlock: nextBlock(state, now),
-    countdown: countdownFor(state),
-    pushesLeft:
-      mode === 'lockIn' && state.phase === 'reaching'
-        ? Math.max(0, state.tuning.maxPushes - state.pushes)
+    countdown: countdownFor(state, now),
+    countdownHint:
+      state.phase === 'snoozing' && snoozeStage(state, now) === 'tired'
+        ? 'Tap Barry to lock in again'
         : null,
     slackAllowed: slack.allowed,
     slackHint: slack.hint,
+    onSlackPass: state.phase === 'slackPass',
+    slackCurrentMin: slackCurrentMin(state),
   };
 }
 

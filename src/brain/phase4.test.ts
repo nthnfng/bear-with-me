@@ -465,3 +465,53 @@ describe('setTuning mid-phase', () => {
     );
   });
 });
+
+describe('Slack pass controls (Stop Slacking, change length)', () => {
+  const stop = (now: number): BarryEvent => ({ type: 'slackPassStopped', now });
+  const change = (durationMs: number, now: number): BarryEvent => ({
+    type: 'slackPassChanged',
+    durationMs,
+    now,
+  });
+
+  it('Stop Slacking on a Restricted tab confronts right away and closes nothing', () => {
+    const s = run(confronted(), slack(5 * MIN), stop(T0 + MIN));
+    expect(s.state.phase).toBe('confronting');
+    expect(s.state.slackPassEndsAt).toBeNull();
+    expect(s.state.slackPassStartedAt).toBeNull();
+    expect(s.last.some((e) => e.type === 'explodeAndClose')).toBe(false);
+    expect(brain.viewFor(s.state, 1, T0 + MIN).eatInput).toBe(true);
+  });
+
+  it('Stop Slacking on a normal tab goes back to studying', () => {
+    const s = run(confronted(), slack(5 * MIN), act(2, T0 + 1), stop(T0 + MIN)).state;
+    expect(s.phase).toBe('clear');
+    expect(brain.nextDeadline(s)).not.toBe(T0 + 5 * MIN);
+  });
+
+  it('Stop Slacking outside a Slack pass is ignored', () => {
+    const r = run(reaching(), stop(REACH_AT + 5)).state;
+    expect(r.phase).toBe('reaching');
+  });
+
+  it('changing the length counts from the original start', () => {
+    const s = run(confronted(), slack(MIN), change(10 * MIN, T0 + 30 * SEC)).state;
+    expect(s.phase).toBe('slackPass');
+    expect(s.slackPassStartedAt).toBe(T0);
+    expect(s.slackPassEndsAt).toBe(T0 + 10 * MIN);
+    expect(brain.nextDeadline(s)).toBe(T0 + 10 * MIN);
+  });
+
+  it('shortening past the time already used ends the break into the warning', () => {
+    const s = run(confronted(), slack(15 * MIN), change(MIN, T0 + MIN + SEC)).state;
+    expect(s.phase).toBe('warning');
+    expect(s.warningStartedAt).toBe(T0 + MIN);
+    expect(s.warningEndsAt).toBe(T0 + MIN + T.warningMs);
+  });
+
+  it('changing outside a Slack pass is ignored', () => {
+    const s = run(confronted(), change(10 * MIN, T0 + 5)).state;
+    expect(s.phase).toBe('confronting');
+    expect(s.slackPassEndsAt).toBeNull();
+  });
+});

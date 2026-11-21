@@ -23,6 +23,20 @@ describe('messageToEvent', () => {
     expect(isPopupMessage({ type: 'hello' })).toBe(false);
   });
 
+  it('maps Stop Slacking and slack length changes from the popup', () => {
+    expect(popupMessageToEvent({ type: 'stopSlackPass' }, 9)).toEqual({
+      type: 'slackPassStopped',
+      now: 9,
+    });
+    expect(popupMessageToEvent({ type: 'changeSlackPass', durationMs: 600_000 }, 9)).toEqual({
+      type: 'slackPassChanged',
+      now: 9,
+      durationMs: 600_000,
+    });
+    expect(isPopupMessage({ type: 'stopSlackPass' })).toBe(true);
+    expect(isPopupMessage({ type: 'changeSlackPass' })).toBe(true);
+  });
+
   it('maps gotUp from a page and from the popup to the same event', () => {
     expect(contentMessageToEvent({ type: 'gotUp' }, 7, 100)).toEqual({ type: 'gotUp', now: 100 });
     expect(popupMessageToEvent({ type: 'gotUp' }, 100)).toEqual({ type: 'gotUp', now: 100 });

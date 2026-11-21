@@ -18,7 +18,7 @@ import type {
 } from '../contracts';
 import manifestJson from '../../public/assets/manifest.json';
 import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
-import { SUGGESTION_MS, formatCountdown, pushesLabel, suggestionText } from './hud';
+import { SUGGESTION_MS, formatCountdown, suggestionText } from './hud';
 import { createInputEater } from './input-eater';
 import { createMediaPauser } from './media-pauser';
 import {
@@ -87,9 +87,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       <div class="barry corner right">
         <div class="suggest" hidden><span class="suggesttext"></span><button class="x" aria-label="Dismiss">×</button></div>
         <div class="bubble" hidden></div>
-        <div class="hud">
-          <div class="pill pushes" hidden></div>
-        </div>
         <div class="stage"><div class="sprite"></div><div class="stars" hidden>✦</div></div>
         <button class="btn" hidden>Back to it?</button>
       </div>
@@ -107,7 +104,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   const arm = q('.arm');
   const armBar = q('.armbar');
   const armFist = q('.armfist');
-  const pushesEl = q('.pushes');
   const suggestEl = q('.suggest');
   const suggestText = q('.suggesttext');
   // One Back to it per Confrontation: the brain takes both of a double click, so hide after the first.
@@ -633,9 +629,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     syncFx();
     renderBubble(view);
 
-    const showPushes = view.pushesLeft !== null;
-    pushesEl.hidden = !showPushes;
-    if (showPushes) pushesEl.textContent = pushesLabel(view.pushesLeft!);
     syncArm(view);
     // A suggestion belongs to chill Barry; any other pose drops it.
     if (view.pose !== 'chill-mug') hideSuggestion();

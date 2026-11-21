@@ -10,6 +10,7 @@ import {
   popupView,
   secondsToMs,
   slackPassStatus,
+  slackChangePreview,
   withStateDefaults,
 } from './view';
 import { brain } from '../brain';
@@ -47,19 +48,29 @@ describe('popup view', () => {
   });
 
   it('chooses the countdown per phase', () => {
-    expect(countdownFor(base())).toBeNull();
-    expect(countdownFor(base({ phase: 'slackPass', slackPassEndsAt: 9 }))?.target).toBe(9);
-    expect(countdownFor(base({ phase: 'warning', warningEndsAt: 7 }))?.label).toBe('Reach in');
-    expect(countdownFor(base({ phase: 'snoozing', snoozeEndsAt: 5 }))?.target).toBe(5);
-    expect(countdownFor(base({ phase: 'reaching', reachStartedAt: 1000 }))?.target).toBe(
+    expect(countdownFor(base(), 0)).toBeNull();
+    expect(countdownFor(base({ phase: 'slackPass', slackPassEndsAt: 9 }), 0)?.target).toBe(9);
+    expect(countdownFor(base({ phase: 'warning', warningEndsAt: 7 }), 0)?.label).toBe('Reach in');
+    expect(countdownFor(base({ phase: 'reaching', reachStartedAt: 1000 }), 0)?.target).toBe(
       1000 + DEFAULT_TUNING.reachMs,
     );
   });
 
-  it('shows pushes left only during the Arm fight in Lock In', () => {
-    const s = base({ modeOverride: 'lockIn', phase: 'reaching', pushes: 2 });
-    expect(popupView(s, 0).pushesLeft).toBe(DEFAULT_TUNING.maxPushes - 2);
-    expect(popupView(base({ modeOverride: 'lockIn' }), 0).pushesLeft).toBeNull();
+  it('hides the Snooze countdown until Barry sits tired, then says to tap him', () => {
+    const snooze = base({
+      modeOverride: 'lockIn',
+      phase: 'snoozing',
+      snoozeStartedAt: 0,
+      snoozeEndsAt: 5 * 60_000,
+    });
+    // Knocked down / getting up: no time yet.
+    expect(countdownFor(snooze, 1000)).toBeNull();
+    expect(popupView(snooze, 1000).countdownHint).toBeNull();
+    // Sitting tired.
+    const sitting = 60_000;
+    expect(countdownFor(snooze, sitting)?.target).toBe(5 * 60_000);
+    expect(popupView(snooze, sitting).countdownHint).toBe('Tap Barry to lock in again');
+    expect(popupView(base({ modeOverride: 'lockIn' }), 0).countdownHint).toBeNull();
   });
 
   it('reports mode source', () => {
@@ -73,7 +84,27 @@ describe('popup view', () => {
     expect(slackPassStatus('chill', 'clear').allowed).toBe(false);
     expect(slackPassStatus('chill', 'clear').hint).toBeTruthy();
     expect(slackPassStatus('lockIn', 'clear')).toEqual({ allowed: true, hint: null });
-    expect(slackPassStatus('lockIn', 'slackPass').allowed).toBe(false);
+    // During a Slack pass the chips stay live: they change its length (after a confirm).
+    expect(slackPassStatus('lockIn', 'slackPass')).toEqual({ allowed: true, hint: null });
+  });
+
+  it('describes a running Slack pass', () => {
+    const on = base({
+      modeOverride: 'lockIn',
+      phase: 'slackPass',
+      slackPassStartedAt: 0,
+      slackPassEndsAt: 5 * 60_000,
+    });
+    expect(popupView(on, 0).onSlackPass).toBe(true);
+    expect(popupView(on, 0).slackCurrentMin).toBe(5);
+    expect(popupView(base({ modeOverride: 'lockIn' }), 0).onSlackPass).toBe(false);
+    expect(popupView(base({ modeOverride: 'lockIn' }), 0).slackCurrentMin).toBeNull();
+  });
+
+  it('previews a Slack pass length change from its start', () => {
+    const s = { slackPassStartedAt: 0 };
+    expect(slackChangePreview(s, 10, 3 * 60_000)).toBe('10 min total, 7:00 left.');
+    expect(slackChangePreview(s, 1, 3 * 60_000)).toBe('This ends your break now.');
   });
 
   it('headlines', () => {

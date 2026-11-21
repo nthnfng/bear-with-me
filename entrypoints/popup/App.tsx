@@ -9,6 +9,7 @@ import {
   formatClock,
   headerBarry,
   formatCountdown,
+  slackChangePreview,
   popupView,
   speedPreset,
   secondsToMs,
@@ -101,6 +102,18 @@ function App() {
   const v = state ? popupView(state, now) : null;
   const hb = state ? headerBarry(state, now, activeTabId) : null;
 
+  // Chip waiting on "Are you sure?". Dropped when the Slack pass ends on its own.
+  const [pendingMin, setPendingMin] = useState<number | null>(null);
+  const onSlackPass = v?.onSlackPass ?? false;
+  useEffect(() => {
+    if (!onSlackPass) setPendingMin(null);
+  }, [onSlackPass]);
+  const onChip = (min: number) => {
+    if (!v) return;
+    if (!v.onSlackPass) send({ type: 'startSlackPass', durationMs: min * 60_000 });
+    else if (min !== v.slackCurrentMin) setPendingMin(min);
+  };
+
   return (
     <main>
       <div className="hero">
@@ -112,7 +125,10 @@ function App() {
           onClick={onBarry}
         />
         {hb && (
-          <span className="header-pose" onClick={onBarry}>
+          <span
+            className={`header-pose${hb.canGetUp ? ' tappable' : ''}`}
+            onClick={() => (hb.canGetUp ? send({ type: 'gotUp' }) : onBarry())}
+          >
             <HeaderPose pose={hb.pose} poseSince={hb.poseSince} />
           </span>
         )}
@@ -137,11 +153,7 @@ function App() {
               <span className="dim">{v.countdown.label}</span>
             </div>
           )}
-          {v.pushesLeft !== null && (
-            <p className="pushes">
-              {v.pushesLeft} {v.pushesLeft === 1 ? 'Push' : 'Pushes'} left
-            </p>
-          )}
+          {v.countdownHint && <p className="countdown-hint">{v.countdownHint}</p>}
 
           <dl className="blocks">
             <dt>Now</dt>
@@ -175,16 +187,50 @@ function App() {
           <div className="slack">
             <span className="label">Slack pass</span>
             <div className="chips">
-              {SLACK_PRESETS_MIN.map((min) => (
-                <button
-                  key={min}
-                  disabled={!v.slackAllowed}
-                  onClick={() => send({ type: 'startSlackPass', durationMs: min * 60_000 })}
-                >
-                  {min} min
-                </button>
-              ))}
+              {SLACK_PRESETS_MIN.map((min) => {
+                const current = v.slackCurrentMin === min;
+                return (
+                  <button
+                    key={min}
+                    disabled={!v.slackAllowed}
+                    className={current ? 'on' : pendingMin === min ? 'pending' : ''}
+                    aria-pressed={current}
+                    onClick={() => onChip(min)}
+                  >
+                    {min} min
+                  </button>
+                );
+              })}
             </div>
+            {v.onSlackPass && pendingMin !== null && (
+              <div className="confirm" role="alertdialog" aria-label="Change slack time">
+                <p>Are you sure you want to change your slack time?</p>
+                <p className="hint">{slackChangePreview(state, pendingMin, now)}</p>
+                <div className="row">
+                  <button
+                    className="yes"
+                    onClick={() => {
+                      send({ type: 'changeSlackPass', durationMs: pendingMin * 60_000 });
+                      setPendingMin(null);
+                    }}
+                  >
+                    Yes, make it {pendingMin} min
+                  </button>
+                  <button onClick={() => setPendingMin(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {v.onSlackPass && (
+              <button
+                className="stop-slack"
+                onClick={() => {
+                  setPendingMin(null);
+                  send({ type: 'stopSlackPass' });
+                }}
+              >
+                Stop Slacking
+              </button>
+            )}
             {v.slackHint && <p className="hint">{v.slackHint}</p>}
           </div>
 

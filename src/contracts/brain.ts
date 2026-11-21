@@ -118,6 +118,10 @@ export type BarryEvent =
   | Ev<'backToIt', { tabId: TabId }>
   /** Ignored unless in Lock In (the popup disables the button in Chill). */
   | Ev<'slackPassStarted', { durationMs: number }>
+  /** Stop Slacking: ends a running Slack pass early, straight back to Lock In. Ignored otherwise. */
+  | Ev<'slackPassStopped'>
+  /** Changes a running Slack pass to `durationMs` long, counted from when it started. */
+  | Ev<'slackPassChanged', { durationMs: number }>
   | Ev<'pushed', { tabId: TabId }>
   /** Sent by the overlay; ignored if `reachStartedAt` is stale (a Push restarted it). */
   | Ev<'reachLanded', { tabId: TabId; reachStartedAt: Millis }>

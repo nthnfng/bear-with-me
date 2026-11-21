@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
-import { formatCountdown, pushesLabel } from './hud';
+import { formatCountdown } from './hud';
 
 describe('reachProgress', () => {
   const r = { startedAt: 1000, durationMs: 8000 };
@@ -54,10 +54,6 @@ describe('hud text', () => {
     expect(formatCountdown(754_000)).toBe('12:34');
     expect(formatCountdown(4_100)).toBe('0:05');
     expect(formatCountdown(-5)).toBe('0:00');
-  });
-  it('labels pushes', () => {
-    expect(pushesLabel(1)).toBe('1 push left');
-    expect(pushesLabel(5)).toBe('5 pushes left');
   });
 });
 
