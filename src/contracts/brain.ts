@@ -50,9 +50,23 @@ export interface BarryState {
   fatness: number;
   /** End of the running Slack pass ('slackPass' phase). */
   slackPassEndsAt: Millis | null;
+  /** When a Slack pass started mid-Confrontation: Barry says "Okay... -_-" for a moment. */
+  okayStartedAt: Millis | null;
   /** End of the running Snooze ('snoozing' phase). */
   snoozeEndsAt: Millis | null;
+  /** Start of the running Snooze. Its stages (knocked down, getting up, "ow", ..., tired) are timed from it. */
+  snoozeStartedAt: Millis | null;
+  /** When the user clicked tired Barry (Get up). The Snooze then ends after a short happy jump. */
+  gotUpAt: Millis | null;
   warningEndsAt: Millis | null;
+  /** When the current warning began (stable under retuning); null outside a warning. */
+  warningStartedAt: Millis | null;
+  /** Start of the running Slack pass ('slackPass' phase). Chill Barry's pose run starts here. */
+  slackPassStartedAt: Millis | null;
+  /** When the current Confrontation pose (Fatness tier or chud-point) began; shared start for its poseSince. */
+  confrontSince: Millis | null;
+  /** Start of the current Arm fight run (not reset by a Push), so the Reach pose isn't restarted by each Push. */
+  fightStartedAt: Millis | null;
   /** One shared start time so the Reach is in sync on every tab. */
   reachStartedAt: Millis | null;
   /** Pushes in the current Arm fight. Resets when a Snooze is won. */
@@ -65,8 +79,16 @@ export interface BarryState {
 
   /** Start of the last free gap a todo was suggested for (once per gap). */
   lastGapSuggested: Millis | null;
+  /** True once any scheduleUpdated has arrived (even an empty one). Free-gap suggestions wait for it. */
+  scheduleKnown: boolean;
   /** `now` of the last processed event; time-based growth integrates from here. */
   lastNow: Millis | null;
+  /**
+   * Restricted tabs Barry has already arrived on this episode (burst, and the chud song when the
+   * Chud meter is full). Coming back to one plays nothing. Clears when a break starts, Lock In
+   * ends, or no Restricted tab is open anywhere.
+   */
+  arrivedTabs: TabId[];
 
   position: Position;
   cave: boolean;
@@ -99,6 +121,8 @@ export type BarryEvent =
   | Ev<'pushed', { tabId: TabId }>
   /** Sent by the overlay; ignored if `reachStartedAt` is stale (a Push restarted it). */
   | Ev<'reachLanded', { tabId: TabId; reachStartedAt: Millis }>
+  /** Get up: the user clicked tired Barry (or the popup button). Ignored unless `canGetUp`. */
+  | Ev<'gotUp'>
   | Ev<'modeOverrideSet', { override: ModeOverride }>
   | Ev<'blocklistSet', { blocklist: BlocklistEntry[] }>
   | Ev<'positionSet', { position: Position }>
@@ -112,7 +136,8 @@ export type BarryEffect =
   /** Explosion on each tab, then close them. */
   | { type: 'explodeAndClose'; tabIds: TabId[] }
   /** Shown as a speech bubble from chill Barry in his corner. */
-  | { type: 'showSuggestion'; tabId: TabId; todo: Todo; freeMinutes: number }
+  /** freeMinutes is null when no block is coming up (an open-ended gap). */
+  | { type: 'showSuggestion'; tabId: TabId; todo: Todo; freeMinutes: number | null }
   | { type: 'setBadge'; pose: PoseId; text: string };
 
 export interface ReduceResult {
@@ -129,23 +154,39 @@ export interface TabView {
   placement: 'corner' | 'face';
   position: Position;
   pose: PoseId;
-  /** Sprite scale from Fatness (1 = as drawn). Only grows during a Confrontation. */
-  scale: number;
+  /**
+   * When this pose began, so every tab starts the pose's strip and entrance animation from
+   * the same moment. A view with the same pose and a new poseSince restarts it.
+   */
+  poseSince: Millis;
+  /** Tired Barry during a Snooze: clicking him sends 'gotUp'. */
+  canGetUp: boolean;
   /** Speech bubble text, or null for none. */
   line: string | null;
   showBackToIt: boolean;
   /** True only during a Confrontation. Pages work normally during an Arm fight. */
   eatInput: boolean;
   pauseMedia: boolean;
-  /** 0..1, or null to hide the meter. */
-  chudMeter: number | null;
   /** The renderer counts down to this; null hides the countdown. */
   breakEndsAt: Millis | null;
   /** The arm stretching out of corner Barry. Progress = (now - startedAt) / durationMs. Null = no arm. */
   reach: { startedAt: Millis; durationMs: number } | null;
   pushesLeft: number | null;
-  /** Play the chud song once when this view first appears. */
-  singChud: boolean;
+  /**
+   * Where this tab sits in its window's tab strip, so the Arm can reach for it.
+   * The brain always leaves this null; the runtime fills it in before sending the view.
+   */
+  tabSlot: TabSlot | null;
+}
+
+/** A tab's place in its window's horizontal tab strip. Pinned tabs sit first and are narrow. */
+export interface TabSlot {
+  /** 0-based index among all tabs in the window (pinned included). */
+  index: number;
+  /** Tabs in the window, pinned included. */
+  count: number;
+  /** Pinned tabs in the window. */
+  pinned: number;
 }
 
 export const HIDDEN_VIEW: TabView = {
@@ -153,16 +194,16 @@ export const HIDDEN_VIEW: TabView = {
   placement: 'corner',
   position: 'right',
   pose: 'studious',
-  scale: 1,
+  poseSince: 0,
+  canGetUp: false,
   line: null,
   showBackToIt: false,
   eatInput: false,
   pauseMedia: false,
-  chudMeter: null,
   breakEndsAt: null,
   reach: null,
   pushesLeft: null,
-  singChud: false,
+  tabSlot: null,
 };
 
 /** The brain's public surface. Implemented in src/brain (Workstream A). */

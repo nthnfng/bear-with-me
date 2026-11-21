@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Barry overlay harness</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 16px;
+        max-width: 760px;
+      }
+      #panel {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        width: 300px;
+        background: #fffbe6;
+        border: 2px solid #333;
+        padding: 8px;
+        font-size: 12px;
+        z-index: 1000;
+        max-height: 90vh;
+        overflow: auto;
+      }
+      #poses button { display: block; width: 100%; text-align: left; margin: 1px 0; font-size: 11px; }
+      #poses .grp { margin-top: 6px; font-weight: 700; text-transform: uppercase; opacity: 0.7; }
+      #log {
+        height: 160px;
+        overflow: auto;
+        background: #111;
+        color: #9f9;
+        padding: 4px;
+        font-family: monospace;
+      }
+      main {
+        margin-left: 330px;
+      }
+      .filler p {
+        margin: 0 0 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <strong>Barry harness</strong>
+      <div>
+        View:
+        <select id="views"></select>
+      </div>
+      <div id="poses"></div>
+      <div>
+        Effects:
+        <button data-effect="chomp">chomp</button>
+        <button data-effect="burst">burst</button>
+        <button data-effect="explosion">explosion</button>
+      </div>
+      <div>
+        Arm fight:
+        Tab <input id="tabindex" type="number" min="0" value="2" style="width: 3em" /> of
+        <input id="tabcount" type="number" min="1" value="8" style="width: 3em" />, pinned
+        <input id="tabpinned" type="number" min="0" value="1" style="width: 3em" />
+        <label><input id="tabnull" type="checkbox" /> no slot</label><br />
+        <button data-fight="reach">reach (now)</button>
+        <button data-fight="push">simulate push</button>
+        <button data-fight="snooze">snoozing</button>
+        <button data-fight="okay">confront &rarr; okay</button>
+        <button data-effect="punch">punch</button>
+        <button data-effect="ow">ow</button>
+      </div>
+      <div>
+        Todos:
+        <button id="suggest">suggestion bubble</button>
+        <button id="picker">start picker</button>
+        <button id="chudsong">chud arrives (playSound chudSong)</button>
+      </div>
+      <div id="picktarget">
+        <ul id="demo-list">
+          <li>Write lab report</li>
+          <li>Email TA</li>
+          <li class="done" aria-checked="true">Already done</li>
+        </ul>
+      </div>
+      <div>Sent messages (<a href="#" id="clear">clear</a>):</div>
+      <div id="log"></div>
+    </div>
+    <main>
+      <h1>Page under Barry</h1>
+      <p>
+        <button class="logbtn">Page button A</button>
+        <button class="logbtn">Page button B</button>
+        <a href="#x" class="logbtn">link</a>
+      </p>
+      <video id="video" controls loop muted width="320"></video>
+      <audio id="audio" controls loop></audio>
+      <p><button id="addvideo">Add another video later</button></p>
+      <div class="filler" id="filler"></div>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

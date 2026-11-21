@@ -2,7 +2,7 @@
 
 Companion to [prd-barry.md](./prd-barry.md). Terms follow [CONTEXT.md](../CONTEXT.md).
 
-The build is split into **4 phases**. Each phase has **3 workstreams, one per person**, that run at the same time, and ends with an **integration checkpoint** where the three pieces are joined and checked together before anyone starts the next phase.
+The build is split into **5 phases**. Each phase has **3 workstreams, one per person**, that run at the same time, and ends with an **integration checkpoint** where the three pieces are joined and checked together before anyone starts the next phase.
 
 ## How three people work at once without blocking
 
@@ -196,6 +196,95 @@ From here on, keep this path working.
 ### ✅ Checkpoint 4 (feature freeze)
 
 Run the demo script twice in the demo profile without touching code. After this, fix bugs only.
+
+---
+
+## Phase 5: Real art, animations and sounds
+
+**Goal:** on real pages Barry looks, moves and sounds like the team's animation demo (`demo/index.html`, mapped in [animations.md](./animations.md)), still driven entirely by the brain.
+
+**Port, don't copy.** The demo is plain JS that decides *and* draws. In the extension the split from [ADR 0001](./adr/0001-pure-brain-dumb-renderers.md) stays:
+
+- **The brain** owns anything that changes what Barry says, how long something lasts, or what the user can do (poses, lines, the Snooze sequence's stages, Get up).
+- **The overlay** owns how it looks: sprite strips, CSS animation classes, sub-second in-between frames, floating "chomp!"/"POW"/♪ text, particles.
+
+### Decisions (2026-11-21)
+
+- **Fatness is sprite tiers, not scaling.** Eats 0 → `suspicious`, 1–4 → `fat-1`…`fat-4`, 5+ → `chud`. `TabView.scale`, `scalePerFat` and `maxScale` retire.
+- **The Snooze stays timed, and Barry can be told to get up.** After the 5th Push: knocked down (5 s, spinning ✦) → get-up frames → "ow" → "my arm hurts i guess ill leave u alone" → sits tired in the corner. Clicking tired Barry ends the Snooze early (**Get up**: one happy jump, then the Arm comes back like a normal Snooze end). The Chud meter only counts the Snooze time actually used.
+- **Max chud is a Confrontation.** With a full Chud meter, the Confrontation is the chud-point dance (sway ±90 px around the middle every 0.9 s, ♪ notes, "♪ I'm a chud ♪") plus the chud song. A Reach with a full meter uses `chud` as the Arm's body.
+- **The team's demo code moves to `demo/`.** `src/barry/*` → `demo/barry/`, so `src/` is only extension code. The demo keeps working as the art reference. The "Animations" rules in `CONTEXT.md` move to `docs/animations.md` (the glossary stays terms only), with paths fixed.
+
+### Pose map
+
+One `PoseId` per sprite. Sizes are art pixels; `S` is the integer screen scale.
+
+| Situation | Pose / sprite | Frames | Overlay animation |
+|---|---|---|---|
+| Chill, corner | `chill-mug` | 13 × 220 ms | — |
+| Free-gap suggestion | `thinking` | 1 | pop, then breathe; bubble 4 s |
+| Lock In, on task | `studious` | 14 × 180 ms | — |
+| Confrontation, 0 eats | `suspicious` | 1 | pop (burst-in) + flash |
+| Confrontation, 1–4 eats | `fat-1` … `fat-4` | 1 | chomp squash + "chomp!" |
+| Confrontation, 5+ eats | `chud` | 1 | pop on the 5th, chomp after |
+| Confrontation, Chud meter full | `chud-point` | 1 (PNG at 4×) | bounce + sway + ♪ |
+| Back to it | `close-tab` | 1 | pop, fast Arm (350 ms) to the tab, explosion |
+| Slack pass from a Confrontation | `suspicious` + "Okay... -_-" | 1 | — |
+| Slack pass | `chill` (lounging) | 1 | breathe; bubble: clock icon + time left; chud bar |
+| Warning | `suspicious-tap` + "Wrap it up!" | 6 × 130 ms | — |
+| Reach | `close-tab` (`chud` if meter full) | 1 | Arm from the pose's paw anchor to the tab |
+| Push | same | — | hit flash/shake + "POW" |
+| Snooze: knocked down | `got-owned` | 1 | spinning ✦ |
+| Snooze: getting up | `get-up`, `get-up-2`, `default` | 1 each | squash/unsquash between poses |
+| Snooze: "ow" | `suspicious` | 1 | unsquash |
+| Snooze: "my arm hurts…" | `grieved` | 1 | unsquash |
+| Snooze: resting | `tired` (clickable) | 1 | squash into it |
+| Get up | `happy` | 1 | slow jump, then the Snooze ends |
+
+**Size on screen.** At `S = 4` the corner sprites are ~70 px and `fat-4` is 168 px. In-your-face placement should be larger: use `S = 8` for `face`, still an integer so pixels stay crisp. Lane C confirms in the harness. `chud-point` is saved at 4×, so it gets a little soft at 8×; that's acceptable, or the team re-exports it at 8×.
+
+### Contract changes (orchestrator, before the lanes start)
+
+- `PoseId`: the sprite list above (`chill-mug`, `chill`, `thinking`, `studious`, `suspicious`, `suspicious-tap`, `fat-1`…`fat-4`, `chud`, `chud-point`, `close-tab`, `got-owned`, `get-up`, `get-up-2`, `default`, `grieved`, `tired`, `happy`).
+- `AssetManifest`: per-pose `{ file, w, h, frames, frameMs?, paw? }` (paw = the Arm's start, from the demo's `PAW`), plus `scale: { corner, face }`, `chudBar`, `clockIcon`. `public/assets/manifest.json` is rewritten to match.
+- `SoundId` gains `explosion` (`sounds/explosion.mp3`).
+- `TabView`: drop `scale`. Add `poseSince: Millis`, so every tab restarts a pose's strip and entrance animation from the same moment. Add `canGetUp: boolean` (tired Barry is clickable).
+- `BarryState`: add `snoozeStartedAt: Millis | null` (the Snooze stages are timed from it).
+- Event `gotUp` (`ContentMessage { type: 'gotUp' }` and the popup's Get up button).
+
+### A: Brain
+
+- [ ] Fatness tiers → pose; remove scale. Tests per tier, including switching Restricted tabs keeping the tier.
+- [ ] Snooze stages from `snoozeStartedAt` (knocked down 5 s → get-up 0.6 s → standing 2 s → "ow" 1 s → "my arm hurts…" 2.2 s → tired). `nextDeadline` includes stage boundaries, so views re-push on time. `canGetUp` only in the tired stage.
+- [ ] `gotUp` ends the Snooze early, with a short `happy` stage first. The Chud meter integrates only the time used. Tests: get up at each stage (ignored before tired), muted, mode flips, laptop-sleep jumps.
+- [ ] Max chud: `chud-point` for a full-meter Confrontation, `chud` as the Reach body; the chud song keeps its once-per-arrival rule.
+- [ ] Lines aligned with the art: warning "Wrap it up!" (countdown in the bubble), "ow", "my arm hurts i guess ill leave u alone", "♪ I'm a chud ♪". The full PRD lines stay where the art has none.
+- [ ] Update `docs/demo-script.md` beats to the new sequence.
+
+### B: Runtime and popup
+
+- [ ] `explosion` sound via the offscreen player when `explodeAndClose` runs (once per batch, timed with the overlay's explosion).
+- [ ] Route `gotUp` from the content script and the popup.
+- [ ] Popup: pixel-art Barry (current pose sprite) in the header next to `barry-home.png`; a Get up button while `canGetUp`; chud bar drawn from `chud-bar.png` in 10 steps.
+- [ ] Popup cave: "send Barry back" / "let Barry out" hop animation from the demo (`barry-default` hops in, `barry-happy` hops out), still one screen, still a toggle.
+
+### C: Overlay and art
+
+- [ ] Move `src/barry/` → `demo/barry/` and fix `demo/index.html`; move the animation rules out of `CONTEXT.md` into `docs/animations.md` and fix its paths (`assets/sprites/` → `public/assets/sprites/`; note that `source/` and `tools/build_sprites.py` live with the art team).
+- [ ] Rewrite `public/assets/manifest.json` for the new contract. Delete the placeholder SVGs and `scripts/gen-placeholders.mjs` (keep `cave.svg` until the popup cave lands).
+- [ ] Sprite renderer: a `div` with the PNG strip as its background, integer `S`, `image-rendering: pixelated`, a flipbook timer per `frameMs`, feet on the bottom edge, restarted when `poseSince` changes.
+- [ ] Port `barry.css` animation classes into the shadow-root styles: breathe, pop, chomp, hit, squash/unsquash, slowjump, bounce; the bubble style; float text; the ✦ spin. Keep `prefers-reduced-motion`.
+- [ ] Chomp feedback: when the overlay reports an eaten click, play the chomp squash and "chomp!" locally (cosmetic, same throttle). Pose tiers come from the view.
+- [ ] Arm drawn in code (the demo's style) from the pose's `paw` anchor to the Phase 4 tab-strip target; punchable; Push plays hit + "POW". Back to it plays the 350 ms reach before the explosion.
+- [ ] Explosion: the demo's pixel particles at the Arm's target, finishing inside the runtime's 1300 ms window.
+- [ ] Chud bar: `chud-bar.png` outline with the orange fill drawn in 10 steps. Slack pass bubble: clock icon + time left.
+- [ ] Snooze visuals: ✦ while knocked down, in-between get-up frames, tired Barry clickable → `gotUp`.
+- [ ] Max chud dance: sway and ♪ notes.
+- [ ] Harness: one button per row of the pose map, like the demo's panel.
+
+### ✅ Checkpoint 5
+
+In real Chrome, with Demo speed: run `docs/demo-script.md` and see every row of the pose map at least once, and hear burst, chomp, punch, ow, chud song and explosion. The demo page (`demo/index.html`) still opens and plays.
 
 ---
 
