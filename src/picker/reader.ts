@@ -4,6 +4,7 @@ import { storage } from 'wxt/utils/storage';
 import { STORAGE_KEYS, type ContentMessage, type Settings, type TodoSource } from '../contracts';
 import { exportUrl, isDocsSource, parseDocsExport } from './docs';
 import { queryAllPiercing, queryDeep } from './deep';
+import { W2D_SELECTOR, W2D_TAG, w2dCandidates, type TNode } from './brightspace';
 import {
   collectCandidates,
   createChangeGate,
@@ -47,6 +48,10 @@ export function asNode(el: Element): NodeLike {
 }
 
 export function readSource(source: TodoSource, root: ParentNode = document): string[] {
+  if (source.selector === W2D_SELECTOR) {
+    const widgets = queryAllPiercing(root, W2D_TAG);
+    return normalizeItems(widgets.flatMap((w) => w2dCandidates(w as unknown as TNode)));
+  }
   let els: Element[] = [];
   try {
     els = queryDeep(root, source.selector);

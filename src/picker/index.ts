@@ -11,6 +11,14 @@ import {
   type ElLike,
 } from './selector';
 import { ancestorChain, stepInChain, suggestContainer } from './widen';
+import { W2D_SELECTOR, W2D_TAG } from './brightspace';
+
+function insideW2D(el: Element | null): boolean {
+  for (let n = el, i = 0; n && i < 80; n = composedParent(n), i++) {
+    if (n.tagName.toLowerCase() === W2D_TAG) return true;
+  }
+  return false;
+}
 
 export interface PickerOptions {
   send(msg: ContentMessage): void;
@@ -170,12 +178,14 @@ export function startPicker(opts: PickerOptions): void {
     if (!keepsTarget(m.clientX, m.clientY)) setDeepest(pick(m.clientX, m.clientY) ?? deepest);
     const el = target;
     // Docs: any click saves the marker (the text is read from the export, not the DOM).
-    const marker = pageSpecificSelector(location.hostname, location.pathname);
+    const docsMarker = pageSpecificSelector(location.hostname, location.pathname);
+    // Brightspace Work To Do: any click inside the widget saves its marker.
+    const marker = docsMarker ?? (insideW2D(deepest ?? el) ? W2D_SELECTOR : null);
     if (!el && !marker) return;
     const source: TodoSource = {
       id: makeSourceId(),
       origin: location.origin,
-      path: (marker && docPathPrefix(location.pathname)) || location.pathname,
+      path: (docsMarker && docPathPrefix(location.pathname)) || location.pathname,
       selector: marker ?? deepSelectorFor(el!, deepest),
     };
     stop();
