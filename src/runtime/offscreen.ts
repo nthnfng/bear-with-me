@@ -21,7 +21,8 @@ export function isOffscreenSound(msg: unknown): msg is OffscreenSound {
 
 let creating: Promise<void> | null = null;
 
-async function ensureOffscreen(): Promise<void> {
+/** Opens the offscreen document if it isn't open (Chrome closes it after ~30 s of silence). */
+export async function ensureOffscreen(): Promise<void> {
   const contexts = await browser.runtime.getContexts({
     contextTypes: ['OFFSCREEN_DOCUMENT' as never],
     documentUrls: [browser.runtime.getURL(OFFSCREEN_PATH as never)],
