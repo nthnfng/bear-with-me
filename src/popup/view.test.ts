@@ -190,3 +190,50 @@ describe('withStateDefaults', () => {
     expect(merged.tuning.snoozeMs).toBe(init.tuning.snoozeMs);
   });
 });
+
+describe('pixel popup helpers', () => {
+  it('picks the chill scene over the Lock In phase', async () => {
+    const { sceneKey, BUBBLE } = await import('./view');
+    expect(sceneKey('chill', 'reaching')).toBe('chill');
+    expect(BUBBLE[sceneKey('lockIn', 'snoozing')]).toBe('Beaten... zzz');
+  });
+
+  it('times the block card from the phase, then the block, then the next block', async () => {
+    const { blockCardTimer } = await import('./view');
+    const base = {
+      countdown: null,
+      currentBlock: null,
+      nextBlock: null,
+    } as unknown as Parameters<typeof blockCardTimer>[0];
+    const cur = { ...block('a', 0, 5000), end: 5000 };
+    const nxt = block('b', 9000, 12000);
+    expect(blockCardTimer(base)).toBeNull();
+    expect(blockCardTimer({ ...base, nextBlock: nxt })).toEqual({ label: 'Next block in', target: 9000 });
+    expect(blockCardTimer({ ...base, currentBlock: cur, nextBlock: nxt })).toEqual({
+      label: 'Time left',
+      target: 5000,
+    });
+    const slack = { label: 'Slack pass ends in', target: 42 };
+    expect(blockCardTimer({ ...base, countdown: slack, currentBlock: cur })).toBe(slack);
+  });
+
+  it('lights the chud sign in eighths', async () => {
+    const { chudSignSegments } = await import('./view');
+    expect(chudSignSegments(0).filter(Boolean)).toHaveLength(0);
+    expect(chudSignSegments(0.4).filter(Boolean)).toHaveLength(3);
+    expect(chudSignSegments(1).every(Boolean)).toBe(true);
+    expect(chudSignSegments(NaN).some(Boolean)).toBe(false);
+  });
+
+  it('adds, ticks and removes popup todos', async () => {
+    const { addPopupTodo, togglePopupTodo, removePopupTodo, todosLeft } = await import('./view');
+    let list = addPopupTodo([], '  Gym  ', '1');
+    expect(addPopupTodo(list, '   ', '2')).toBe(list);
+    list = addPopupTodo(list, 'Lab report', '2');
+    expect(list.map((t) => t.text)).toEqual(['Gym', 'Lab report']);
+    list = togglePopupTodo(list, '1');
+    expect(list[0]!.done).toBe(true);
+    expect(todosLeft(list, [{ sourceId: 'notion' }, { sourceId: 'popup' }])).toBe(2);
+    expect(removePopupTodo(list, '1').map((t) => t.id)).toEqual(['2']);
+  });
+});

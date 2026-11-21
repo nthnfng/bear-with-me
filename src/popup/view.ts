@@ -11,9 +11,10 @@ import type {
   PoseSprite,
   TabId,
   ModeOverride,
+  PopupTodo,
   Tuning,
 } from '../contracts';
-import { DEFAULT_TUNING, DEMO_TUNING } from '../contracts';
+import { DEFAULT_TUNING, DEMO_TUNING, POPUP_TODO_SOURCE_ID } from '../contracts';
 import { currentBlock, resolveMode } from '../brain/helpers';
 import { brain, caveAllowed } from '../brain';
 
@@ -324,4 +325,83 @@ export function withStateDefaults(saved: BarryState | null | undefined): BarrySt
   if (!saved) return null;
   const init = brain.initialState();
   return { ...init, ...saved, tuning: { ...init.tuning, ...saved.tuning } };
+}
+
+// ---- pixel popup: sky scene, block card timer, chud sign, popup todos ----------------------
+
+export type SceneKey = BarryState['phase'] | 'chill';
+
+/** Which sky and speech bubble the header shows. Chill wins over the Lock In phase. */
+export function sceneKey(mode: Mode, phase: BarryState['phase']): SceneKey {
+  return mode === 'chill' ? 'chill' : phase;
+}
+
+const BLUE_SKY = ['#3a9ff0', '#4eaef4', '#66bdf7', '#80cbfa'];
+const RED_SKY = ['#b83a3a', '#c94a42', '#d85d4c', '#e57458'];
+
+/** Four sky bands, top to bottom. */
+export const SKY: Record<SceneKey, string[]> = {
+  clear: BLUE_SKY,
+  chill: BLUE_SKY,
+  slackPass: BLUE_SKY,
+  confronting: RED_SKY,
+  warning: ['#e07a3e', '#ea8c4c', '#f2a05e', '#f7b674'],
+  reaching: RED_SKY,
+  snoozing: ['#2e2a5a', '#3c3670', '#4b4385', '#5b5197'],
+};
+
+export const BUBBLE: Record<SceneKey, string> = {
+  clear: 'Studying...',
+  chill: 'Hibernating...',
+  slackPass: 'Enjoy your break!',
+  confronting: 'Caught you!',
+  warning: "Break's over...",
+  reaching: 'Get back here!',
+  snoozing: 'Beaten... zzz',
+};
+
+/** Hard-edged CSS bands for the sky, `band` px each. */
+export function skyBands(key: SceneKey, band: number): string {
+  const c = SKY[key];
+  return `linear-gradient(${c[0]} 0 ${band}px, ${c[1]} ${band}px ${band * 2}px, ${c[2]} ${band * 2}px ${band * 3}px, ${c[3]} ${band * 3}px)`;
+}
+
+/**
+ * The Current Block card's countdown: a phase countdown (Slack pass, Reach...) wins; otherwise
+ * time left in the current block, or in Chill the time until the next one.
+ */
+export function blockCardTimer(v: PopupView): Countdown | null {
+  if (v.countdown) return v.countdown;
+  if (v.currentBlock) return { label: 'Time left', target: v.currentBlock.end };
+  if (v.nextBlock) return { label: 'Next block in', target: v.nextBlock.start };
+  return null;
+}
+
+export const CHUD_SIGN_SEGMENTS = 8;
+
+/** Which of the sign's segments are lit, left to right. */
+export function chudSignSegments(meter: number): boolean[] {
+  const m = Number.isFinite(meter) ? Math.min(1, Math.max(0, meter)) : 0;
+  const lit = Math.round(m * CHUD_SIGN_SEGMENTS);
+  return Array.from({ length: CHUD_SIGN_SEGMENTS }, (_, i) => i < lit);
+}
+
+/** Append a typed todo; blank input changes nothing. */
+export function addPopupTodo(list: PopupTodo[], text: string, id: string): PopupTodo[] {
+  const t = text.trim();
+  return t ? [...list, { id, text: t, done: false }] : list;
+}
+
+export const togglePopupTodo = (list: PopupTodo[], id: string): PopupTodo[] =>
+  list.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
+
+export const removePopupTodo = (list: PopupTodo[], id: string): PopupTodo[] =>
+  list.filter((t) => t.id !== id);
+
+/** "3 left": unfinished popup todos plus todos copied from pages. */
+export function todosLeft(popupTodos: PopupTodo[], copied: { sourceId: string }[]): number {
+  return (
+    popupTodos.filter((t) => !t.done).length +
+    copied.filter((t) => t.sourceId !== POPUP_TODO_SOURCE_ID).length
+  );
 }
