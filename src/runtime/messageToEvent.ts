@@ -33,6 +33,10 @@ export function popupMessageToEvent(msg: PopupMessage, now: Millis): BarryEvent 
       return { type: 'modeOverrideSet', now, override: msg.override };
     case 'startSlackPass':
       return { type: 'slackPassStarted', now, durationMs: msg.durationMs };
+    case 'stopSlackPass':
+      return { type: 'slackPassStopped', now };
+    case 'changeSlackPass':
+      return { type: 'slackPassChanged', now, durationMs: msg.durationMs };
     case 'gotUp':
       return { type: 'gotUp', now };
     case 'setCave':
@@ -52,6 +56,8 @@ export function popupMessageToEvent(msg: PopupMessage, now: Millis): BarryEvent 
 const POPUP_TYPES = new Set([
   'setModeOverride',
   'startSlackPass',
+  'stopSlackPass',
+  'changeSlackPass',
   'setCave',
   'setPosition',
   'setMuted',

@@ -17,6 +17,7 @@ import {
   formatClock,
   formatCountdown,
   headerBarry,
+  slackChangePreview,
   popupView,
   removePopupTodo,
   sceneKey,
@@ -26,7 +27,7 @@ import {
 } from '@/src/popup/view';
 import type { PopupView } from '@/src/popup/view';
 import { send, useActiveTabId, useBarryState, useNow, useStored } from './hooks';
-import { ChudSign, Cloud, HeaderPose, Heart, Icons, Paper, SpeechTail, assetUrl } from './Pixel';
+import { ChudSign, Cloud, HeaderPose, Icons, Paper, SpeechTail, assetUrl } from './Pixel';
 import { SettingsScreen } from './Settings';
 
 const UNLOCK_KEY = 'barry:devUnlocked';
@@ -100,6 +101,18 @@ function Home({
   const key = sceneKey(v.mode, state.phase);
   const night = key === 'snoozing';
 
+  // Chip waiting on "Are you sure?". Dropped when the Slack pass ends on its own.
+  const [pendingMin, setPendingMin] = useState<number | null>(null);
+  const onSlackPass = v?.onSlackPass ?? false;
+  useEffect(() => {
+    if (!onSlackPass) setPendingMin(null);
+  }, [onSlackPass]);
+  const onChip = (min: number) => {
+    if (!v) return;
+    if (!v.onSlackPass) send({ type: 'startSlackPass', durationMs: min * 60_000 });
+    else if (min !== v.slackCurrentMin) setPendingMin(min);
+  };
+
   return (
     <main className="popup home">
       <header className="sky" style={{ background: skyBands(key, 36) }}>
@@ -137,16 +150,7 @@ function Home({
 
         <div className="bubble" role="status">
           <span>{BUBBLE[key]}</span>
-          {v.pushesLeft !== null && (
-            <span className="pushes">
-              <span className="hearts">
-                {Array.from({ length: state.tuning.maxPushes }, (_, i) => (
-                  <Heart key={i} full={i < v.pushesLeft!} />
-                ))}
-              </span>
-              {v.pushesLeft} left
-            </span>
-          )}
+          {v.countdownHint && <span className="pushes">{v.countdownHint}</span>}
         </div>
         <span className="bubble-tail">
           <SpeechTail />
@@ -184,20 +188,55 @@ function Home({
           <span className="dirt-label">Slack:</span>
           {v.slackAllowed ? (
             <div className="chips">
-              {SLACK_PRESETS_MIN.map((min) => (
-                <button
-                  key={min}
-                  className="stone"
-                  onClick={() => send({ type: 'startSlackPass', durationMs: min * 60_000 })}
-                >
-                  {min}m
-                </button>
-              ))}
+              {SLACK_PRESETS_MIN.map((min) => {
+                const current = v.slackCurrentMin === min;
+                return (
+                  <button
+                    key={min}
+                    className={current ? 'stone on' : pendingMin === min ? 'stone pending' : 'stone'}
+                    aria-pressed={current}
+                    onClick={() => onChip(min)}
+                  >
+                    {min}m
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <span className="dirt-hint">{v.slackHint}</span>
           )}
         </div>
+        {v.onSlackPass && pendingMin !== null && (
+          <div className="slack-confirm" role="alertdialog" aria-label="Change slack time">
+            <p>Are you sure you want to change your slack time?</p>
+            <p className="dirt-hint">{slackChangePreview(state, pendingMin, now)}</p>
+            <div className="chips two">
+              <button
+                className="stone on"
+                onClick={() => {
+                  send({ type: 'changeSlackPass', durationMs: pendingMin * 60_000 });
+                  setPendingMin(null);
+                }}
+              >
+                Yes, {pendingMin}m
+              </button>
+              <button className="stone" onClick={() => setPendingMin(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {v.onSlackPass && (
+          <button
+            className="stone danger wide"
+            onClick={() => {
+              setPendingMin(null);
+              send({ type: 'stopSlackPass' });
+            }}
+          >
+            Stop Slacking
+          </button>
+        )}
       </div>
     </main>
   );

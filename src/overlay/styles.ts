@@ -72,10 +72,6 @@ export const CSS = `
   font-weight: 700; padding: 8px 20px; border: 4px solid var(--ink); background: #86b04a; color: var(--ink); }
 .btn:hover { background: #9cc65a; }
 
-/* hud: pushes pill and the Chud bar (outline PNG + coloured fill drawn by code) */
-.hud { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 6px; }
-.pill { background: var(--ink); color: #fff; padding: 3px 10px; font-size: 13px; font-weight: 700; }
-.pushes { background: #c43c2c; }
 
 /* the stretchy arm: drawn in code (white bar + dark outline); a wide invisible hit area for punching */
 .arm { position: fixed; width: 0; height: 0; transform-origin: 0 50%; pointer-events: none; }

@@ -152,6 +152,19 @@ function apply(
         keepFatness: true,
       };
     }
+    case 'slackPassStopped':
+      // Stop Slacking: back to Lock In as if the break never started. No tabs close; if a
+      // Restricted tab is active the Confrontation picks up right away (derived after apply).
+      if (state.phase !== 'slackPass') return { state };
+      return { state: toClear(state) };
+    case 'slackPassChanged': {
+      // The new length counts from the original start, so changing can't extend the break
+      // past what the chosen chip allows. An end already passed rolls into the warning.
+      if (state.phase !== 'slackPass' || state.slackPassStartedAt === null) return { state };
+      return {
+        state: { ...state, slackPassEndsAt: state.slackPassStartedAt + event.durationMs },
+      };
+    }
     case 'pushed': {
       if (state.phase !== 'reaching' || state.reachStartedAt === null) return { state };
       // A Push after the Reach already ran out is too late; the deadline lands it.
@@ -413,7 +426,8 @@ function snoozeStageAt(
   for (const st of stageStarts()) if (elapsed >= st.at) cur = st;
   return { stage: cur.stage, since: start + cur.at };
 }
-function snoozeStage(state: BarryState, now: Millis): SnoozeStage | null {
+/** The Snooze stage at `now` ('knocked' ... 'tired', 'happy'), or null outside a Snooze. */
+export function snoozeStage(state: BarryState, now: Millis): SnoozeStage | null {
   return snoozeStageAt(state, now)?.stage ?? null;
 }
 
@@ -727,7 +741,8 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
         poseSince: at?.since ?? snoozeStart(state) ?? 0,
         line,
         canGetUp: stage === 'tired',
-        breakEndsAt: state.snoozeEndsAt,
+        // No countdown while he's collapsing and getting up: it starts once he sits tired.
+        breakEndsAt: stage === 'tired' ? state.snoozeEndsAt : null,
       };
     }
   }

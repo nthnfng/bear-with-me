@@ -33,6 +33,8 @@ export type BackgroundMessage =
 export type PopupMessage =
   | { type: 'setModeOverride'; override: ModeOverride }
   | { type: 'startSlackPass'; durationMs: number }
+  | { type: 'stopSlackPass' }
+  | { type: 'changeSlackPass'; durationMs: number }
   | { type: 'gotUp' }
   | { type: 'setCave'; cave: boolean }
   | { type: 'setPosition'; position: Position }

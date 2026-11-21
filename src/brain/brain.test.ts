@@ -625,9 +625,16 @@ describe('Snooze', () => {
       placement: 'corner',
       pose: 'got-owned',
       line: null,
-      breakEndsAt: now + SNOOZE,
+      // No countdown while he collapses and gets up...
+      breakEndsAt: null,
       reach: null,
       eatInput: false,
+    });
+    // ...it shows once he sits tired.
+    expect(brain.viewFor(r.state, 2, now + 60_000)).toMatchObject({
+      pose: 'tired',
+      canGetUp: true,
+      breakEndsAt: now + SNOOZE,
     });
     // opening a Restricted tab during the Snooze does not confront
     expect(run(r.state, nav(3, YT), act(3)).state.phase).toBe('snoozing');
