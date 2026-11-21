@@ -257,10 +257,12 @@ export function startRuntime(brain: Brain) {
     closing.delete(tabId);
     dispatch({ type: 'tabClosed', now: Date.now(), tabId });
   });
+  // Focus leaving Chrome (another app, or a DevTools window) keeps the last real tab active:
+  // it's still on screen, and dev commands typed in the worker console need a tab to target.
   browser.windows.onFocusChanged.addListener(async (windowId) => {
-    const tabId =
-      windowId === browser.windows.WINDOW_ID_NONE ? null : await activeTabOfFocusedWindow();
-    dispatch({ type: 'tabActivated', now: Date.now(), tabId });
+    if (windowId === browser.windows.WINDOW_ID_NONE) return;
+    const tabId = await activeTabOfFocusedWindow();
+    if (tabId !== null) dispatch({ type: 'tabActivated', now: Date.now(), tabId });
   });
 
   browser.runtime.onInstalled.addListener(async () => {
