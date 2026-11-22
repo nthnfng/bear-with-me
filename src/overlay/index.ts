@@ -636,9 +636,9 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     setTimeout(() => f.remove(), 500);
   }
 
-  /** Snooze: get-up, then get-up-2, then default, from the shared poseSince so tabs agree. */
+  /** Snooze: get-up, then get-up-2, from the shared poseSince so tabs agree. */
   function startGetUp(view: TabView) {
-    const frames: Array<'get-up' | 'get-up-2' | 'default'> = ['get-up', 'get-up-2', 'default'];
+    const frames: Array<'get-up' | 'get-up-2'> = ['get-up', 'get-up-2'];
     const fresh = Date.now() - view.poseSince < FRESH_MS;
     const play = (f: (typeof frames)[number]) =>
       show(f, view.poseSince, '', f === 'get-up' || !fresh ? '' : 'unsquash');
@@ -701,7 +701,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
           const look = poseLook(view.pose, view.placement, prevPose);
           let entrance: EntranceAnim = fresh ? look.entrance : '';
           // The local chomp already squashed him a moment ago; don't squash twice.
-          // Already showing this pose locally (e.g. the get-up sequence ended on default): no second bounce.
+          // Already showing this pose locally: no second bounce.
           if (displayPose === view.pose && prevPose !== view.pose) entrance = '';
           if (entrance === 'chomp' && Date.now() - lastChompAt < 400) entrance = '';
           if (view.pose === 'tired' && fresh && prevPose === 'grieved') {

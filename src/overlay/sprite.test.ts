@@ -49,7 +49,7 @@ describe('get-up and dance timing', () => {
     expect(getUpFrame(0)).toBe('get-up');
     expect(getUpFrame(299)).toBe('get-up');
     expect(getUpFrame(300)).toBe('get-up-2');
-    expect(getUpFrame(600)).toBe('default');
+    expect(getUpFrame(600)).toBe('get-up-2');
   });
   it('sways around the middle every 0.9 s', () => {
     expect([0, 900, 1800, 2700].map(swayOffset)).toEqual([0, 90, -90, 90]);

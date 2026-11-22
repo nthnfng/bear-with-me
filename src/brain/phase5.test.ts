@@ -11,7 +11,6 @@ import {
   SNOOZE_GRIEVED_MS,
   SNOOZE_KNOCKED_MS,
   SNOOZE_OW_MS,
-  SNOOZE_STANDING_MS,
 } from '.';
 
 const YT = 'https://www.youtube.com/watch?v=1';
@@ -210,28 +209,26 @@ describe('Snooze stages', () => {
   const stageAt = (s: BarryState, ms: number) => view(s, 1, SN0 + ms);
   const B1 = SNOOZE_KNOCKED_MS;
   const B2 = B1 + SNOOZE_GET_UP_MS;
-  const B3 = B2 + SNOOZE_STANDING_MS;
-  const B4 = B3 + SNOOZE_OW_MS;
+  const B4 = B2 + SNOOZE_OW_MS;
   const B5 = B4 + SNOOZE_GRIEVED_MS;
 
   it('stage durations', () => {
     expect([
       SNOOZE_KNOCKED_MS,
       SNOOZE_GET_UP_MS,
-      SNOOZE_STANDING_MS,
       SNOOZE_OW_MS,
       SNOOZE_GRIEVED_MS,
-    ]).toEqual([5000, 600, 2000, 1000, 2200]);
+    ]).toEqual([5000, 600, 1000, 2200]);
     expect(GOT_UP_HAPPY_MS).toBe(1000);
   });
-  it('walks knocked down, get up, standing, ow, grieved, tired', () => {
+  it('walks knocked down, get up, ow, grieved, tired (no standing in between)', () => {
     const s = snoozing();
     expect(s.snoozeStartedAt).toBe(SN0);
     expect(stageAt(s, 0)).toMatchObject({ pose: 'got-owned', poseSince: SN0, canGetUp: false });
     expect(stageAt(s, B1 - 1).pose).toBe('got-owned');
     expect(stageAt(s, B1)).toMatchObject({ pose: 'get-up', poseSince: SN0 + B1, canGetUp: false });
-    expect(stageAt(s, B2)).toMatchObject({ pose: 'default', poseSince: SN0 + B2 });
-    expect(stageAt(s, B3)).toMatchObject({ pose: 'suspicious', line: 'ow', poseSince: SN0 + B3 });
+    expect(stageAt(s, B2 - 1).pose).toBe('get-up');
+    expect(stageAt(s, B2)).toMatchObject({ pose: 'suspicious', line: 'ow', poseSince: SN0 + B2 });
     expect(stageAt(s, B4)).toMatchObject({
       pose: 'grieved',
       line: 'my arm hurts i guess ill leave u alone',
@@ -257,18 +254,18 @@ describe('Snooze stages', () => {
       if (d >= SN0 + T.snoozeMs) break;
       s = run(s, tick(d)).state;
     }
-    expect(seen.slice(0, 5)).toEqual([SN0 + B1, SN0 + B2, SN0 + B3, SN0 + B4, SN0 + B5]);
-    expect(seen[5]).toBe(SN0 + T.snoozeMs);
+    expect(seen.slice(0, 4)).toEqual([SN0 + B1, SN0 + B2, SN0 + B4, SN0 + B5]);
+    expect(seen[4]).toBe(SN0 + T.snoozeMs);
   });
   it('snoozeMs shorter than the stages truncates them; nothing past the end is a deadline', () => {
     const s = snoozing({ snoozeMs: 3000 });
     expect(s.snoozeEndsAt).toBe(SN0 + 3000);
     expect(stageAt(s, 2999)).toMatchObject({ pose: 'got-owned', canGetUp: false });
     expect(brain.nextDeadline(s)).toBe(SN0 + 3000);
-    const mid = snoozing({ snoozeMs: B3 + 500 });
-    expect(stageAt(mid, B2 + 1).pose).toBe('default');
-    expect(stageAt(mid, B3 + 100)).toMatchObject({ pose: 'suspicious', canGetUp: false });
-    const end = run(mid, tick(SN0 + B3 + 500)).state;
+    const mid = snoozing({ snoozeMs: B2 + 500 });
+    expect(stageAt(mid, B2 - 1).pose).toBe('get-up');
+    expect(stageAt(mid, B2 + 100)).toMatchObject({ pose: 'suspicious', canGetUp: false });
+    const end = run(mid, tick(SN0 + B2 + 500)).state;
     expect(end.phase).toBe('reaching');
   });
   it('the Reach comes back after the Snooze with a fresh fight run', () => {
@@ -284,10 +281,10 @@ describe('Snooze stages', () => {
 
 describe('Get up', () => {
   const TIRED =
-    SNOOZE_KNOCKED_MS + SNOOZE_GET_UP_MS + SNOOZE_STANDING_MS + SNOOZE_OW_MS + SNOOZE_GRIEVED_MS;
+    SNOOZE_KNOCKED_MS + SNOOZE_GET_UP_MS + SNOOZE_OW_MS + SNOOZE_GRIEVED_MS;
   it('is ignored at every stage before tired', () => {
     const s = snoozing();
-    for (const ms of [0, 1000, 5000, 5700, 7700, 8000, 9000, TIRED - 1]) {
+    for (const ms of [0, 1000, 5000, 5700, 6000, 7000, TIRED - 1]) {
       const r = run(s, gotUp(SN0 + ms));
       expect(r.state.gotUpAt).toBeNull();
       expect(r.state.snoozeEndsAt).toBe(s.snoozeEndsAt);
@@ -392,7 +389,6 @@ describe('review fixes', () => {
       SN0 +
       SNOOZE_KNOCKED_MS +
       SNOOZE_GET_UP_MS +
-      SNOOZE_STANDING_MS +
       SNOOZE_OW_MS +
       SNOOZE_GRIEVED_MS +
       10;
