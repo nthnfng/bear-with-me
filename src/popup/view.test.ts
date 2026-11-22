@@ -397,9 +397,9 @@ describe('pixel popup helpers', () => {
     );
     // Today's timed events first, then multi-day, then one-day all-day; tomorrow left out.
     expect(list.map((e) => [e.block.id, e.when, e.status, e.group])).toEqual([
-      ['done', 'done', 'past', 0],
+      ['done', 'ended', 'past', 0],
       ['etf', '● now', 'now', 0],
-      ['gym', 'in 4h', 'later', 0],
+      ['gym', '', 'later', 0],
       ['hack', '● now', 'now', 1],
       ['holiday', '', 'allDay', 2],
     ]);
@@ -417,15 +417,23 @@ describe('pixel popup helpers', () => {
     expect(v.taskFromEvent(ev('etf', at(14), at(16)))).toEqual({
       title: 'etf',
       estimateMs: 2 * 3_600_000,
+      eventKey: `etf@${at(14)}`,
     });
     expect(v.taskFromEvent(ev('hack', at(12, 0, 20), at(17, 0, 23)))).toBeNull();
     expect(v.taskFromEvent(ev('holiday', at(0), at(0, 0, 22), true))).toBeNull();
     expect(v.taskFromEvent(ev('long', at(9), at(17, 30)))?.estimateMs).toBe(8.5 * 3_600_000);
-    const tasks = v.addTask([], { title: 'ETF' }, '1');
-    expect(v.eventTaskState(tasks, 'etf')).toBe('added');
-    expect(v.eventTaskState(tasks, 'gym')).toBe('none');
-    // Checked off: the event reads as done, and "+ task" doesn't come back.
-    expect(v.eventTaskState(v.toggleTask(tasks, '1', 5), 'ETF')).toBe('done');
+    // Matched by the exact event, not the name: two "test" events stay separate.
+    const first = ev('test', at(9, 30), at(10));
+    const second = ev('test2', at(21, 30), at(22));
+    second.title = 'test';
+    const tasks = v.addTask([], v.taskFromEvent(first)!, '1');
+    expect(v.eventTaskState(tasks, first)).toBe('added');
+    expect(v.eventTaskState(tasks, second)).toBe('none');
+    const checked = v.toggleTask(tasks, '1', 5);
+    expect(v.eventTaskState(checked, first)).toBe('done');
+    expect(v.eventTaskState(checked, second)).toBe('none');
+    // A task typed by hand with the same name isn't linked to the event.
+    expect(v.eventTaskState(v.addTask([], { title: 'test' }, '2'), first)).toBe('none');
   });
 
   it("works out each task's time slot from the list order", async () => {

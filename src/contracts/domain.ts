@@ -39,6 +39,8 @@ export interface Task {
   doneAt: Millis | null;
   /** Time left when it was paused; Start resumes from here. Absent/null = not paused. */
   leftMs?: number | null;
+  /** The calendar event it was added from ("+ task"), so same-named events don't get mixed up. */
+  eventKey?: string;
 }
 
 /** The Task the user pressed Start on: Lock In runs until `endsAt`. */

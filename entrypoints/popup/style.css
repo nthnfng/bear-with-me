@@ -692,7 +692,10 @@ button:disabled {
   color: var(--ink-soft);
 }
 .today li.past .ev-title {
-  text-decoration: line-through;
+  color: #9b8466;
+}
+.today li.past .when {
+  color: #b39a78;
 }
 .today .range {
   flex: none;
@@ -1190,4 +1193,13 @@ button:disabled {
 .todo-list .planned.done-at {
   color: #357a44;
   background: rgba(53, 122, 68, 0.12);
+}
+.today .re-add {
+  display: none;
+}
+.today li.finished:hover .task-done {
+  display: none;
+}
+.today li.finished:hover .re-add {
+  display: inline;
 }
