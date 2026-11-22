@@ -141,11 +141,14 @@ function Home({
   };
   // The bottom button: what's going on (break, warning, Reach, Snooze), or just "Slack".
   const canSlack = v.slackAllowed && (state.phase === 'clear' || state.phase === 'confronting');
-  const slackLabel = v.onSlackPass
-    ? `☕ Slacking · ${v.countdown ? formatCountdown(v.countdown.target - now) : ''} left`
-    : v.countdown
-      ? `${v.countdown.label} ${formatCountdown(v.countdown.target - now)}`
-      : '☕ Slack';
+  // In Chill Barry leaves you alone anyway, so there's nothing to take a break from.
+  const slackLabel = !v.slackAllowed
+    ? '☕ Already slacking'
+    : v.onSlackPass
+      ? `☕ Slacking · ${v.countdown ? formatCountdown(v.countdown.target - now) : ''} left`
+      : v.countdown
+        ? `${v.countdown.label} ${formatCountdown(v.countdown.target - now)}`
+        : '☕ Slack';
 
   return (
     <main className="popup home">
