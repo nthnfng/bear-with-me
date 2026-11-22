@@ -816,7 +816,11 @@ function baseView(state: BarryState, tabId: TabId, now: Millis): TabView {
       position: state.position,
       pose: tierPose(state.fatness, chud),
       poseSince: state.confrontSince ?? 0,
-      line: full ? chudLine : plan ? "Get back to it ,':/" : "You said you'd lock in ,':/",
+      line: full
+        ? chudLine
+        : plan
+          ? `You planned ${plan.task?.title ?? plan.block?.title} ,':/`
+          : "You said you'd lock in ,':/",
       plan,
       showBackToIt: true,
       eatInput: true,

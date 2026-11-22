@@ -151,7 +151,8 @@ describe('the plan under the Confrontation line', () => {
     ).state;
     const v = brain.viewFor(s, 1, T0);
     expect(v.placement).toBe('face');
-    expect(v.line).toBe("Get back to it ,':/");
+    // The original line, naming the task (it comes before the calendar event).
+    expect(v.line).toBe("You planned Task b ,':/");
     expect(v.plan).toEqual({
       task: { title: 'Task b', timing: { kind: 'left', endsAt: T0 + 30 * MIN } },
       block: { title: 'ETF prep', endsAt: T0 + 60 * MIN },

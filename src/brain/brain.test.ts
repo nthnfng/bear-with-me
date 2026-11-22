@@ -102,7 +102,7 @@ describe('Confrontation arrival', () => {
       visible: true,
       placement: 'face',
       pose: 'suspicious',
-      line: "Get back to it ,':/",
+      line: "You planned ETF prep ,':/",
       plan: { task: null, block: { title: 'ETF prep' } },
       showBackToIt: true,
       eatInput: true,

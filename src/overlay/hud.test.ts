@@ -1,29 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import { formatMinutes, parseMinutes, planLines, taskCheckText, truncate } from './hud';
+import {
+  formatMinutes,
+  humanDuration,
+  parseMinutes,
+  planLines,
+  taskCheckText,
+  truncate,
+} from './hud';
 
 const MIN = 60_000;
-const clock = () => '6:00 PM';
 
 describe('plan lines', () => {
-  it('task first, then the calendar block', () => {
+  it('task first, then the calendar event, in words', () => {
     const plan = {
-      task: { title: 'Problem set abc', timing: { kind: 'left' as const, endsAt: 32 * MIN } },
-      block: { title: 'ETF prep', endsAt: 99 },
+      task: { title: 'Problem set abc', timing: { kind: 'left' as const, endsAt: 330 * MIN } },
+      block: { title: 'Hack Western', endsAt: 40 * 60 * MIN },
     };
-    expect(planLines(plan, 0, clock)).toEqual([
-      '★ Problem set abc · 32m left',
-      '📅 ETF prep · until 6:00 PM',
+    expect(planLines(plan, 0)).toEqual([
+      'Task Problem set abc: ~5 hours 30 minutes left',
+      'Event Hack Western: ~1 day 16 hours left',
     ]);
   });
 
   it('estimate, time up, and nothing', () => {
     expect(
-      planLines({ task: { title: 'A', timing: { kind: 'estimate', ms: 90 * MIN } }, block: null }, 0),
-    ).toEqual(['★ A · ~1h 30m']);
-    expect(planLines({ task: { title: 'A', timing: { kind: 'timesUp' } }, block: null }, 0)).toEqual([
-      "★ A · time's up",
-    ]);
+      planLines(
+        { task: { title: 'A', timing: { kind: 'estimate', ms: 5 * MIN } }, block: null },
+        0,
+      ),
+    ).toEqual(['Task A: ~5 minutes']);
+    expect(
+      planLines({ task: { title: 'A', timing: { kind: 'timesUp' } }, block: null }, 0),
+    ).toEqual(["Task A: time's up"]);
     expect(planLines(null, 0)).toEqual([]);
+  });
+
+  it('says lengths in words', () => {
+    expect(humanDuration(1)).toBe('1 minute');
+    expect(humanDuration(25 * MIN)).toBe('25 minutes');
+    expect(humanDuration(60 * MIN)).toBe('1 hour');
+    expect(humanDuration(61 * MIN)).toBe('1 hour 1 minute');
+    expect(humanDuration(24 * 60 * MIN)).toBe('1 day');
+    expect(humanDuration(50 * 60 * MIN)).toBe('2 days 2 hours');
   });
 
   it('formats minutes and truncates long titles', () => {

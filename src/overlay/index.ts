@@ -230,7 +230,8 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       sprite.style.backgroundPosition = `${frameOffset(pose, s, f)}px 0`;
     };
     update();
-    if (pose.frames > 1 && pose.frameMs) flipTimer = setInterval(update, Math.max(20, pose.frameMs / 2));
+    if (pose.frames > 1 && pose.frameMs)
+      flipTimer = setInterval(update, Math.max(20, pose.frameMs / 2));
     displayPose = poseId;
     displaySince = since;
   }
@@ -247,7 +248,8 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   }
   sprite.addEventListener('animationend', (e) => {
     // squash holds its end state until the next pose swap replaces it.
-    if (e.target === sprite && e.animationName !== 'squash') sprite.className = `sprite ${baseClass}`.trim();
+    if (e.target === sprite && e.animationName !== 'squash')
+      sprite.className = `sprite ${baseClass}`.trim();
   });
 
   function show(poseId: PoseId, since: number, idle: string, entrance: EntranceAnim | 'pop fast') {
@@ -407,6 +409,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       countEl = null;
       planEl = null;
       if (view.line !== null) bubble.append(view.line);
+      bubble.classList.toggle('has-plan', !!view.plan);
       if (view.plan) {
         planEl = document.createElement('div');
         planEl.className = 'plan';
@@ -445,11 +448,13 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       };
       paint();
       // A running Task's "32m left" counts down.
-      if (plan?.task?.timing.kind === 'left') planTimer = setInterval(paint, 15_000);
+      // Running task and calendar event times count down.
+      if (plan?.task?.timing.kind === 'left' || plan?.block) planTimer = setInterval(paint, 15_000);
     }
     if (countEl && visibleBubble) {
       const tick = () => {
-        if (countEl && breakEnd !== null) countEl.textContent = formatCountdown(breakEnd - Date.now());
+        if (countEl && breakEnd !== null)
+          countEl.textContent = formatCountdown(breakEnd - Date.now());
       };
       tick();
       countdownTimer = setInterval(tick, 250);
@@ -705,14 +710,16 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
             playAnim('squash');
             later(() => show('tired', view.poseSince, '', 'unsquash'), 150);
           } else show(view.pose, view.poseSince, look.idle, entrance);
-          if (fresh && view.placement === 'face' && view.pose === 'suspicious' && !wasFace) burstFlash();
+          if (fresh && view.placement === 'face' && view.pose === 'suspicious' && !wasFace)
+            burstFlash();
         }
       } else if (displayPose) {
         // Same pose: placement or viewport size may still have changed.
         paintSprite(displayPose, displaySince, view.placement);
       }
       if (firstRect) shrinkFrom(firstRect);
-      if (!view.showBackToIt || (backSentSince !== null && view.poseSince !== backSentSince)) backSentSince = null;
+      if (!view.showBackToIt || (backSentSince !== null && view.poseSince !== backSentSince))
+        backSentSince = null;
       button.hidden = !view.showBackToIt || backSentSince !== null;
     }
     syncFx();

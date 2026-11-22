@@ -141,13 +141,15 @@ function Home({
   };
   // The bottom button: what's going on (break, warning, Reach, Snooze), or just "Slack".
   const canSlack = v.slackAllowed && (state.phase === 'clear' || state.phase === 'confronting');
+  // Snoozed Barry sitting tired can be told to get up: the bottom button ends the Snooze.
+  const canStopSnooze = v.countdownHint !== null;
   // In Chill Barry leaves you alone anyway, so there's nothing to take a break from.
   const slackLabel = !v.slackAllowed
     ? '☕ Already slacking'
     : v.onSlackPass
       ? `☕ Slacking · ${v.countdown ? formatCountdown(v.countdown.target - now) : ''} left`
       : v.countdown
-        ? `${v.countdown.label} ${formatCountdown(v.countdown.target - now)}`
+        ? `${v.countdown.label} ${formatCountdown(v.countdown.target - now)}${canStopSnooze ? ' · Stop snooze' : ''}`
         : '☕ Slack';
 
   return (
@@ -213,9 +215,9 @@ function Home({
 
         <button
           className={v.onSlackPass ? 'stone on wide slack-open' : 'stone wide slack-open'}
-          disabled={!v.onSlackPass && !canSlack}
+          disabled={!v.onSlackPass && !canSlack && !canStopSnooze}
           title={!v.slackAllowed ? (v.slackHint ?? undefined) : undefined}
-          onClick={() => setSlackOpen(true)}
+          onClick={() => (canStopSnooze ? send({ type: 'gotUp' }) : setSlackOpen(true))}
         >
           {slackLabel}
         </button>
