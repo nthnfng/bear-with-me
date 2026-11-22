@@ -555,6 +555,20 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       ],
       { duration: ms, easing: 'ease-in', fill: 'forwards' },
     );
+    // flipbook blast under the particles, origin on the blast point; skipped for reduced motion
+    if (!calm) {
+      const sh = manifest.explosion.sheet;
+      const w = sh.w * sh.scale;
+      const h = sh.h * sh.scale;
+      const blast = document.createElement('div');
+      blast.className = 'blast';
+      blast.style.cssText = `left:${x - sh.origin[0] * sh.scale}px;top:${y - sh.origin[1] * sh.scale}px;width:${w}px;height:${h}px;background-image:url("${assetUrl(sh.file)}");background-size:${w * sh.frames}px ${h}px`;
+      fx.appendChild(blast);
+      blast.animate(
+        [{ backgroundPosition: '0 0' }, { backgroundPosition: `-${w * sh.frames}px 0` }],
+        { duration: ms, easing: `steps(${sh.frames})`, fill: 'forwards' },
+      );
+    }
     for (let i = 0; i < 90; i++) {
       const p = document.createElement('div');
       p.className = 'particle';

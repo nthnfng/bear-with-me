@@ -123,6 +123,7 @@ export const CSS = `
 /* explosion: backdrop eats clicks while the tab is closing; pixel particles drawn in code */
 .explosion { position: fixed; inset: 0; pointer-events: auto; }
 .particle { position: absolute; pointer-events: none; }
+.blast { position: absolute; pointer-events: none; background-repeat: no-repeat; image-rendering: pixelated; }
 .flash { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
   font-size: 72px; font-weight: 900; color: #ff5722; -webkit-text-stroke: 3px var(--ink);
   animation: flash 700ms ease-out forwards; pointer-events: none; }

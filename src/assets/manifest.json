@@ -183,7 +183,15 @@
     ]
   },
   "explosion": {
-    "durationMs": 1000
+    "durationMs": 1000,
+    "sheet": {
+      "file": "sprites/explosion-sheet.png",
+      "w": 97,
+      "h": 143,
+      "frames": 17,
+      "origin": [43, 79],
+      "scale": 4
+    }
   },
   "cave": "sprites/cave.svg"
 }

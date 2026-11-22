@@ -81,6 +81,9 @@
 
 /* explosion particles */
 .boom { position:absolute; width:12px; height:12px; z-index:9; transition: transform .6s ease-out, opacity .6s; }
+.blast { position:absolute; z-index:11; pointer-events:none; background-repeat:no-repeat; image-rendering:pixelated;
+  animation: blast .65s steps(17) forwards; }
+@keyframes blast { to { background-position-x: var(--blast-end); } }
 .boomtint { position:absolute; inset:0; z-index:10; pointer-events:none; animation: boomtint .6s ease-in forwards; }
 @keyframes boomtint { 0% { background:rgba(255,246,176,.55); } 15% { background:rgba(246,208,77,.45); }
   40% { background:rgba(232,116,47,.3); } 100% { background:rgba(232,116,47,.45); } }

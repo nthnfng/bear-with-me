@@ -215,6 +215,15 @@ function explode() {
   // translucent blast tint that thickens into a solid fill, held until the tab closes
   const tint = document.createElement("div"); tint.className = "boomtint";
   browser.appendChild(tint);
+  // flipbook blast (public/assets/sprites/explosion-sheet.png: 17 frames of 97x143, origin 43,79)
+  const blast = document.createElement("div"); blast.className = "blast";
+  blast.style.left = cx - 43 * S + "px"; blast.style.top = cy - 79 * S + "px";
+  blast.style.width = 97 * S + "px"; blast.style.height = 143 * S + "px";
+  blast.style.backgroundImage = `url("${SPRITE_DIR}explosion-sheet.png")`;
+  blast.style.backgroundSize = `${97 * S * 17}px ${143 * S}px`;
+  blast.style.setProperty("--blast-end", `-${97 * S * 17}px`);
+  browser.appendChild(blast);
+  setTimeout(() => blast.remove(), 700);
   for (let i = 0; i < 45; i++) {
     const p = document.createElement("div"); p.className = "boom";
     p.style.left = cx + "px"; p.style.top = cy + "px"; p.style.background = colors[i % colors.length];

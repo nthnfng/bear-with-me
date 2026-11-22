@@ -57,4 +57,13 @@ describe('asset manifest', () => {
     expect(manifest.explosion.durationMs).toBeGreaterThan(0);
     expect(manifest.explosion.durationMs).toBeLessThanOrEqual(1300);
   });
+  it('explosion sheet is a w*frames strip with its origin inside a frame', () => {
+    const { file: f, w, h, frames, origin, scale } = manifest.explosion.sheet;
+    expect(file(f), f).toBe(true);
+    expect(pngWidth(f)).toBe(w * frames);
+    expect(pngHeight(f)).toBe(h);
+    expect(origin[0]).toBeLessThan(w);
+    expect(origin[1]).toBeLessThan(h);
+    expect(Number.isInteger(scale)).toBe(true);
+  });
 });

@@ -46,6 +46,15 @@ export interface ImageAsset {
   h: number;
 }
 
+/** Horizontal strip of equal frames; w/h are one frame, in art px. */
+export interface ExplosionSheet extends ImageAsset {
+  frames: number;
+  /** Art px inside a frame that sits on the blast point. */
+  origin: [number, number];
+  /** Integer screen scale, so pixels stay crisp. */
+  scale: number;
+}
+
 /**
  * One pose: a horizontal PNG strip of `frames` frames, each `w` × `h` art pixels.
  * Render with background-size = (w * frames * S) × (h * S), so a strip saved at a larger
@@ -69,8 +78,11 @@ export interface AssetManifest {
   clockIcon: ImageAsset;
   /** One variant is picked at random per play (e.g. several chomps). */
   sounds: Record<SoundId, string[]>;
-  /** Pixel-particle explosion drawn in code; must finish inside the runtime's close delay. */
-  explosion: { durationMs: number };
+  /**
+   * Explosion: a flipbook sprite plus pixel particles drawn in code; must finish inside the
+   * runtime's close delay. The sheet's frames are played evenly across durationMs.
+   */
+  explosion: { durationMs: number; sheet: ExplosionSheet };
   /** Shown in the popup. */
   cave: string;
 }
