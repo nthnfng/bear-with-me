@@ -307,10 +307,17 @@ function Home({
 function EventsCard({ state, now }: { state: BarryState; now: number }) {
   const settings = useStored<SettingsData>(STORAGE_KEYS.settings, DEFAULT_SETTINGS);
   // "+ task" that would take the unchecked total past 8 hours waits on "Are you sure?".
-  const [pending, setPending] = useState<{ title: string; estimateMs: number } | null>(null);
+  const [pending, setPending] = useState<{
+    title: string;
+    estimateMs: number;
+    eventKey: string;
+  } | null>(null);
   const events = todayEvents(state.blocks, now);
   const full = atTaskLimit(state.tasks);
-  const addFromEvent = (t: { title: string; estimateMs: number }, force = false) => {
+  const addFromEvent = (
+    t: { title: string; estimateMs: number; eventKey: string },
+    force = false,
+  ) => {
     if (full) return;
     if (!force && wouldExceedTotal(state.tasks, t.estimateMs)) return setPending(t);
     send({ type: 'setTasks', tasks: addTask(state.tasks, t, crypto.randomUUID()) });
@@ -336,16 +343,31 @@ function EventsCard({ state, now }: { state: BarryState; now: number }) {
           <li className="empty">Nothing on your calendar today.</li>
         ) : (
           events.map((e, i) => {
-            const asTask = e.status === 'past' ? null : taskFromEvent(e.block);
-            const inTasks = eventTaskState(state.tasks, e.block.title);
+            const asTask = taskFromEvent(e.block);
+            const inTasks = eventTaskState(state.tasks, e.block);
             const added = inTasks === 'added';
-            // Its task was checked off: the event reads as done (crossed out), no "+ task".
+            // Its task was checked off: green "✓ done" (crossed out); hover offers "+ add again".
             const finished = inTasks === 'done';
+            // Time passed without it being done as a task: light "ended", no button.
+            const ended = !finished && !added && e.status === 'past';
             // A line between groups: multi-day / today's events / all-day.
             const divider = i > 0 && events[i - 1]!.group !== e.group;
+            const when = finished ? '' : e.when;
             const action = finished ? (
-              <span className="task-done">✓ done</span>
-            ) : (
+              <>
+                <span className="task-done">✓ done</span>
+                {asTask && (
+                  <button
+                    className="link re-add"
+                    disabled={full}
+                    title="Add it to your tasks again"
+                    onClick={() => addFromEvent(asTask)}
+                  >
+                    + add again
+                  </button>
+                )}
+              </>
+            ) : ended ? null : (
               asTask && (
                 <button
                   className="link"
@@ -368,7 +390,7 @@ function EventsCard({ state, now }: { state: BarryState; now: number }) {
                       </span>
                       <span className="range">{e.range}</span>
                     </span>
-                    {e.when && <span className="when">{e.when}</span>}
+                    {when && <span className="when">{when}</span>}
                     {action}
                   </li>
                 ) : (
@@ -377,7 +399,7 @@ function EventsCard({ state, now }: { state: BarryState; now: number }) {
                     <span className="ev-title" title={e.block.title}>
                       {e.block.title}
                     </span>
-                    {e.when && <span className="when">{e.when}</span>}
+                    {when && <span className="when">{when}</span>}
                     {action}
                   </li>
                 )}

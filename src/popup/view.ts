@@ -530,7 +530,7 @@ export const clampTitle = (title: string) => title.trim().slice(0, TASK_TITLE_MA
  */
 export function addTask(
   tasks: Task[],
-  input: { title: string; description?: string; estimateMs?: number },
+  input: { title: string; description?: string; estimateMs?: number; eventKey?: string },
   id: string,
 ): Task[] {
   const title = clampTitle(input.title);
@@ -542,6 +542,7 @@ export function addTask(
     estimateMs: Math.min(TASK_ESTIMATE_MAX_MS, input.estimateMs ?? TASK_DEFAULT_ESTIMATE_MS),
     done: false,
     doneAt: null,
+    ...(input.eventKey ? { eventKey: input.eventKey } : {}),
   };
   const lastOpen = tasks.reduce((at, t, i) => (t.done ? at : i), -1);
   const out = [...tasks];
@@ -611,7 +612,7 @@ export interface TodayEvent {
   block: CalendarBlock;
   /** "2:00–4:00 PM", or "All day". */
   range: string;
-  /** "● now", "in 25m", "done", or "" for all-day events. */
+  /** "● now", "ended" (its time has passed), or "" (later today, all-day). */
   when: string;
   status: 'allDay' | 'past' | 'now' | 'later';
   /**
@@ -681,16 +682,9 @@ export function todayEvents(blocks: CalendarBlock[], now: Millis): TodayEvent[] 
       const long = isLongEvent(block);
       const range = long ? formatSpan(block) : formatRange(block.start, block.end);
       if (block.allDay) return { block, range, when: '', status: 'allDay', long, group };
-      if (block.end <= now) return { block, range, when: 'done', status: 'past', long, group };
+      if (block.end <= now) return { block, range, when: 'ended', status: 'past', long, group };
       if (block.start <= now) return { block, range, when: '● now', status: 'now', long, group };
-      return {
-        block,
-        range,
-        when: `in ${formatEstimate(Math.max(60_000, block.start - now))}`,
-        status: 'later',
-        long,
-        group,
-      };
+      return { block, range, when: '', status: 'later', long, group };
     });
 }
 
@@ -698,22 +692,32 @@ export function todayEvents(blocks: CalendarBlock[], now: Millis): TodayEvent[] 
  * "+ task" on an event: its title, its length as the estimate. Null for an all-day event or one
  * longer than a Task may be (8h 30m), e.g. a multi-day event: those can't be added.
  */
-export function taskFromEvent(block: CalendarBlock): { title: string; estimateMs: number } | null {
+export function taskFromEvent(
+  block: CalendarBlock,
+): { title: string; estimateMs: number; eventKey: string } | null {
   const length = block.end - block.start;
   if (block.allDay || length > TASK_ESTIMATE_MAX_MS) return null;
   return {
     title: clampTitle(block.title) || 'Calendar event',
     estimateMs: Math.max(60_000, length),
+    eventKey: eventKey(block),
   };
 }
 
+/** One occurrence of a calendar event (a repeating event's occurrences share an id). */
+export const eventKey = (b: Pick<CalendarBlock, 'id' | 'start'>) => `${b.id}@${b.start}`;
+
 /**
- * Whether an event is already in the task list: 'added' while a matching Task (same title) is
- * unchecked, 'done' once it's been checked off, else 'none' (so "+ task" shows).
+ * Whether this exact event is in the task list (matched by the event it was added from, not the
+ * title, so same-named events stay separate): 'added' while its Task is unchecked, 'done' once
+ * checked off, else 'none' (so "+ task" shows).
  */
-export function eventTaskState(tasks: Task[], title: string): 'none' | 'added' | 'done' {
-  const key = clampTitle(title).toLowerCase();
-  const matching = tasks.filter((t) => t.title.toLowerCase() === key);
+export function eventTaskState(
+  tasks: Task[],
+  block: Pick<CalendarBlock, 'id' | 'start'>,
+): 'none' | 'added' | 'done' {
+  const key = eventKey(block);
+  const matching = tasks.filter((t) => t.eventKey === key);
   if (matching.some((t) => !t.done)) return 'added';
   return matching.length > 0 ? 'done' : 'none';
 }
