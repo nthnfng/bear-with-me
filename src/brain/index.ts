@@ -544,18 +544,16 @@ function applyDev(
 
 /** The Snooze's stages, timed from `snoozeStartedAt`. A Snooze shorter than them just ends early. */
 export const SNOOZE_KNOCKED_MS = 5000; // got-owned, spinning
-export const SNOOZE_GET_UP_MS = 600; // get-up (the overlay adds the in-between frames)
-export const SNOOZE_STANDING_MS = 2000; // default
+export const SNOOZE_GET_UP_MS = 600; // get-up, then get-up-2 (the overlay adds it); straight into ow
 export const SNOOZE_OW_MS = 1000; // suspicious + "ow"
 export const SNOOZE_GRIEVED_MS = 2200; // grieved + "my arm hurts..."; then tired until the end
 /** How long Barry jumps happily after Get up before the Snooze ends. */
 export const GOT_UP_HAPPY_MS = 1000;
 
-type SnoozeStage = 'knocked' | 'getUp' | 'standing' | 'ow' | 'grieved' | 'tired' | 'happy';
+type SnoozeStage = 'knocked' | 'getUp' | 'ow' | 'grieved' | 'tired' | 'happy';
 const SNOOZE_STAGES: { stage: SnoozeStage; ms: number }[] = [
   { stage: 'knocked', ms: SNOOZE_KNOCKED_MS },
   { stage: 'getUp', ms: SNOOZE_GET_UP_MS },
-  { stage: 'standing', ms: SNOOZE_STANDING_MS },
   { stage: 'ow', ms: SNOOZE_OW_MS },
   { stage: 'grieved', ms: SNOOZE_GRIEVED_MS },
 ];
@@ -908,7 +906,6 @@ function viewForBreak(state: BarryState, tabId: TabId, now: Millis): TabView | n
       const pose: PoseId = {
         knocked: 'got-owned',
         getUp: 'get-up',
-        standing: 'default',
         ow: 'suspicious',
         grieved: 'grieved',
         tired: 'tired',

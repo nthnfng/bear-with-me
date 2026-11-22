@@ -112,11 +112,10 @@ punch (click the ARM only, not Barry's body; pushes 1–4)       punch()
 after 5th punch                                                gotOwned()
 1. barry-got-owned for 5 s + spinning ✦
 2. barry-get-up (0.3 s) → barry-get-up-2 (0.3 s)
-3. bounce → barry-default (2 s)
-4. bounce → barry-suspicious (1 s) + "ow"
-5. bounce → barry-grieved (2.2 s) + "my arm hurts i guess ill leave u alone"
-6. squash & stretch → barry-tired, seated in the bottom-right
-7. stays seated; chud-bar fills while he sits (demo: +10% / 2 s)
+3. bounce → barry-suspicious (1 s) + "ow"
+4. bounce → barry-grieved (2.2 s) + "my arm hurts i guess ill leave u alone"
+5. squash & stretch → barry-tired, seated in the bottom-right
+6. stays seated; chud-bar fills while he sits (demo: +10% / 2 s)
 
 tell tired Barry to get up (click him, or a popup button)      getUp()
 1. squash → barry-happy does one slow jump (0.9 s)
@@ -144,7 +143,7 @@ All in `public/assets/sprites/`. Sizes are **art pixels** (1 frame). The code sc
 
 | Sprite | Size | Frames | Used for |
 |---|---|---|---|
-| `barry-default` | 17×20 | 1 | get-up pause, standing after getting up, cave send-off |
+| `barry-default` | 17×20 | 1 | standing after Get up, cave send-off |
 | `barry-chill-mug` | 17×20 | 13 | chill idle (sipping) |
 | `barry-chill` | 29×18 | 1 | slack pass active (lounging) |
 | `barry-thinking` | 17×20 | 1 | free-gap suggestion |

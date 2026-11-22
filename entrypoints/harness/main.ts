@@ -114,13 +114,12 @@ function doPush() {
   if (fightPushes === 0) {
     overlay.playEffect({ type: 'playSound', tabId: 0, sound: 'ow' });
     renderNow('knockedDown');
-    // The brain's Snooze stages, compressed: down, getting up, standing, ow, hurts, tired.
+    // The brain's Snooze stages: down, getting up, ow, hurts, tired.
     const at = (ms: number, name: string) => timers.push(window.setTimeout(() => renderNow(name), ms));
     at(5000, 'gettingUp');
-    at(5600, 'standing');
-    at(7600, 'ow');
-    at(8600, 'armHurts');
-    at(10800, 'tired');
+    at(5600, 'ow');
+    at(6600, 'armHurts');
+    at(8800, 'tired');
   } else renderNow(currentName === 'reachingChud' ? 'reachingChud' : 'reaching', { pushesLeft: fightPushes });
 }
 document.querySelectorAll<HTMLElement>('[data-fight]').forEach((b) => {

@@ -38,11 +38,9 @@ export function fitScale(base: number, h: number, viewportH: number, maxFraction
 
 
 export const GET_UP_STEP_MS = 300;
-/** Local in-between frames while the view's pose is `get-up`. */
-export function getUpFrame(elapsedMs: number): 'get-up' | 'get-up-2' | 'default' {
-  if (elapsedMs < GET_UP_STEP_MS) return 'get-up';
-  if (elapsedMs < 2 * GET_UP_STEP_MS) return 'get-up-2';
-  return 'default';
+/** Local in-between frame while the view's pose is `get-up`: get-up-2 holds until the brain moves on. */
+export function getUpFrame(elapsedMs: number): 'get-up' | 'get-up-2' {
+  return elapsedMs < GET_UP_STEP_MS ? 'get-up' : 'get-up-2';
 }
 
 export const SWAY_MS = 900;

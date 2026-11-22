@@ -75,6 +75,8 @@ const FRESH_MS = 1500;
 const CLOSE_WINDOW_MS = 1300;
 const BACK_TO_IT_POP_MS = 250;
 const BACK_TO_IT_ARM_MS = 350;
+/** After the Back to it explosion, the tab should close within this; if not, Barry comes back. */
+const CLOSE_GRACE_MS = 1500;
 const EXPLOSION_COLORS = ['#f6d04d', '#e8742f', '#c43c2c', '#1e1a16', '#ffffff'];
 
 export function mountOverlay(opts: OverlayOptions): Overlay {
@@ -563,13 +565,18 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     setTimeout(() => {
       backdrop.remove();
       fx.replaceChildren();
-      if (locked) {
-        // Not closed (harness, or the close failed): hand the sprite back to the view.
-        locked = false;
-        localReach = null;
-        if (current) render(current, true);
-      }
+      // Back to it: hold close-tab Barry until the runtime closes the tab, which lands just
+      // after this. Handing back now would flash the Confrontation before the tab goes.
+      if (locked) later(unlockIfStillOpen, CLOSE_GRACE_MS);
     }, ms + 60);
+  }
+
+  /** Not closed (harness, or the close failed): hand the sprite back to the view. */
+  function unlockIfStillOpen() {
+    if (!locked) return;
+    locked = false;
+    localReach = null;
+    if (current) render(current, true);
   }
 
   /** explodeAndClose: Back to it plays pose + fast reach first; a landed Reach just explodes. */
@@ -629,9 +636,9 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     setTimeout(() => f.remove(), 500);
   }
 
-  /** Snooze: get-up, then get-up-2, then default, from the shared poseSince so tabs agree. */
+  /** Snooze: get-up, then get-up-2, from the shared poseSince so tabs agree. */
   function startGetUp(view: TabView) {
-    const frames: Array<'get-up' | 'get-up-2' | 'default'> = ['get-up', 'get-up-2', 'default'];
+    const frames: Array<'get-up' | 'get-up-2'> = ['get-up', 'get-up-2'];
     const fresh = Date.now() - view.poseSince < FRESH_MS;
     const play = (f: (typeof frames)[number]) =>
       show(f, view.poseSince, '', f === 'get-up' || !fresh ? '' : 'unsquash');
@@ -694,7 +701,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
           const look = poseLook(view.pose, view.placement, prevPose);
           let entrance: EntranceAnim = fresh ? look.entrance : '';
           // The local chomp already squashed him a moment ago; don't squash twice.
-          // Already showing this pose locally (e.g. the get-up sequence ended on default): no second bounce.
+          // Already showing this pose locally: no second bounce.
           if (displayPose === view.pose && prevPose !== view.pose) entrance = '';
           if (entrance === 'chomp' && Date.now() - lastChompAt < 400) entrance = '';
           if (view.pose === 'tired' && fresh && prevPose === 'grieved') {
