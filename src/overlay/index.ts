@@ -297,7 +297,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   }
 
   // The Reach: Push = click on the arm, the fist, or Barry himself (only clickable while
-  // reaching). Tired Barry is clickable when the view says canGetUp.
+  // reaching). Ending a Snooze is controlled from the extension popup.
   const push = (e: Event) => {
     e.stopPropagation();
     if (locked) return;
@@ -308,10 +308,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   armFist.addEventListener('click', push);
   sprite.addEventListener('click', (e) => {
     if (current?.reach) push(e);
-    else if (current?.canGetUp) {
-      e.stopPropagation();
-      send({ type: 'gotUp' });
-    }
   });
 
   // ---- suggestion (chill Barry thinks for 4 s) -----------------------------------------------
@@ -679,7 +675,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       return;
     }
 
-    barry.className = `barry ${view.placement} ${view.position}${view.reach ? ' fighting' : ''}${view.canGetUp ? ' clickable' : ''}${barry.classList.contains('dancing') ? ' dancing' : ''}`;
+    barry.className = `barry ${view.placement} ${view.position}${view.reach ? ' fighting' : ''}${barry.classList.contains('dancing') ? ' dancing' : ''}`;
 
     if (!locked) {
       const newPoseKey = `${view.pose}|${view.poseSince}`;
