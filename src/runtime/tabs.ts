@@ -67,7 +67,6 @@ const AMBIENT_EVENTS = new Set<BarryEvent['type']>([
   'tick',
   'idleChanged',
   'scheduleUpdated',
-  'todosUpdated',
   'tabActivated',
   'tabNavigated',
   'tabClosed',

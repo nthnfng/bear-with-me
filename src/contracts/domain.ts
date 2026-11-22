@@ -23,31 +23,33 @@ export interface CalendarBlock {
   source: 'ics' | 'dev';
 }
 
-export interface Todo {
-  text: string;
-  sourceId: string;
-}
-
-/** A todo typed into the popup. Stored in Settings; unfinished ones reach the brain as Todos. */
-export interface PopupTodo {
+/**
+ * Something the user plans to do, typed into the popup. The list is in priority order: the
+ * first unchecked Task is the top Task. Barry never checks one off by himself.
+ */
+export interface Task {
   id: string;
-  text: string;
+  title: string;
+  /** Optional detail; empty string for none. */
+  description: string;
+  /** How long the user thinks it takes. Starting the Task runs Lock In for this long. */
+  estimateMs: number;
   done: boolean;
+  /** When it was checked off, so the popup can clear yesterday's finished Tasks. */
+  doneAt: Millis | null;
+  /** Time left when it was paused; Start resumes from here. Absent/null = not paused. */
+  leftMs?: number | null;
 }
 
-/** A todo copied from a page that the user deleted in the popup; re-reads of its source skip it. */
-export interface HiddenTodo {
-  sourceId: string;
-  text: string;
-}
-
-/** Where the element picker found a todo list. */
-export interface TodoSource {
+/** The Task the user pressed Start on: Lock In runs until `endsAt`. */
+export interface ActiveTask {
   id: string;
-  origin: string;
-  path: string;
-  selector: string;
+  startedAt: Millis;
+  endsAt: Millis;
 }
+
+/** Answers to "Time's up for X. Done?": check it off, or keep going for more minutes. */
+export type TaskAnswer = 'done' | 'extend';
 
 export interface BlocklistEntry {
   /** Bare host, e.g. "youtube.com". Also matches its subdomains. */

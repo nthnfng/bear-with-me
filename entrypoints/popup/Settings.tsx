@@ -1,5 +1,5 @@
 // The Settings screen: the sky header with the cave toggle under it, then calendar, restricted
-// sites, Barry (position, sounds), todo sources and, once unlocked, the dev panel.
+// sites, Barry (position, sounds) and, once unlocked, the dev panel.
 // Draws src/popup/view.ts only.
 
 import { useEffect, useState } from 'react';
@@ -32,19 +32,6 @@ const POSITIONS: { value: Position; label: string }[] = [
   { value: 'middle', label: 'Middle' },
   { value: 'right', label: 'Right' },
 ];
-
-function sourceStatus(
-  s: { id: string; origin: string; selector: string },
-  todos: { sourceId: string }[],
-): string {
-  const n = todos.filter((t) => t.sourceId === s.id).length;
-  const docs = s.selector === '@gdocs';
-  if (n > 0)
-    return `${n} item${n === 1 ? '' : 's'} read${docs ? " (reads the doc's checklist; checked items are skipped)" : ''}`;
-  if (docs || s.origin === 'https://docs.google.com')
-    return "Reads the doc's checklist (checked items are skipped). Saved, but no items found yet. Make sure the doc has a bulleted or checklist and you are signed in.";
-  return 'Saved, but no items found yet. Open that page and make sure the list is visible.';
-}
 
 export function SettingsScreen({
   state,
@@ -99,7 +86,6 @@ export function SettingsScreen({
         <CalendarCard now={now} send={send} />
         <SitesCard state={state} send={send} />
         <BarryCard state={state} send={send} />
-        <TodoSourcesCard state={state} send={send} />
         {devOpen && <DevPanel state={state} send={send} onClose={onHideDev} />}
       </div>
     </main>
@@ -270,53 +256,6 @@ function BarryCard({ state, send }: { state: BarryState; send: Send }) {
           onChange={(on) => send({ type: 'setMuted', muted: !on })}
         />
       </div>
-    </Paper>
-  );
-}
-
-function TodoSourcesCard({ state, send }: { state: BarryState; send: Send }) {
-  const settings = useStored<SettingsData>(STORAGE_KEYS.settings, DEFAULT_SETTINGS);
-  return (
-    <Paper seed={31} label="Copy todos from a page">
-      <div className="card-head">
-        <h2>Copy todos from a page</h2>
-      </div>
-      <button
-        className="blue wide"
-        onClick={() =>
-          // Close the popup so the page gets the mouse and the Up/Down keys for the picker.
-          browser.runtime
-            .sendMessage({ type: 'startPicker' } satisfies PopupMessage)
-            .catch(() => {})
-            .finally(() => window.close())
-        }
-      >
-        Point Barry at my list
-      </button>
-      <p className="note">
-        The popup closes. Hover your list on the page, Up/Down to grow or shrink the box, click to
-        save.
-      </p>
-      {settings.todoSources.length > 0 && (
-        <ul className="source-list">
-          {settings.todoSources.map((s) => (
-            <li key={s.id}>
-              <span className="text" title={s.selector}>
-                {s.origin.replace(/^https?:\/\//, '')}
-                {s.path}
-                <small>{sourceStatus(s, state.todos)}</small>
-              </span>
-              <button
-                className="trash"
-                aria-label="Remove source"
-                onClick={() => send({ type: 'removeTodoSource', sourceId: s.id })}
-              >
-                {Icons.trash}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </Paper>
   );
 }

@@ -11,11 +11,19 @@ import type {
   PoseSprite,
   TabId,
   ModeOverride,
-  PopupTodo,
+  Task,
   Tuning,
 } from '../contracts';
-import { DEFAULT_TUNING, DEMO_TUNING, POPUP_TODO_SOURCE_ID } from '../contracts';
-import { currentBlock, resolveMode } from '../brain/helpers';
+import {
+  DEFAULT_TUNING,
+  DEMO_TUNING,
+  TASK_DEFAULT_ESTIMATE_MS,
+  TASK_ESTIMATE_MAX_MS,
+  TASK_MAX,
+  TASK_TITLE_MAX,
+  TASK_WARN_TOTAL_MS,
+} from '../contracts';
+import { currentBlock, resolveMode, runningTask } from '../brain/helpers';
 import { brain, caveAllowed, snoozeStage } from '../brain';
 
 export interface Countdown {
@@ -34,6 +42,8 @@ export interface PopupView {
   override: ModeOverride;
   currentBlock: CalendarBlock | null;
   nextBlock: CalendarBlock | null;
+  /** The started Task while its time runs, with its end. */
+  currentTask: { task: Task; endsAt: Millis } | null;
   countdown: Countdown | null;
   /** Under the countdown while tired Barry can be told to get up, else null. */
   countdownHint: string | null;
@@ -125,6 +135,16 @@ export function slackChangePreview(
   return `${min} min total, ${formatCountdown(left)} left.`;
 }
 
+/** The started Task while its time runs, or null. */
+export function currentTaskOf(
+  state: Pick<BarryState, 'tasks' | 'activeTask'>,
+  now: Millis,
+): PopupView['currentTask'] {
+  const a = runningTask(state, now);
+  const task = a ? state.tasks.find((t) => t.id === a.id && !t.done) : undefined;
+  return a && task ? { task, endsAt: a.endsAt } : null;
+}
+
 export function popupView(state: BarryState, now: Millis): PopupView {
   const mode = resolveMode(state, now);
   const slack = slackPassStatus(mode, state.phase);
@@ -138,6 +158,7 @@ export function popupView(state: BarryState, now: Millis): PopupView {
     override: state.modeOverride,
     currentBlock: currentBlock(state, now),
     nextBlock: nextBlock(state, now),
+    currentTask: currentTaskOf(state, now),
     countdown: countdownFor(state, now),
     countdownHint:
       state.phase === 'snoozing' && snoozeStage(state, now) === 'tired'
@@ -348,7 +369,11 @@ export function frameAt(sprite: Pick<PoseSprite, 'frames' | 'frameMs'>, elapsed:
 }
 
 /** Pixel-crisp CSS box for one frame of a strip at an integer scale. */
-export function spriteBox(sprite: Pick<PoseSprite, 'w' | 'h' | 'frames'>, scale: number, frame = 0) {
+export function spriteBox(
+  sprite: Pick<PoseSprite, 'w' | 'h' | 'frames'>,
+  scale: number,
+  frame = 0,
+) {
   return {
     width: sprite.w * scale,
     height: sprite.h * scale,
@@ -381,7 +406,7 @@ export function withStateDefaults(saved: BarryState | null | undefined): BarrySt
   return { ...init, ...saved, tuning: { ...init.tuning, ...saved.tuning } };
 }
 
-// ---- pixel popup: sky scene, block card timer, chud sign, popup todos ----------------------
+// ---- pixel popup: sky scene, block card timer, chud sign ----------------------------------
 
 export type SceneKey = BarryState['phase'] | 'chill';
 
@@ -421,11 +446,15 @@ export function skyBands(key: SceneKey, band: number): string {
 }
 
 /**
- * The Current Block card's countdown: a phase countdown (Slack pass, Reach...) wins; otherwise
- * time left in the current block, or in Chill the time until the next one.
+ * The Current Block card's countdown: a phase countdown (Slack pass, Reach...) wins; then the
+ * started Task's time left; then time left in the current block, or the time until the next one.
  */
-export function blockCardTimer(v: PopupView): Countdown | null {
+export function blockCardTimer(
+  v: Pick<PopupView, 'countdown' | 'currentBlock' | 'nextBlock'> &
+    Partial<Pick<PopupView, 'currentTask'>>,
+): Countdown | null {
   if (v.countdown) return v.countdown;
+  if (v.currentTask) return { label: 'Task time left', target: v.currentTask.endsAt };
   if (v.currentBlock) return { label: 'Time left', target: v.currentBlock.end };
   if (v.nextBlock) return { label: 'Next block in', target: v.nextBlock.start };
   return null;
@@ -440,22 +469,138 @@ export function chudSignSegments(meter: number): boolean[] {
   return Array.from({ length: CHUD_SIGN_SEGMENTS }, (_, i) => i < lit);
 }
 
-/** Append a typed todo; blank input changes nothing. */
-export function addPopupTodo(list: PopupTodo[], text: string, id: string): PopupTodo[] {
-  const t = text.trim();
-  return t ? [...list, { id, text: t, done: false }] : list;
+// ---- Tasks -------------------------------------------------------------------------------
+
+export const openTasks = (tasks: Task[]) => tasks.filter((t) => !t.done);
+
+/** Sum of the unchecked Tasks' estimates. */
+export const totalEstimateMs = (tasks: Task[]) =>
+  openTasks(tasks).reduce((sum, t) => sum + t.estimateMs, 0);
+
+/** The list is full: TASK_MAX unchecked Tasks (checked ones don't count). */
+export const atTaskLimit = (tasks: Task[]) => openTasks(tasks).length >= TASK_MAX;
+
+/** Adding `estimateMs` more would take the unchecked total past TASK_WARN_TOTAL_MS. */
+export const wouldExceedTotal = (tasks: Task[], estimateMs: number) =>
+  totalEstimateMs(tasks) + estimateMs > TASK_WARN_TOTAL_MS;
+
+/** "15m", "1h", "1h 30m". */
+export function formatEstimate(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 60_000));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
-export const togglePopupTodo = (list: PopupTodo[], id: string): PopupTodo[] =>
-  list.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
+/** The hours box: digits only, at most 8. */
+export function hoursField(input: string): string {
+  const d = input.replace(/\D/g, '').slice(-1);
+  return d === '' ? '' : String(Math.min(8, Number(d)));
+}
 
-export const removePopupTodo = (list: PopupTodo[], id: string): PopupTodo[] =>
-  list.filter((t) => t.id !== id);
+/** The minutes box: digits only, at most 59. */
+export function minutesField(input: string): string {
+  const d = input.replace(/\D/g, '').slice(0, 2);
+  return d === '' ? '' : String(Math.min(59, Number(d)));
+}
 
-/** "3 left": unfinished popup todos plus todos copied from pages. */
-export function todosLeft(popupTodos: PopupTodo[], copied: { sourceId: string }[]): number {
-  return (
-    popupTodos.filter((t) => !t.done).length +
-    copied.filter((t) => t.sourceId !== POPUP_TODO_SOURCE_ID).length
-  );
+/**
+ * Hours + minutes typed into the custom time boxes. Both empty = nothing typed (ms null, no
+ * error). Zero, or over TASK_ESTIMATE_MAX_MS (8h 30m), is an error.
+ */
+export function hoursMinutesMs(
+  hours: string,
+  minutes: string,
+): { ms: number | null; error: string | null } {
+  if (hours.trim() === '' && minutes.trim() === '') return { ms: null, error: null };
+  const ms = ((Number(hours) || 0) * 60 + (Number(minutes) || 0)) * 60_000;
+  if (ms <= 0) return { ms: null, error: 'Enter at least 1 minute.' };
+  if (ms > TASK_ESTIMATE_MAX_MS)
+    return { ms: null, error: `Max ${formatEstimate(TASK_ESTIMATE_MAX_MS)} per task.` };
+  return { ms, error: null };
+}
+
+/** A title cut to TASK_TITLE_MAX characters. */
+export const clampTitle = (title: string) => title.trim().slice(0, TASK_TITLE_MAX).trim();
+
+/**
+ * Adds a Task after the last unchecked one (so it sits above finished Tasks). Blank titles and a
+ * full list change nothing.
+ */
+export function addTask(
+  tasks: Task[],
+  input: { title: string; description?: string; estimateMs?: number },
+  id: string,
+): Task[] {
+  const title = clampTitle(input.title);
+  if (!title || atTaskLimit(tasks)) return tasks;
+  const task: Task = {
+    id,
+    title,
+    description: (input.description ?? '').trim(),
+    estimateMs: Math.min(TASK_ESTIMATE_MAX_MS, input.estimateMs ?? TASK_DEFAULT_ESTIMATE_MS),
+    done: false,
+    doneAt: null,
+  };
+  const lastOpen = tasks.reduce((at, t, i) => (t.done ? at : i), -1);
+  const out = [...tasks];
+  out.splice(lastOpen + 1, 0, task);
+  return out;
+}
+
+/** Ticks or unticks a Task where it is (the list order never changes). */
+export function toggleTask(tasks: Task[], id: string, now: Millis): Task[] {
+  if (!tasks.some((x) => x.id === id)) return tasks;
+  return tasks.map((x) => (x.id === id ? { ...x, done: !x.done, doneAt: x.done ? null : now } : x));
+}
+
+/** New title and details for a Task. A blank title keeps the old one. */
+export function renameTask(tasks: Task[], id: string, title: string, description: string): Task[] {
+  const t = tasks.find((x) => x.id === id);
+  if (!t) return tasks;
+  const next = { ...t, title: clampTitle(title) || t.title, description: description.trim() };
+  if (next.title === t.title && next.description === t.description) return tasks;
+  return tasks.map((x) => (x.id === id ? next : x));
+}
+
+export const removeTask = (tasks: Task[], id: string): Task[] => tasks.filter((t) => t.id !== id);
+
+/** Swaps an unchecked Task with the unchecked neighbour above (-1) or below (+1). */
+export function moveTask(tasks: Task[], id: string, dir: -1 | 1): Task[] {
+  const i = tasks.findIndex((t) => t.id === id);
+  if (i < 0 || tasks[i]!.done) return tasks;
+  let j = i + dir;
+  while (j >= 0 && j < tasks.length && tasks[j]!.done) j += dir;
+  if (j < 0 || j >= tasks.length) return tasks;
+  const out = [...tasks];
+  [out[i], out[j]] = [out[j]!, out[i]!];
+  return out;
+}
+
+/**
+ * Drag and drop: puts Task `id` just before or after `targetId` (checked or not). Only
+ * unchecked Tasks are dragged.
+ */
+export function moveTaskTo(
+  tasks: Task[],
+  id: string,
+  targetId: string,
+  place: 'before' | 'after',
+): Task[] {
+  const moving = tasks.find((t) => t.id === id);
+  const target = tasks.find((t) => t.id === targetId);
+  if (!moving || !target || moving.done || id === targetId) return tasks;
+  const rest = tasks.filter((t) => t.id !== id);
+  const at = rest.findIndex((t) => t.id === targetId) + (place === 'after' ? 1 : 0);
+  const out = [...rest.slice(0, at), moving, ...rest.slice(at)];
+  return out.every((t, i) => t === tasks[i]) ? tasks : out;
+}
+
+/** Drops Tasks checked off before today (local midnight), so finished ones clear overnight. */
+export function dropStaleDone(tasks: Task[], now: Millis): Task[] {
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  const keep = tasks.filter((t) => !t.done || (t.doneAt ?? 0) >= midnight.getTime());
+  return keep.length === tasks.length ? tasks : keep;
 }

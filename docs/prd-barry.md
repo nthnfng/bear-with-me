@@ -49,15 +49,18 @@ Users who don't want Barry on screen can send him to his **cave** (the extension
 8. As a user, I want to see which calendar block Barry thinks is current (and the next one), so that I can trust what he's acting on.
 9. As a user whose calendar feed is stale, I want to force Lock In manually from the popup, so that a block I just added still works right away.
 
-### Untimed todos (element picker)
+### Tasks (typed in the popup)
 
-10. As a Notion user, I want to click "Point Barry at my task list" and then click the list on the page, so that Barry learns where my todos are without a Notion login.
-11. As a user of any todo app (Todoist, TickTick, a Google Doc checklist), I want the same picker to work there, so that I'm not limited to supported apps.
-12. As a user, I want Barry to re-read my picked list whenever I visit that page, so that his copy of my todos stays reasonably current.
-13. As a user, I want to see the todos Barry has captured in the popup, so that I can confirm the picker grabbed the right thing.
-14. As a user, I want to re-pick or remove a todo source, so that I can fix it when the app's layout changes.
-15. As a user, I want Barry to suggest one of my untimed todos when a free gap opens up in my calendar ("You've got 40 free minutes. Lab report?"), so that free time doesn't quietly disappear.
+> Revised Nov 2026: the element picker was removed. Tasks are typed into the popup; see CONTEXT.md (Task, Start, Done check).
+
+10. As a user, I want to add a Task with a title, optional details and an estimated time, so that Barry knows what I plan to do today and how long it takes.
+11. As a user, I want to order my Tasks by priority, so that Barry always knows which one matters most.
+12. As a user, I want to press Start on a Task, so that Barry is in Lock In for its estimate without needing a calendar event.
+13. As a user, I want Barry to ask "Done?" when a started Task's time is up (Done / +15 min / my own minutes), so that he tracks what I actually finished without guessing.
+14. As a user, I want Barry to show my Task (and my calendar event, if one is running) when he catches me, so that I remember what I planned.
+15. As a user, I want Barry to suggest my top Task when a free gap opens up in my calendar ("You've got 40 free minutes. Lab report?"), so that free time doesn't quietly disappear.
 16. As a user, I want a free-gap suggestion only once per gap, so that it's a reminder, not nagging.
+17. As a user, I want a warning past 8 hours of Tasks and a cap of 15, so that my plan for the day stays realistic.
 
 ### Blocklist
 
@@ -188,10 +191,9 @@ All behavior rules live in one pure module with no Chrome APIs, DOM, or real clo
 - Stores the user's secret ICS URL. Fetches it on an alarm (e.g. every 5 minutes) and on popup open, runs the ICS Parser, and sends "schedule updated" to the brain.
 - On fetch failure it keeps the last good schedule and shows the error in the popup.
 
-### Module: Todo Picker (adapter, content script)
-- A picker mode highlights elements on hover; clicking one saves a selector for that site's origin and path.
-- Whenever the user visits a saved source, it reads the text of the item-like children under the selector and sends "todos updated". It keeps the last captured list when the page isn't open.
-- There are no per-site scrapers. Any todo app works through the picker.
+### Module: Tasks (popup + brain)
+- The popup edits the Task list (title, details, estimate, order) and sends it whole; Start, Stop and the "Done?" answers are events.
+- The brain owns the running Task and the Done check; a running Task puts Auto in Lock In until its estimate ends.
 
 ### Module: Page Overlay (adapter, content script)
 - Renders Barry in an isolated shadow DOM container so page CSS can't affect him and his CSS can't leak out.
@@ -202,7 +204,7 @@ All behavior rules live in one pure module with no Chrome APIs, DOM, or real clo
 
 ### Module: Popup
 - Shows Barry hibernating in his cave, the current block, the next block, captured todos, slack time left, and the chud meter.
-- Controls: mode override (Auto / Chill / Lock In), slack pass toggle with duration, cave toggle (disabled while Barry is on a restricted site in Lock In), corner position, ICS URL, blocklist editor with a per-site on/off toggle, todo picker launcher and source management.
+- Controls: mode override (Auto / Chill / Lock In), slack pass toggle with duration, cave toggle (disabled while Barry is on a restricted site in Lock In), corner position, ICS URL, blocklist editor with a per-site on/off toggle, and the Task list (add, reorder, Start, Done check).
 - Hidden dev panel (unlocked by a secret gesture): inject a fake block, set slack pass and extended slack pass durations in seconds, set the fatness tier, set the chud meter, trigger a free-gap suggestion, reset all state.
 
 ### Art and sound
@@ -231,14 +233,14 @@ All behavior rules live in one pure module with no Chrome APIs, DOM, or real clo
   - Cave on, restricted tab in Lock In, so Barry still shows, and toggling the cave is ignored.
   - A free gap of at least 20 minutes suggests the top todo exactly once. A gap shorter than the threshold suggests nothing.
 - **Seam #2, ICS Parser:** fixture ICS strings covering a single event, a weekly recurrence, a recurrence with an exception date, a moved occurrence, events in another time zone, all-day events, and events outside the window.
-- **Not tested automatically:** the Chrome adapters (overlay, picker, fetcher, popup), the art, and the sounds. These are covered by manual runs with the dev panel.
+- **Not tested automatically:** the Chrome adapters (overlay, fetcher, popup), the art, and the sounds. These are covered by manual runs with the dev panel.
 - **Prior art:** none. This is a greenfield project. Suggested runner: Vitest, run headless with no browser needed, since both seams are pure.
 
 ## Out of Scope
 
 - LLM / AI judgment of whether a tab is on-task (deferred; blocklist only for now).
 - Google, Notion, or any other OAuth or direct-login integration.
-- Per-site scraping adapters for specific todo apps (the generic element picker replaces them).
+- Importing todos from other apps (Notion, Google Docs, Apple Notes) or a page element picker. Tasks are typed in the popup.
 - Hard blocking that can't be dismissed: Barry persuades, eats interactions, and can be beaten off, but never permanently locks a site.
 - Tracking task completion or writing anything back to the calendar or todo app.
 - Long-term progression (Barry's weight or the chud meter carrying across days).

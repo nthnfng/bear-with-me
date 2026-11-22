@@ -5,24 +5,30 @@ import {
   DEFAULT_BLOCKLIST,
   DEFAULT_TUNING,
   HIDDEN_VIEW,
+  TASK_EXTEND_MAX_MS,
+  TASK_EXTEND_MS,
   type BarryEffect,
   type BarryEvent,
   type BarryState,
   type Brain,
   type Millis,
+  type PlanView,
   type PoseId,
   type ReduceResult,
+  type Task,
   type TabId,
   type TabView,
 } from '../contracts';
-import { currentBlock, isRestricted, resolveMode } from './helpers';
+import { currentBlock, isRestricted, resolveMode, runningTask } from './helpers';
 
 export function initialState(): BarryState {
   return {
     modeOverride: 'auto',
     blocklist: DEFAULT_BLOCKLIST,
     blocks: [],
-    todos: [],
+    tasks: [],
+    activeTask: null,
+    taskCheck: null,
     openTabs: {},
     activeTabId: null,
     userIdle: false,
@@ -74,8 +80,28 @@ function apply(
 ): { state: BarryState; keepFatness?: boolean } {
   switch (event.type) {
     case 'tick':
-    case 'todosUpdated':
-      return { state: event.type === 'todosUpdated' ? { ...state, todos: event.todos } : state };
+      return { state };
+    case 'tasksSet':
+      return { state: setTasks(state, event.tasks) };
+    case 'taskStarted': {
+      const task = state.tasks.find((t) => t.id === event.id);
+      if (!task || task.done) return { state };
+      // The started Task becomes the top Task, and Barry locks in for it (resuming a pause).
+      const runMs = task.leftMs != null && task.leftMs > 0 ? task.leftMs : task.estimateMs;
+      return {
+        state: {
+          ...state,
+          tasks: [{ ...task, leftMs: null }, ...state.tasks.filter((t) => t.id !== task.id)],
+          activeTask: { id: task.id, startedAt: event.now, endsAt: event.now + runMs },
+          taskCheck: null,
+          modeOverride: 'lockIn',
+        },
+      };
+    }
+    case 'taskStopped':
+      return { state: pauseTask(state, event.now, 'auto') };
+    case 'taskAnswered':
+      return { state: answerTask(state, event.id, event.answer, event.now, event.extendMs) };
     case 'scheduleUpdated':
       // The feed replaces the ICS blocks only: an injected dev block must survive the
       // 5-minute refresh (and the refresh every worker wake does).
@@ -120,6 +146,10 @@ function apply(
       effects.push({ type: 'explodeAndClose', tabIds: [event.tabId] });
       return { state };
     case 'modeOverrideSet':
+      // Leaving Lock In while a Task runs pauses it (the popup asks first).
+      if (event.override !== 'lockIn' && runningTask(state, event.now)) {
+        return { state: pauseTask(state, event.now, event.override) };
+      }
       return { state: { ...state, modeOverride: event.override } };
     case 'blocklistSet':
       return { state: { ...state, blocklist: event.blocklist } };
@@ -242,6 +272,111 @@ function toClear(state: BarryState): BarryState {
   };
 }
 
+/** The popup's new list. A started or waiting Task that was deleted or checked off is dropped. */
+function setTasks(state: BarryState, tasks: Task[]): BarryState {
+  const open = (id: string | undefined) =>
+    id !== undefined && tasks.some((t) => t.id === id && !t.done);
+  const keepRunning = open(state.activeTask?.id);
+  return {
+    ...state,
+    tasks,
+    activeTask: keepRunning ? state.activeTask : null,
+    taskCheck: open(state.taskCheck?.id) ? state.taskCheck : null,
+    // Checking off or deleting the running Task finishes it: back to Auto.
+    modeOverride: state.activeTask && !keepRunning ? 'auto' : state.modeOverride,
+  };
+}
+
+/** Pauses the running Task (keeping its time left) and sets the override to `mode`. */
+function pauseTask(state: BarryState, now: Millis, mode: BarryState['modeOverride']): BarryState {
+  const a = state.activeTask;
+  if (!a) return { ...state, modeOverride: mode };
+  const left = Math.max(0, a.endsAt - now);
+  return {
+    ...state,
+    activeTask: null,
+    modeOverride: mode,
+    tasks: state.tasks.map((t) => (t.id === a.id ? { ...t, leftMs: left > 0 ? left : null } : t)),
+  };
+}
+
+/**
+ * "Time's up. Done?": done checks it off (where it is); extend runs it `extendMs` more
+ * (default TASK_EXTEND_MS, clamped to 1 min .. TASK_EXTEND_MAX_MS). Also accepted for the
+ * running Task (finishing early).
+ */
+function answerTask(
+  state: BarryState,
+  id: string,
+  answer: 'done' | 'extend',
+  now: Millis,
+  extendMs?: number,
+): BarryState {
+  const asked = state.taskCheck?.id === id || state.activeTask?.id === id;
+  const task = state.tasks.find((t) => t.id === id);
+  if (!asked || !task || task.done) return state;
+  const base = { ...state, taskCheck: null, activeTask: null };
+  if (answer === 'done') {
+    return {
+      ...base,
+      tasks: state.tasks.map((t) =>
+        t.id === id ? { ...t, done: true, doneAt: now, leftMs: null } : t,
+      ),
+      // Finished: Lock In from the Task ends (time's up already returned to Auto).
+      modeOverride: state.activeTask?.id === id ? 'auto' : state.modeOverride,
+    };
+  }
+  const ms =
+    extendMs !== undefined && Number.isFinite(extendMs)
+      ? Math.min(TASK_EXTEND_MAX_MS, Math.max(60_000, Math.round(extendMs)))
+      : TASK_EXTEND_MS;
+  return {
+    ...base,
+    activeTask: { id, startedAt: now, endsAt: now + ms },
+    modeOverride: 'lockIn',
+  };
+}
+
+/** A started Task whose time ran out waits for "Done?"; its Lock In ends (back to Auto). */
+function expireTask(state: BarryState, now: Millis): BarryState {
+  const a = state.activeTask;
+  if (!a || now < a.endsAt) return state;
+  return {
+    ...state,
+    activeTask: null,
+    taskCheck: { id: a.id, at: a.endsAt },
+    modeOverride: state.modeOverride === 'lockIn' ? 'auto' : state.modeOverride,
+  };
+}
+
+/** The first unchecked Task, or undefined. */
+export function topTask(state: Pick<BarryState, 'tasks'>): Task | undefined {
+  return state.tasks.find((t) => !t.done);
+}
+
+/**
+ * What the Confrontation shows under its line. Task first: the running one (time left), else
+ * the one waiting for "Done?", else the top unchecked one (its estimate). Then the calendar block.
+ */
+export function planFor(state: BarryState, now: Millis): PlanView | null {
+  const byId = (id: string | undefined) => state.tasks.find((t) => t.id === id && !t.done);
+  const running = runningTask(state, now);
+  const runningT = byId(running?.id);
+  const waiting = byId(state.taskCheck?.id);
+  const top = topTask(state);
+  const task: PlanView['task'] =
+    runningT && running
+      ? { title: runningT.title, timing: { kind: 'left', endsAt: running.endsAt } }
+      : waiting
+        ? { title: waiting.title, timing: { kind: 'timesUp' } }
+        : top
+          ? { title: top.title, timing: { kind: 'estimate', ms: top.leftMs ?? top.estimateMs } }
+          : null;
+  const b = currentBlock(state, now);
+  const block = b ? { title: b.title, endsAt: b.end } : null;
+  return task || block ? { task, block } : null;
+}
+
 /** The Reach lands: explode every Restricted tab, forget them, reset Fatness and Pushes. */
 function land(state: BarryState, effects: BarryEffect[]): BarryState {
   const ids = restrictedTabIds(state);
@@ -360,7 +495,7 @@ function applyDev(
     }
     case 'reset':
       // Everything the runtime feeds the brain survives (it would not be re-sent): real tabs,
-      // idle, the ICS schedule (dev blocks go) and the captured todos. Settings (blocklist,
+      // idle, the ICS schedule (dev blocks go) and the Tasks (none running). Settings (blocklist,
       // position, cave, muted, tuning) return to their defaults.
       return {
         state: {
@@ -370,7 +505,7 @@ function applyDev(
           userIdle: state.userIdle,
           blocks: state.blocks.filter((b) => b.source !== 'dev'),
           scheduleKnown: state.scheduleKnown,
-          todos: state.todos,
+          tasks: state.tasks,
         },
       };
   }
@@ -473,14 +608,14 @@ function nextBlockStart(state: BarryState, now: Millis): Millis | null {
   return starts.length ? Math.min(...starts) : null;
 }
 
-/** Suggestion for the top todo on the active tab (the tab the user is looking at). */
+/** Suggestion for the top unchecked Task on the active tab (the tab the user is looking at). */
 function pushSuggestion(state: BarryState, freeMs: Millis | null, effects: BarryEffect[]): boolean {
-  const todo = state.todos[0];
-  if (!todo || state.activeTabId === null) return false;
+  const task = topTask(state);
+  if (!task || state.activeTabId === null) return false;
   effects.push({
     type: 'showSuggestion',
     tabId: state.activeTabId,
-    todo,
+    task,
     freeMinutes: freeMs === null ? null : Math.floor(freeMs / 60_000),
   });
   return true;
@@ -490,14 +625,14 @@ function pushSuggestion(state: BarryState, freeMs: Millis | null, effects: Barry
  * Free-time suggestion: Chill, no block running, and the next timed block (any day) is at
  * least freeGapMinMs away, or there is none (an open-ended gap, `freeMinutes: null`). Once per gap (`lastGapSuggested` = the gap's start: the end of the block
  * before it, or the moment of the suggestion when there is none). Not marked as suggested
- * while there is no todo, no active tab, or the cave is on, so it fires once those clear.
+ * while there is no Task, no active tab, or the cave is on, so it fires once those clear.
  * With no next block the gap runs from the last block's end, or from the first suggestion.
  */
 function maybeSuggest(state: BarryState, now: Millis, effects: BarryEffect[]): BarryState {
   if (resolveMode(state, now) !== 'chill' || currentBlock(state, now) !== null || state.cave) {
     return state;
   }
-  // Fresh install: todos can load before the calendar. Without the schedule "free right now"
+  // Fresh install: Tasks can exist before the calendar loads. Without the schedule "free right now"
   // would be a guess, so wait for the first scheduleUpdated.
   if (!state.scheduleKnown) return state;
   const next = nextBlockStart(state, now);
@@ -563,6 +698,8 @@ function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
     lastNow: Math.max(event.now, prev.lastNow ?? event.now),
   };
 
+  // A started Task whose time ran out ends its Lock In and asks "Done?".
+  state = expireTask(state, event.now);
   // Derived: break/fight phases first, then Confrontation, then Fatness lifetime.
   state = advance(state, event.now, effects);
   if (state.phase === 'clear' || state.phase === 'confronting') {
@@ -612,13 +749,31 @@ function tierPose(fatness: number, chud: number): PoseId {
 }
 
 function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
+  const view = baseView(state, tabId, now);
+  // "Done?" rides on calm corner Barry (not in your face, not mid-fight or Snooze).
+  const waiting = state.taskCheck
+    ? state.tasks.find((t) => t.id === state.taskCheck!.id && !t.done)
+    : undefined;
+  if (
+    !waiting ||
+    !view.visible ||
+    view.placement !== 'corner' ||
+    view.reach !== null ||
+    state.phase === 'snoozing'
+  ) {
+    return view;
+  }
+  return { ...view, taskCheck: { id: waiting.id, title: waiting.title } };
+}
+
+function baseView(state: BarryState, tabId: TabId, now: Millis): TabView {
   const mode = resolveMode(state, now);
 
   const inBreak = state.phase !== 'clear' && state.phase !== 'confronting';
   if (!inBreak && confrontedTab(state, now) === tabId) {
-    const block = currentBlock(state, now);
     const chud = liveChud(state, now);
     const full = chud >= 1;
+    const plan = planFor(state, now);
     return {
       ...HIDDEN_VIEW,
       visible: true,
@@ -626,11 +781,8 @@ function viewFor(state: BarryState, tabId: TabId, now: Millis): TabView {
       position: state.position,
       pose: tierPose(state.fatness, chud),
       poseSince: state.confrontSince ?? 0,
-      line: full
-        ? chudLine
-        : block
-          ? `You planned ${block.title} ,':/`
-          : "You said you'd lock in ,':/",
+      line: full ? chudLine : plan ? "Get back to it ,':/" : "You said you'd lock in ,':/",
+      plan,
       showBackToIt: true,
       eatInput: true,
       pauseMedia: true,
@@ -764,6 +916,7 @@ function nextDeadline(state: BarryState): Millis | null {
     blockDeadline(state),
     lockBackInDeadline(state),
     chudFullDeadline(state),
+    state.activeTask?.endsAt ?? null,
   ].filter((d): d is Millis => d !== null);
   return all.length ? Math.min(...all) : null;
 }

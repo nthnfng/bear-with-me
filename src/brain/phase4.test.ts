@@ -94,7 +94,7 @@ function snoozing(): BarryState {
 }
 
 describe('reset', () => {
-  it('keeps what the runtime feeds (tabs, idle, ICS blocks, schedule known, todos) and drops dev blocks', () => {
+  it('keeps what the runtime feeds (tabs, idle, ICS blocks, schedule known, tasks) and drops dev blocks', () => {
     const s = run(
       initialState(),
       sched(T0, block(T0 + 5 * MIN, T0 + 9 * MIN)),
@@ -102,13 +102,19 @@ describe('reset', () => {
       nav(1, YT),
       act(1),
       idle(true, T0),
-      { type: 'todosUpdated', todos: [{ text: 'x', sourceId: 's' }], now: T0 },
+      {
+        type: 'tasksSet',
+        tasks: [
+          { id: 'x', title: 'x', description: '', estimateMs: MIN, done: false, doneAt: null },
+        ],
+        now: T0,
+      },
       eat(1),
       dev({ kind: 'reset' }, T0 + 5),
     ).state;
     expect(s.scheduleKnown).toBe(true);
     expect(s.blocks.map((b) => b.source)).toEqual(['ics']);
-    expect(s.todos).toHaveLength(1);
+    expect(s.tasks).toHaveLength(1);
     expect(s.userIdle).toBe(true);
     expect(s.openTabs).toEqual({ 1: YT });
     expect(s.activeTabId).toBe(1);

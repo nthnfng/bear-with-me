@@ -7,9 +7,9 @@ import type {
   EatKind,
   Millis,
   ModeOverride,
-  PopupTodo,
   Position,
-  TodoSource,
+  Task,
+  TaskAnswer,
 } from './domain';
 
 /** Content script → background. The tab id comes from the message sender. */
@@ -20,14 +20,13 @@ export type ContentMessage =
   | { type: 'pushed' }
   | { type: 'reachLanded'; reachStartedAt: Millis }
   | { type: 'gotUp' }
-  | { type: 'pickerSaved'; source: TodoSource }
-  | { type: 'todosCaptured'; sourceId: string; items: string[] };
+  /** From the on-page "Done?" bubble. */
+  | { type: 'answerTask'; id: string; answer: TaskAnswer; extendMs?: number };
 
 /** Background → content script. */
 export type BackgroundMessage =
   | { type: 'view'; view: TabView }
-  | { type: 'effect'; effect: BarryEffect }
-  | { type: 'startPicker' };
+  | { type: 'effect'; effect: BarryEffect };
 
 /** Popup → background. The popup reads state from storage (see storage.ts). */
 export type PopupMessage =
@@ -42,10 +41,10 @@ export type PopupMessage =
   | { type: 'setBlocklist'; blocklist: BlocklistEntry[] }
   | { type: 'setIcsUrl'; url: string }
   | { type: 'refreshSchedule' }
-  | { type: 'startPicker' }
-  | { type: 'removeTodoSource'; sourceId: string }
-  /** The whole list of popup todos after an add, tick or delete. */
-  | { type: 'setPopupTodos'; todos: PopupTodo[] }
-  /** Delete a todo copied from a page; it stays gone when the page is read again. */
-  | { type: 'hideTodo'; sourceId: string; text: string }
+  /** The whole Task list after an add, edit, reorder, tick or delete. */
+  | { type: 'setTasks'; tasks: Task[] }
+  | { type: 'startTask'; id: string }
+  | { type: 'stopTask' }
+  /** extendMs: how long "extend" runs (default 15 min). */
+  | { type: 'answerTask'; id: string; answer: TaskAnswer; extendMs?: number }
   | { type: 'dev'; command: DevCommand };

@@ -264,15 +264,107 @@ describe('pixel popup helpers', () => {
     expect(chudSignSegments(NaN).some(Boolean)).toBe(false);
   });
 
-  it('adds, ticks and removes popup todos', async () => {
-    const { addPopupTodo, togglePopupTodo, removePopupTodo, todosLeft } = await import('./view');
-    let list = addPopupTodo([], '  Gym  ', '1');
-    expect(addPopupTodo(list, '   ', '2')).toBe(list);
-    list = addPopupTodo(list, 'Lab report', '2');
-    expect(list.map((t) => t.text)).toEqual(['Gym', 'Lab report']);
-    list = togglePopupTodo(list, '1');
-    expect(list[0]!.done).toBe(true);
-    expect(todosLeft(list, [{ sourceId: 'notion' }, { sourceId: 'popup' }])).toBe(2);
-    expect(removePopupTodo(list, '1').map((t) => t.id)).toEqual(['2']);
+
+  it('Task list: add, tick, reorder, totals and limits', async () => {
+    const v = await import('./view');
+    const MIN = 60_000;
+    let list = v.addTask([], { title: '  Gym  ', estimateMs: 30 * MIN }, '1');
+    expect(v.addTask(list, { title: '   ' }, 'x')).toBe(list);
+    list = v.addTask(list, { title: 'Lab', description: ' notes ', estimateMs: 90 * MIN }, '2');
+    expect(list.map((t) => [t.title, t.description])).toEqual([
+      ['Gym', ''],
+      ['Lab', 'notes'],
+    ]);
+    // Ticking and unticking never reorder.
+    list = v.toggleTask(list, '1', 5);
+    expect(list.map((t) => [t.id, t.done, t.doneAt])).toEqual([
+      ['1', true, 5],
+      ['2', false, null],
+    ]);
+    list = v.addTask(list, { title: 'Read' }, '3');
+    expect(list.map((t) => t.id)).toEqual(['1', '2', '3']);
+    expect(v.totalEstimateMs(list)).toBe(120 * MIN);
+    expect(v.formatEstimate(v.totalEstimateMs(list))).toBe('2h');
+    expect(v.toggleTask(list, '1', 6).map((t) => [t.id, t.done])).toEqual([
+      ['1', false],
+      ['2', false],
+      ['3', false],
+    ]);
+    expect(v.moveTask(list, '3', -1).map((t) => t.id)).toEqual(['1', '3', '2']);
+    expect(v.moveTask(list, '3', 1)).toBe(list); // already last
+    expect(v.removeTask(list, '2').map((t) => t.id)).toEqual(['1', '3']);
+  });
+
+  it('warns past 8h, caps at 15 unchecked, parses custom minutes', async () => {
+    const v = await import('./view');
+    const HOUR = 3_600_000;
+    let list = v.addTask([], { title: 'a', estimateMs: 7 * HOUR }, 'a');
+    expect(v.wouldExceedTotal(list, HOUR)).toBe(false);
+    expect(v.wouldExceedTotal(list, HOUR + 60_000)).toBe(true);
+    list = [];
+    for (let i = 0; i < 15; i++) list = v.addTask(list, { title: `t${i}` }, `t${i}`);
+    expect(v.atTaskLimit(list)).toBe(true);
+    expect(v.addTask(list, { title: 'one more' }, 'x')).toBe(list);
+    expect(v.atTaskLimit(v.toggleTask(list, 't0', 1))).toBe(false);
+    // Hours (0-8) and minutes (0-59) boxes; 8h 30m max per Task.
+    expect(v.hoursField('12')).toBe('2');
+    expect(v.hoursField('9')).toBe('8');
+    expect(v.hoursField('a')).toBe('');
+    expect(v.minutesField('75')).toBe('59');
+    expect(v.minutesField('4x5')).toBe('45');
+    expect(v.minutesField('123')).toBe('12');
+    expect(v.hoursMinutesMs('', '')).toEqual({ ms: null, error: null });
+    expect(v.hoursMinutesMs('1', '15')).toEqual({ ms: 75 * 60_000, error: null });
+    expect(v.hoursMinutesMs('', '45')).toEqual({ ms: 45 * 60_000, error: null });
+    expect(v.hoursMinutesMs('8', '30').ms).toBe(8.5 * HOUR);
+    expect(v.hoursMinutesMs('8', '31')).toEqual({ ms: null, error: 'Max 8h 30m per task.' });
+    expect(v.hoursMinutesMs('0', '0').error).toBe('Enter at least 1 minute.');
+    // Titles are cut to 50 characters, on add and rename.
+    const long = 'x'.repeat(80);
+    expect(v.addTask([], { title: long }, 'l')[0]!.title).toHaveLength(50);
+    expect(v.renameTask(v.addTask([], { title: 'a' }, 'r'), 'r', long, '')[0]!.title).toHaveLength(50);
+  });
+
+  it('clears Tasks finished before today', async () => {
+    const v = await import('./view');
+    const now = new Date(2026, 10, 21, 15).getTime();
+    const yesterday = new Date(2026, 10, 20, 23).getTime();
+    const base = { description: '', estimateMs: 1, title: 't' };
+    const list = [
+      { ...base, id: 'old', done: true, doneAt: yesterday },
+      { ...base, id: 'today', done: true, doneAt: now - 1000 },
+      { ...base, id: 'open', done: false, doneAt: null },
+    ];
+    expect(v.dropStaleDone(list, now).map((t) => t.id)).toEqual(['today', 'open']);
+    expect(v.dropStaleDone(list.slice(1), now)).toHaveLength(2);
+  });
+
+  it('drag and drop puts a Task before or after another unchecked one', async () => {
+    const v = await import('./view');
+    const base = { description: '', estimateMs: 1, doneAt: null };
+    const list = ['a', 'b', 'c'].map((id) => ({ ...base, id, title: id, done: false }));
+    const withDone = [...list, { ...base, id: 'x', title: 'x', done: true }];
+    const ids = (l: { id: string }[]) => l.map((t) => t.id);
+    expect(ids(v.moveTaskTo(withDone, 'c', 'a', 'before'))).toEqual(['c', 'a', 'b', 'x']);
+    expect(ids(v.moveTaskTo(withDone, 'a', 'c', 'after'))).toEqual(['b', 'c', 'a', 'x']);
+    expect(ids(v.moveTaskTo(withDone, 'a', 'b', 'after'))).toEqual(['b', 'a', 'c', 'x']);
+    // A checked Task can be a drop target; it just isn't dragged itself.
+    expect(ids(v.moveTaskTo(withDone, 'a', 'x', 'after'))).toEqual(['b', 'c', 'x', 'a']);
+    // No-ops: onto itself, a finished Task, the same spot.
+    expect(v.moveTaskTo(withDone, 'a', 'a', 'after')).toBe(withDone);
+    expect(v.moveTaskTo(withDone, 'x', 'a', 'before')).toBe(withDone);
+    expect(v.moveTaskTo(withDone, 'a', 'b', 'before')).toBe(withDone);
+  });
+
+  it('renames a Task and its details; a blank title keeps the old one', async () => {
+    const v = await import('./view');
+    const list = v.addTask([], { title: 'Gym', description: 'legs' }, '1');
+    expect(v.renameTask(list, '1', ' Run ', ' 5k ')[0]).toMatchObject({
+      title: 'Run',
+      description: '5k',
+    });
+    expect(v.renameTask(list, '1', '  ', '')[0]).toMatchObject({ title: 'Gym', description: '' });
+    expect(v.renameTask(list, '1', 'Gym', 'legs')).toBe(list);
+    expect(v.renameTask(list, 'nope', 'x', '')).toBe(list);
   });
 });

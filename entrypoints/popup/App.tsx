@@ -1,28 +1,41 @@
 // Popup: draws src/popup/view.ts and sends PopupMessages. No behaviour here (ADR 0001).
-// Two screens: home (sky, cave, Current Block, todos, mode and Slack pass) and Settings.
+// Two screens: home (sky, cave, Current Block, Tasks, mode and Slack pass) and Settings.
 
 import { useEffect, useState } from 'react';
-import { DEFAULT_SETTINGS, POPUP_TODO_SOURCE_ID, STORAGE_KEYS } from '@/src/contracts';
-import type {
-  BarryState,
-  ModeOverride,
-  PopupTodo,
-  Settings as SettingsData,
+import {
+  TASK_DEFAULT_ESTIMATE_MS,
+  TASK_ESTIMATE_PRESETS_MIN,
+  TASK_ESTIMATE_MAX_MS,
+  TASK_MAX,
+  TASK_TITLE_MAX,
 } from '@/src/contracts';
+import type { BarryState, ModeOverride, Task } from '@/src/contracts';
 import {
   SLACK_PRESETS_MIN,
-  addPopupTodo,
+  addTask,
+  atTaskLimit,
   blockCardTimer,
+  dropStaleDone,
+  formatCountdown,
+  formatEstimate,
   formatTimeLeft,
   formatWhen,
-  slackChangePreview,
+  moveTask,
+  moveTaskTo,
+  openTasks,
+  hoursField,
+  hoursMinutesMs,
+  minutesField,
   popupView,
-  removePopupTodo,
-  togglePopupTodo,
-  todosLeft,
+  removeTask,
+  renameTask,
+  slackChangePreview,
+  toggleTask,
+  totalEstimateMs,
+  wouldExceedTotal,
 } from '@/src/popup/view';
 import type { PopupView } from '@/src/popup/view';
-import { send, useBarryState, useNow, useStored } from './hooks';
+import { send, useBarryState, useNow } from './hooks';
 import { Icons, Paper, assetUrl } from './Pixel';
 import { SettingsScreen } from './Settings';
 import { SkyHeader } from './Sky';
@@ -35,8 +48,6 @@ const readUnlocked = () => {
     return false;
   }
 };
-
-const NO_TODOS: PopupTodo[] = [];
 
 const MODES: { value: ModeOverride; label: string }[] = [
   { value: 'auto', label: 'Auto' },
@@ -78,7 +89,9 @@ function App() {
         onHideDev={() => setDevOpen(false)}
       />
     );
-  return <Home state={state} now={now} onBarry={onBarry} onSettings={() => setScreen('settings')} />;
+  return (
+    <Home state={state} now={now} onBarry={onBarry} onSettings={() => setScreen('settings')} />
+  );
 }
 
 function Home({
@@ -96,6 +109,18 @@ function Home({
 
   // Chip waiting on "Are you sure?". Dropped when the Slack pass ends on its own.
   const [pendingMin, setPendingMin] = useState<number | null>(null);
+  // Auto/Chill picked while a Task's timer runs: ask before pausing it.
+  const [pendingMode, setPendingMode] = useState<ModeOverride | null>(null);
+  const runningTitle = v.currentTask?.task.title ?? null;
+  useEffect(() => {
+    if (!runningTitle) setPendingMode(null);
+  }, [runningTitle]);
+  const onMode = (m: ModeOverride) => {
+    if (m === v.override) return;
+    if (runningTitle && m !== 'lockIn') return setPendingMode(m);
+    setPendingMode(null);
+    send({ type: 'setModeOverride', override: m });
+  };
   const onSlackPass = v?.onSlackPass ?? false;
   useEffect(() => {
     if (!onSlackPass) setPendingMin(null);
@@ -130,16 +155,42 @@ function Home({
               key={m.value}
               role="radio"
               aria-checked={v.override === m.value}
-              className={v.override === m.value ? 'stone on' : 'stone'}
-              onClick={() => send({ type: 'setModeOverride', override: m.value })}
+              className={
+                v.override === m.value
+                  ? 'stone on'
+                  : pendingMode === m.value
+                    ? 'stone pending'
+                    : 'stone'
+              }
+              onClick={() => onMode(m.value)}
             >
               {m.label}
             </button>
           ))}
         </div>
+        {pendingMode && runningTitle && (
+          <div className="slack-confirm" role="alertdialog" aria-label="Pause the running task">
+            <p>You're doing {runningTitle}. Want to pause it?</p>
+            <div className="chips two">
+              <button
+                className="stone on"
+                onClick={() => {
+                  // The brain pauses the running Task when the override leaves Lock In.
+                  send({ type: 'setModeOverride', override: pendingMode });
+                  setPendingMode(null);
+                }}
+              >
+                Yes, pause
+              </button>
+              <button className="stone" onClick={() => setPendingMode(null)}>
+                No
+              </button>
+            </div>
+          </div>
+        )}
 
         <BlockCard v={v} now={now} />
-        <TodoCard state={state} />
+        <TaskCard state={state} now={now} />
 
         <div className="slack-row">
           <span className="dirt-label">Slack:</span>
@@ -150,7 +201,9 @@ function Home({
                 return (
                   <button
                     key={min}
-                    className={current ? 'stone on' : pendingMin === min ? 'stone pending' : 'stone'}
+                    className={
+                      current ? 'stone on' : pendingMin === min ? 'stone pending' : 'stone'
+                    }
                     aria-pressed={current}
                     onClick={() => onChip(min)}
                   >
@@ -202,56 +255,164 @@ function Home({
 function BlockCard({ v, now }: { v: PopupView; now: number }) {
   const timer = blockCardTimer(v);
   const cur = v.currentBlock;
+  const task = v.currentTask;
   const next = v.nextBlock;
-  const nextText = next ? `Next: ${next.title} ${formatWhen(next.start, now)}` : 'Nothing coming up';
+  // One line: a started Task leads, else the calendar block, else what's next.
+  const label = task ? 'Task' : cur ? 'Now' : 'Next';
+  const title = task
+    ? `★ ${task.task.title}`
+    : cur
+      ? cur.title
+      : next
+        ? `${next.title} · ${formatWhen(next.start, now)}`
+        : 'Nothing scheduled';
+  // The rest goes in the tooltip so nothing is lost.
+  const detail = [
+    task && cur && `📅 ${cur.title} until ${formatWhen(cur.end, now)}`,
+    !task && cur && `until ${formatWhen(cur.end, now)}`,
+    (task || cur) && next && `Next: ${next.title} ${formatWhen(next.start, now)}`,
+    timer?.label,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <Paper seed={11} label="Current block" className="block-card">
-      <div className="card-head">
-        <h2>Current Block</h2>
-        {timer && <span className="dim">{timer.label}</span>}
-      </div>
-      <div className="block-row">
-        <div className="block-text">
-          <p className="title">{cur ? cur.title : 'Nothing scheduled'}</p>
-          <p className="sub">{cur ? `until ${formatWhen(cur.end, now)} · ${nextText}` : nextText}</p>
-        </div>
+      <div className="block-line" title={detail || undefined}>
+        <span className="label">{label}</span>
+        <p className="title">{title}</p>
         {timer && <span className="time">{formatTimeLeft(timer.target - now)}</span>}
       </div>
     </Paper>
   );
 }
 
-function TodoCard({ state }: { state: BarryState }) {
-  const settings = useStored<SettingsData>(STORAGE_KEYS.settings, DEFAULT_SETTINGS);
-  const stored = settings.popupTodos ?? NO_TODOS;
-  // Shown right away while the background saves; storage then catches up.
-  const [todos, setTodos] = useState<PopupTodo[]>(stored);
-  useEffect(() => setTodos(stored), [stored]);
+function TaskCard({ state, now }: { state: BarryState; now: number }) {
+  // Shown right away while the background saves; the stored state then catches up.
+  const [tasks, setTasks] = useState<Task[]>(state.tasks);
+  useEffect(() => setTasks(state.tasks), [state.tasks]);
   const [draft, setDraft] = useState('');
-
-  const commit = (next: PopupTodo[]) => {
-    setTodos(next);
-    send({ type: 'setPopupTodos', todos: next });
-  };
-  const add = () => {
-    const next = addPopupTodo(todos, draft, crypto.randomUUID());
-    if (next !== todos) commit(next);
-    setDraft('');
-  };
-
-  const hostOf = new Map(
-    settings.todoSources.map((s) => [s.id, s.origin.replace(/^https?:\/\//, '')]),
+  const [details, setDetails] = useState('');
+  const [showDetails, setShowDetails] = useState(false);
+  const [estimateMs, setEstimateMs] = useState(TASK_DEFAULT_ESTIMATE_MS);
+  // Custom time: hours (0-8) and minutes (0-59) boxes.
+  const [customH, setCustomH] = useState('');
+  const [customM, setCustomM] = useState('');
+  const [confirmOver, setConfirmOver] = useState(false);
+  // "Keep going" time on the Done? check.
+  const [moreH, setMoreH] = useState('');
+  const [moreM, setMoreM] = useState('');
+  // Drag to reorder: the row being dragged, and where it would land.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [over, setOver] = useState<{ id: string; place: 'before' | 'after' } | null>(null);
+  // Rename: double-click a title to edit it (and its details) in place.
+  const [editing, setEditing] = useState<{ id: string; title: string; description: string } | null>(
+    null,
   );
-  const copied = state.todos.filter((t) => t.sourceId !== POPUP_TODO_SOURCE_ID);
-  const left = todosLeft(todos, copied);
+  const saveEdit = () => {
+    if (editing) commit(renameTask(tasks, editing.id, editing.title, editing.description));
+    setEditing(null);
+  };
+  const endDrag = () => {
+    setDragId(null);
+    setOver(null);
+  };
+
+  const commit = (next: Task[]) => {
+    if (next === tasks) return;
+    setTasks(next);
+    send({ type: 'setTasks', tasks: next });
+  };
+  // Finished Tasks clear overnight: drop yesterday's when the popup opens.
+  useEffect(() => {
+    const fresh = dropStaleDone(state.tasks, Date.now());
+    if (fresh !== state.tasks) commit(fresh);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const full = atTaskLimit(tasks);
+  const reset = () => {
+    setDraft('');
+    setDetails('');
+    setShowDetails(false);
+    setEstimateMs(TASK_DEFAULT_ESTIMATE_MS);
+    setCustomH('');
+    setCustomM('');
+    setConfirmOver(false);
+  };
+  const custom = hoursMinutesMs(customH, customM);
+  const usingCustom = customH !== '' || customM !== '';
+  const more = hoursMinutesMs(moreH, moreM);
+  const add = (force = false) => {
+    if (!draft.trim() || full || (usingCustom && custom.ms === null)) return;
+    const ms = usingCustom ? custom.ms! : estimateMs;
+    if (!force && wouldExceedTotal(tasks, ms)) return setConfirmOver(true);
+    commit(
+      addTask(tasks, { title: draft, description: details, estimateMs: ms }, crypto.randomUUID()),
+    );
+    reset();
+  };
+
+  const open = openTasks(tasks);
+  const top = open[0];
+  const running = state.activeTask;
+  // While a Task runs the order is locked (it stays on top as the one being worked on).
+  const reorderLocked = !!running && now < running.endsAt;
+  const check = state.taskCheck
+    ? tasks.find((t) => t.id === state.taskCheck!.id && !t.done)
+    : undefined;
+  const total = totalEstimateMs(tasks);
 
   return (
-    <Paper seed={29} label="Todo list" className="todo-card">
+    <Paper seed={29} label="Tasks" className="todo-card">
       <div className="card-head rule">
         {Icons.clipboard}
-        <h2>Todo List</h2>
-        <span className="dim">{left} left</span>
+        <h2>Tasks</h2>
+        <span className="dim">
+          {open.length}/{TASK_MAX} tasks{open.length > 0 && ` · ${formatEstimate(total)}`}
+        </span>
       </div>
+      {reorderLocked && (
+        <p className="note lock-note">
+          Reordering is locked while a task is running. Pause it (❚❚) to drag tasks again.
+        </p>
+      )}
+
+      {check && (
+        <div className="slack-confirm" role="alertdialog" aria-label="Task time is up">
+          <p>Time's up for {check.title}. Done?</p>
+          <div className="chips two">
+            <button
+              className="stone on"
+              onClick={() => send({ type: 'answerTask', id: check.id, answer: 'done' })}
+            >
+              Done ✓
+            </button>
+            <button
+              className="stone"
+              onClick={() => send({ type: 'answerTask', id: check.id, answer: 'extend' })}
+            >
+              +15 min
+            </button>
+          </div>
+          <form
+            className="hm-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (more.ms === null) return;
+              send({ type: 'answerTask', id: check.id, answer: 'extend', extendMs: more.ms });
+              setMoreH('');
+              setMoreM('');
+            }}
+          >
+            <span className="hm-label">Or keep going</span>
+            <HoursMinutes h={moreH} m={moreM} onH={setMoreH} onM={setMoreM} label="More time" />
+            <button type="submit" className="stone" disabled={more.ms === null}>
+              +
+            </button>
+          </form>
+          {more.error && <p className="note error">{more.error}</p>}
+        </div>
+      )}
+
       <form
         className="todo-add"
         onSubmit={(e) => {
@@ -259,61 +420,298 @@ function TodoCard({ state }: { state: BarryState }) {
           add();
         }}
       >
-        <label className="sr-only" htmlFor="new-todo">
+        <label className="sr-only" htmlFor="new-task">
           New task
         </label>
         <input
-          id="new-todo"
+          id="new-task"
           className="field"
           value={draft}
-          placeholder="Add a new task..."
+          disabled={full}
+          placeholder={full ? `${TASK_MAX} tasks max` : 'Add a task...'}
+          maxLength={TASK_TITLE_MAX}
           autoComplete="off"
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setConfirmOver(false);
+          }}
         />
-        <button type="submit" className="blue icon" aria-label="Add task">
+        <button type="submit" className="blue icon" aria-label="Add task" disabled={full}>
           {Icons.plus}
         </button>
       </form>
+      {full && <p className="note">{TASK_MAX} tasks max. Finish or delete one first.</p>}
+
+      {draft.trim() !== '' && !full && (
+        <div className="task-extra">
+          <div className="estimate-row" role="radiogroup" aria-label="Estimated time">
+            {TASK_ESTIMATE_PRESETS_MIN.map((min) => (
+              <button
+                key={min}
+                type="button"
+                role="radio"
+                aria-checked={!usingCustom && estimateMs === min * 60_000}
+                className={!usingCustom && estimateMs === min * 60_000 ? 'stone on' : 'stone'}
+                onClick={() => {
+                  setCustomH('');
+                  setCustomM('');
+                  setEstimateMs(min * 60_000);
+                  setConfirmOver(false);
+                }}
+              >
+                {formatEstimate(min * 60_000)}
+              </button>
+            ))}
+          </div>
+          <div className="hm-row">
+            <span className="hm-label">Custom</span>
+            <HoursMinutes
+              h={customH}
+              m={customM}
+              onH={(h) => {
+                setCustomH(h);
+                setConfirmOver(false);
+              }}
+              onM={(m) => {
+                setCustomM(m);
+                setConfirmOver(false);
+              }}
+              label="Custom time"
+            />
+          </div>
+          {usingCustom ? (
+            <p className={custom.error ? 'note error' : 'note'}>
+              {custom.error ??
+                `Max ${formatEstimate(TASK_ESTIMATE_MAX_MS)} per task · total would be ${formatEstimate(
+                  total + (custom.ms ?? 0),
+                )}`}
+            </p>
+          ) : null}
+          {draft.length >= TASK_TITLE_MAX - 10 && (
+            <p className="note">
+              {draft.length}/{TASK_TITLE_MAX} characters
+            </p>
+          )}
+          {showDetails ? (
+            <input
+              className="field"
+              aria-label="Details"
+              placeholder="Details (optional)"
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+            />
+          ) : (
+            <button type="button" className="link" onClick={() => setShowDetails(true)}>
+              + details
+            </button>
+          )}
+        </div>
+      )}
+
+      {confirmOver && (
+        <div className="slack-confirm" role="alertdialog" aria-label="Lots of tasks">
+          <p>
+            Your tasks add up to{' '}
+            {formatEstimate(total + (usingCustom ? (custom.ms ?? 0) : estimateMs))}. Are you sure
+            you want to add more?
+          </p>
+          <div className="chips two">
+            <button className="stone on" onClick={() => add(true)}>
+              Add anyway
+            </button>
+            <button className="stone" onClick={() => setConfirmOver(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <ul className="todo-list">
-        {todos.map((t) => (
-          <li key={t.id}>
-            <button
-              className={t.done ? 'check on' : 'check'}
-              aria-pressed={t.done}
-              aria-label={`${t.done ? 'Mark not done' : 'Mark done'}: ${t.text}`}
-              onClick={() => commit(togglePopupTodo(todos, t.id))}
+        {tasks.map((t) => {
+          const isRunning = running?.id === t.id && now < running.endsAt;
+          const isTop = top?.id === t.id;
+          const drop = dragId && over?.id === t.id && dragId !== t.id ? over.place : null;
+          return (
+            <li
+              key={t.id}
+              className={
+                [isRunning && 'running', dragId === t.id && 'dragging', drop && `drop-${drop}`]
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }
+              draggable={!t.done && !reorderLocked && editing?.id !== t.id}
+              onDragStart={(e) => {
+                if (reorderLocked) return e.preventDefault();
+                setDragId(t.id);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', t.id);
+              }}
+              onDragOver={(e) => {
+                if (!dragId || reorderLocked) return;
+                e.preventDefault();
+                const r = e.currentTarget.getBoundingClientRect();
+                const place = e.clientY < r.top + r.height / 2 ? 'before' : 'after';
+                if (over?.id !== t.id || over.place !== place) setOver({ id: t.id, place });
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragId && over) commit(moveTaskTo(tasks, dragId, over.id, over.place));
+                endDrag();
+              }}
+              onDragEnd={endDrag}
             >
-              {t.done && Icons.check}
-            </button>
-            <span className={t.done ? 'text done' : 'text'}>{t.text}</span>
-            <button
-              className="trash"
-              aria-label={`Delete ${t.text}`}
-              onClick={() => commit(removePopupTodo(todos, t.id))}
-            >
-              {Icons.trash}
-            </button>
-          </li>
-        ))}
-        {copied.map((t, i) => (
-          <li key={`${t.sourceId}-${i}`} className="copied">
-            <span className="bullet" aria-hidden="true" />
-            <span className="text">{t.text}</span>
-            <span className="from">{hostOf.get(t.sourceId) ?? 'copied'}</span>
-            <button
-              className="trash"
-              aria-label={`Delete ${t.text}`}
-              onClick={() => send({ type: 'hideTodo', sourceId: t.sourceId, text: t.text })}
-            >
-              {Icons.trash}
-            </button>
-          </li>
-        ))}
-        {todos.length === 0 && copied.length === 0 && (
-          <li className="empty">Nothing yet. Add a task above.</li>
+              {!t.done && !reorderLocked ? (
+                <span
+                  className="grip"
+                  role="button"
+                  tabIndex={0}
+                  title="Drag to reorder"
+                  aria-label={`Reorder ${t.title} (drag, or use the up and down arrow keys)`}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+                    e.preventDefault();
+                    commit(moveTask(tasks, t.id, e.key === 'ArrowUp' ? -1 : 1));
+                  }}
+                >
+                  ⋮⋮
+                </span>
+              ) : (
+                <span
+                  className="grip off"
+                  aria-hidden="true"
+                  title={reorderLocked && !t.done ? 'Locked while a task is running' : undefined}
+                >
+                  {reorderLocked && !t.done ? '⋮⋮' : ''}
+                </span>
+              )}
+              <button
+                className={t.done ? 'check on' : 'check'}
+                aria-pressed={t.done}
+                aria-label={`${t.done ? 'Mark not done' : 'Mark done'}: ${t.title}`}
+                onClick={() => commit(toggleTask(tasks, t.id, Date.now()))}
+              >
+                {t.done && Icons.check}
+              </button>
+              {editing?.id === t.id ? (
+                <span
+                  className="text editing"
+                  onBlur={(e) => {
+                    // Save when focus leaves both inputs.
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) saveEdit();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveEdit();
+                    if (e.key === 'Escape') {
+                      e.stopPropagation();
+                      setEditing(null);
+                    }
+                  }}
+                >
+                  <input
+                    className="field"
+                    aria-label="Task title"
+                    maxLength={TASK_TITLE_MAX}
+                    autoFocus
+                    value={editing.title}
+                    onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                  />
+                  <input
+                    className="field small"
+                    aria-label="Task details"
+                    placeholder="Details (optional)"
+                    value={editing.description}
+                    onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                  />
+                </span>
+              ) : (
+                <span
+                  className={t.done ? 'text done' : 'text'}
+                  title="Double-click to rename"
+                  onDoubleClick={() =>
+                    setEditing({ id: t.id, title: t.title, description: t.description })
+                  }
+                >
+                  {t.title}
+                  {t.description && <small>{t.description}</small>}
+                </span>
+              )}
+              <span className="est">
+                {isRunning
+                  ? formatCountdown(running!.endsAt - now)
+                  : t.leftMs
+                    ? `❚❚ ${formatCountdown(t.leftMs)}`
+                    : formatEstimate(t.estimateMs)}
+              </span>
+              {isRunning ? (
+                <button
+                  className="mini"
+                  aria-label={`Pause ${t.title}`}
+                  onClick={() => send({ type: 'stopTask' })}
+                >
+                  ❚❚
+                </button>
+              ) : isTop ? (
+                <button
+                  className="mini go"
+                  aria-label={`${t.leftMs ? 'Resume' : 'Start'} ${t.title}`}
+                  onClick={() => send({ type: 'startTask', id: t.id })}
+                >
+                  ▶
+                </button>
+              ) : null}
+              <button
+                className="trash"
+                aria-label={`Delete ${t.title}`}
+                onClick={() => commit(removeTask(tasks, t.id))}
+              >
+                {Icons.trash}
+              </button>
+            </li>
+          );
+        })}
+        {tasks.length === 0 && (
+          <li className="empty">No tasks yet. Add one, then press ▶ when you start.</li>
         )}
       </ul>
     </Paper>
+  );
+}
+
+/** Two small boxes: hours (0-8) and minutes (0-59). */
+function HoursMinutes({
+  h,
+  m,
+  onH,
+  onM,
+  label,
+}: {
+  h: string;
+  m: string;
+  onH: (h: string) => void;
+  onM: (m: string) => void;
+  label: string;
+}) {
+  return (
+    <span className="hm" role="group" aria-label={label}>
+      <input
+        className="field hm-box"
+        aria-label={`${label}: hours (0 to 8)`}
+        inputMode="numeric"
+        placeholder="0"
+        value={h}
+        onChange={(e) => onH(hoursField(e.target.value))}
+      />
+      <span className="hm-unit">h</span>
+      <input
+        className="field hm-box"
+        aria-label={`${label}: minutes (0 to 59)`}
+        inputMode="numeric"
+        placeholder="00"
+        value={m}
+        onChange={(e) => onM(minutesField(e.target.value))}
+      />
+      <span className="hm-unit">m</span>
+    </span>
   );
 }
 

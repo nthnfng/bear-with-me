@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BarryEvent, BarryState, CalendarBlock, Todo } from '../contracts';
+import type { BarryEvent, BarryState, CalendarBlock, Task } from '../contracts';
 import { DEFAULT_TUNING } from '../contracts';
 import { brain, caveAllowed, initialState } from '.';
 
@@ -45,10 +45,18 @@ const setChud = (value: number, now = T0): BarryEvent => ({
   now,
   command: { kind: 'setChudMeter', value },
 });
-const todos = (now: number, ...texts: string[]): BarryEvent => ({
-  type: 'todosUpdated',
+const task = (title: string): Task => ({
+  id: title,
+  title,
+  description: '',
+  estimateMs: 30 * 60_000,
+  done: false,
+  doneAt: null,
+});
+const todos = (now: number, ...titles: string[]): BarryEvent => ({
+  type: 'tasksSet',
   now,
-  todos: texts.map((text): Todo => ({ text, sourceId: 's' })),
+  tasks: titles.map(task),
 });
 
 /** Lock In for a long block, a YouTube tab (1) and a docs tab (2), docs active. */
@@ -300,7 +308,7 @@ describe('Free-time suggestion', () => {
       {
         type: 'showSuggestion',
         tabId: 1,
-        todo: { text: 'Lab report', sourceId: 's' },
+        task: task('Lab report'),
         freeMinutes: 45,
       },
     ]);
@@ -416,7 +424,7 @@ describe('Free-time suggestion', () => {
       command: { kind: 'triggerFreeGap' },
     });
     expect(r.last).toEqual([
-      { type: 'showSuggestion', tabId: 1, todo: { text: 'x', sourceId: 's' }, freeMinutes: null },
+      { type: 'showSuggestion', tabId: 1, task: task('x'), freeMinutes: null },
     ]);
   });
 });
@@ -454,9 +462,9 @@ describe('Cave rules and settings events', () => {
     expect(run(s, act(1)).last).toEqual([]);
   });
 
-  it('todosUpdated and scheduleUpdated store their data', () => {
+  it('tasksSet and scheduleUpdated store their data', () => {
     const s = run(initialState(), todos(T0, 'a'), sched(T0, block(1, 2))).state;
-    expect(s.todos[0]?.text).toBe('a');
+    expect(s.tasks[0]?.title).toBe('a');
     expect(s.blocks).toHaveLength(1);
   });
 });

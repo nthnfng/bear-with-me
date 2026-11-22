@@ -3,10 +3,20 @@
 
 import { browser } from 'wxt/browser';
 import type { ContentMessage, TabView } from '@/src/contracts';
+
 import { POSE_ROWS, fixtureViews } from '@/src/dev/fixtures';
 import { mountOverlay } from '@/src/overlay';
-import { startPicker } from '@/src/picker';
-import { readSource } from '@/src/picker/reader';
+import { TASK_DEFAULT_ESTIMATE_MS } from '@/src/contracts';
+import type { Task } from '@/src/contracts';
+
+const DEMO_TASK: Task = {
+  id: 'demo',
+  title: 'Write lab report',
+  description: '',
+  estimateMs: TASK_DEFAULT_ESTIMATE_MS,
+  done: false,
+  doneAt: null,
+};
 
 const log = document.getElementById('log')!;
 const send = (msg: ContentMessage) => {
@@ -62,7 +72,7 @@ for (const row of POSE_ROWS) {
         type: 'showSuggestion',
         tabId: 0,
         freeMinutes: 40,
-        todo: { text: 'Write lab report', sourceId: 'demo' },
+        task: DEMO_TASK,
       });
   };
   posesEl.appendChild(b);
@@ -191,22 +201,17 @@ document.getElementById('addvideo')!.onclick = () => {
   v.play().catch(() => {});
 };
 
-// Todos: suggestion bubble, picker (on the demo list in the panel or the page), chud arrival.
+// Tasks: suggestion bubble, "Done?" bubble, chud arrival.
 document.getElementById('suggest')!.onclick = () => {
   renderNow('chill');
-  overlay.playEffect({
-    type: 'showSuggestion',
-    tabId: 0,
-    freeMinutes: 40,
-    todo: { text: 'Write lab report', sourceId: 'demo' },
+  overlay.playEffect({ type: 'showSuggestion', tabId: 0, freeMinutes: 40, task: DEMO_TASK });
+};
+document.getElementById('taskcheck')!.onclick = () => {
+  overlay.render({
+    ...fixtureViews(Date.now()).chill!,
+    taskCheck: { id: DEMO_TASK.id, title: DEMO_TASK.title },
   });
 };
-document.getElementById('picker')!.onclick = () =>
-  startPicker({
-    send,
-    onSaved: (source) =>
-      send({ type: 'todosCaptured', sourceId: source.id, items: readSource(source) }),
-  });
 // The song starts once per arrival; pressing again while it plays must not restart it.
 document.getElementById('chudsong')!.onclick = () => {
   renderNow('chudPoint');

@@ -3,6 +3,7 @@
 
 import type { PoseId, SoundId } from './assets';
 import type {
+  ActiveTask,
   BlocklistEntry,
   CalendarBlock,
   EatKind,
@@ -10,7 +11,8 @@ import type {
   ModeOverride,
   Position,
   TabId,
-  Todo,
+  Task,
+  TaskAnswer,
   Tuning,
 } from './domain';
 
@@ -39,7 +41,12 @@ export interface BarryState {
   modeOverride: ModeOverride;
   blocklist: BlocklistEntry[];
   blocks: CalendarBlock[];
-  todos: Todo[];
+  /** The user's Tasks in priority order. */
+  tasks: Task[];
+  /** The started Task: Lock In runs until its end. Null when none is running. */
+  activeTask: ActiveTask | null;
+  /** A started Task whose time ran out, waiting for the user's answer to "Done?". */
+  taskCheck: { id: string; at: Millis } | null;
   /** Every open tab's current URL, so the brain can find all Restricted tabs. */
   openTabs: Record<TabId, string>;
   activeTabId: TabId | null;
@@ -109,7 +116,17 @@ export type DevCommand =
 export type BarryEvent =
   | Ev<'tick'>
   | Ev<'scheduleUpdated', { blocks: CalendarBlock[] }>
-  | Ev<'todosUpdated', { todos: Todo[] }>
+  /** The popup's whole Task list after an add, edit, reorder, tick or delete. */
+  | Ev<'tasksSet', { tasks: Task[] }>
+  /**
+   * Start: Lock In (the override becomes Lock In) for the Task's estimate, or what was left
+   * when it was paused. Ignored for a missing or checked Task.
+   */
+  | Ev<'taskStarted', { id: string }>
+  /** Pause the running Task: it keeps its time left, and the override returns to Auto. */
+  | Ev<'taskStopped'>
+  /** The answer to "Time's up. Done?". Ignored unless it matches `taskCheck` (or the running Task). */
+  | Ev<'taskAnswered', { id: string; answer: TaskAnswer; extendMs?: number }>
   | Ev<'tabActivated', { tabId: TabId | null }>
   | Ev<'tabNavigated', { tabId: TabId; url: string }>
   | Ev<'tabClosed', { tabId: TabId }>
@@ -139,9 +156,11 @@ export type BarryEffect =
   | { type: 'playSound'; tabId: TabId; sound: SoundId }
   /** Explosion on each tab, then close them. */
   | { type: 'explodeAndClose'; tabIds: TabId[] }
-  /** Shown as a speech bubble from chill Barry in his corner. */
-  /** freeMinutes is null when no block is coming up (an open-ended gap). */
-  | { type: 'showSuggestion'; tabId: TabId; todo: Todo; freeMinutes: number | null }
+  /**
+   * Shown as a speech bubble from chill Barry in his corner. freeMinutes is null when no block
+   * is coming up (an open-ended gap).
+   */
+  | { type: 'showSuggestion'; tabId: TabId; task: Task; freeMinutes: number | null }
   | { type: 'setBadge'; pose: PoseId; text: string };
 
 export interface ReduceResult {
@@ -177,10 +196,28 @@ export interface TabView {
   reach: { startedAt: Millis; durationMs: number } | null;
   pushesLeft: number | null;
   /**
+   * What the user planned, shown under the Confrontation line: the Task first, then the calendar
+   * block. Null outside a Confrontation or when there is neither.
+   */
+  plan: PlanView | null;
+  /** "Time's up for {title}. Done?" with Done / +15 min / typed minutes. Null when nothing is waiting. */
+  taskCheck: { id: string; title: string } | null;
+  /**
    * Where this tab sits in its window's tab strip, so the Arm can reach for it.
    * The brain always leaves this null; the runtime fills it in before sending the view.
    */
   tabSlot: TabSlot | null;
+}
+
+/** How a Task line is timed: running (count down to endsAt), not started (its estimate), or time's up. */
+export type TaskTiming =
+  | { kind: 'left'; endsAt: Millis }
+  | { kind: 'estimate'; ms: number }
+  | { kind: 'timesUp' };
+
+export interface PlanView {
+  task: { title: string; timing: TaskTiming } | null;
+  block: { title: string; endsAt: Millis } | null;
 }
 
 /** A tab's place in its window's horizontal tab strip. Pinned tabs sit first and are narrow. */
@@ -207,6 +244,8 @@ export const HIDDEN_VIEW: TabView = {
   breakEndsAt: null,
   reach: null,
   pushesLeft: null,
+  plan: null,
+  taskCheck: null,
   tabSlot: null,
 };
 

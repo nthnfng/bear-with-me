@@ -78,7 +78,7 @@ button:disabled {
 .sky {
   position: relative;
   flex: none;
-  height: 160px;
+  height: 112px;
   overflow: hidden;
 }
 .cloud {
@@ -102,7 +102,7 @@ button:disabled {
   position: absolute;
   left: 12px;
   right: 12px;
-  top: 10px;
+  top: 8px;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -126,25 +126,25 @@ button:disabled {
 }
 .cave {
   position: absolute;
-  left: -8px;
-  top: 19px;
-  width: 160px;
-  height: 160px;
+  left: -4px;
+  top: 6px;
+  width: 116px;
+  height: 116px;
   cursor: pointer;
   user-select: none;
 }
 .cave-barry {
   position: absolute;
-  left: 52px;
-  bottom: 6px;
+  left: 34px;
+  bottom: 4px;
   z-index: 1;
   display: inline-flex;
   cursor: pointer;
 }
 .bubble {
   position: absolute;
-  left: 90px;
-  bottom: 62px;
+  left: 86px;
+  top: 40px;
   z-index: 2;
   max-width: 150px;
   padding: 9px 12px;
@@ -177,23 +177,23 @@ button:disabled {
 }
 .bubble-tail {
   position: absolute;
-  left: 78px;
-  top: 98px;
+  left: 72px;
+  top: 76px;
   z-index: 2;
   line-height: 0;
 }
 .getup {
   position: absolute !important;
   left: 12px;
-  top: 50px;
+  top: 40px;
   z-index: 3;
 }
 
 /* the Chud meter signpost */
 .chud-sign {
   position: absolute;
-  right: 22px;
-  top: 80px;
+  right: 18px;
+  top: 40px;
   width: 92px;
   display: flex;
   flex-direction: column;
@@ -252,7 +252,7 @@ button:disabled {
 .grass {
   position: absolute;
   left: 0;
-  top: 142px;
+  top: 94px;
   z-index: 3;
   width: 360px;
   height: 33px;
@@ -578,6 +578,30 @@ button:disabled {
 /* Current Block */
 .block-card .paper-body {
   gap: 4px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.block-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.block-line .label {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.block-line .title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .block-row {
   display: flex;
@@ -610,7 +634,7 @@ button:disabled {
   line-height: 1;
 }
 
-/* Todo list */
+/* Task list */
 .todo-card {
   flex: 1;
   min-height: 0;
@@ -625,8 +649,7 @@ button:disabled {
   gap: 10px;
 }
 .todo-list,
-.site-list,
-.source-list {
+.site-list {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -637,8 +660,7 @@ button:disabled {
   overflow-y: auto;
 }
 .todo-list li,
-.site-list li,
-.source-list li {
+.site-list li {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -659,30 +681,114 @@ button:disabled {
 .text.off {
   color: #8a7560;
 }
-.todo-list .bullet {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  margin: 0 7px;
-  background: var(--field-line);
+.todo-list li {
+  gap: 6px;
 }
-.todo-list .from {
-  flex: none;
+.todo-list li.running {
+  background: rgba(134, 176, 74, 0.18);
+}
+.todo-list .text small {
+  display: block;
   font-size: 11px;
   color: var(--ink-soft);
+}
+.todo-list .text.editing {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.todo-list .text.editing .field {
+  flex: none;
+  height: 26px;
+  font-size: 14px;
+}
+.todo-list .text.editing .field.small {
+  height: 22px;
+  font-size: 12px;
+}
+.todo-list .est {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.grip {
+  flex: none;
+  width: 14px;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: -3px;
+  color: var(--ink-soft);
+  cursor: grab;
+  user-select: none;
+}
+.grip.off {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+.lock-note {
+  flex: none;
+  padding: 4px 6px;
+  background: rgba(134, 176, 74, 0.18);
+}
+.todo-list li[draggable='true'] {
+  cursor: grab;
+}
+.todo-list li.dragging {
+  opacity: 0.4;
+}
+.todo-list li.drop-before {
+  box-shadow: inset 0 3px 0 0 var(--blue);
+}
+.todo-list li.drop-after {
+  box-shadow: inset 0 -3px 0 0 var(--blue);
+}
+.mini {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  background: var(--paper-field);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--ink);
+}
+.mini.go {
+  background: var(--green);
+  color: #fff;
+}
+.mini:disabled {
+  opacity: 0.35;
+}
+.task-extra {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.task-extra .field {
+  width: 100%;
+  flex: none;
+}
+.estimate-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  padding: 3px;
+}
+.estimate-row .stone {
+  min-height: 26px;
+  padding: 3px 2px;
+  font-size: 13px;
 }
 .todo-list .empty {
   font-size: 13px;
   color: var(--ink-soft);
   border-bottom: 0;
-}
-.source-list .text {
-  font-size: 13px;
-}
-.source-list small {
-  display: block;
-  font-size: 11px;
-  color: var(--ink-soft);
 }
 
 /* Settings */
@@ -735,8 +841,8 @@ button:disabled {
 /* Barry walking into the cave (right to the mouth, then shrinks into the dark) and out again. */
 .cave-walk {
   position: absolute;
-  left: 52px;
-  bottom: 6px;
+  left: 34px;
+  bottom: 4px;
   z-index: 1;
   display: inline-flex;
   transform-origin: 50% 100%;
@@ -750,7 +856,7 @@ button:disabled {
 }
 @keyframes cave-walk-in {
   0% {
-    left: 170px;
+    left: 150px;
     opacity: 0;
     scale: 1;
   }
@@ -758,28 +864,28 @@ button:disabled {
     opacity: 1;
   }
   65% {
-    left: 52px;
-    bottom: 6px;
+    left: 34px;
+    bottom: 4px;
     opacity: 1;
     scale: 1;
   }
   100% {
-    left: 56px;
-    bottom: 14px;
+    left: 38px;
+    bottom: 10px;
     opacity: 0;
     scale: 0.5;
   }
 }
 @keyframes cave-walk-out {
   0% {
-    left: 56px;
-    bottom: 14px;
+    left: 38px;
+    bottom: 10px;
     opacity: 0;
     scale: 0.5;
   }
   30% {
-    left: 52px;
-    bottom: 6px;
+    left: 34px;
+    bottom: 4px;
     opacity: 1;
     scale: 1;
   }
@@ -787,7 +893,7 @@ button:disabled {
     opacity: 1;
   }
   100% {
-    left: 170px;
+    left: 150px;
     opacity: 0;
     scale: 1;
   }
@@ -803,8 +909,8 @@ button:disabled {
 }
 .zzz {
   position: absolute;
-  left: 74px;
-  top: 104px;
+  left: 50px;
+  top: 66px;
   z-index: 1;
   color: #cfd8dc;
   font-size: 12px;
@@ -830,4 +936,41 @@ button:disabled {
 }
 .chips.two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.chips.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.hm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.hm-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.hm {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.field.hm-box {
+  flex: none;
+  width: 34px;
+  height: 26px;
+  padding: 0 4px;
+  text-align: center;
+  font-size: 14px;
+}
+.hm-unit {
+  font-size: 12px;
+  font-weight: 700;
+}
+.hm-row .stone {
+  flex: none;
+  width: 30px;
+  min-height: 26px;
+  padding: 0;
 }

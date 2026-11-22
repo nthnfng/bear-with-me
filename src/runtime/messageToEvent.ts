@@ -19,7 +19,9 @@ export function contentMessageToEvent(
       return { type: 'reachLanded', now, tabId, reachStartedAt: msg.reachStartedAt };
     case 'gotUp':
       return { type: 'gotUp', now };
-    // 'hello' is answered with a view by the runtime; picker messages are TODO Phase 3.
+    case 'answerTask':
+      return { type: 'taskAnswered', now, id: msg.id, answer: msg.answer, extendMs: msg.extendMs };
+    // 'hello' is answered with a view by the runtime.
     default:
       return null;
   }
@@ -47,7 +49,15 @@ export function popupMessageToEvent(msg: PopupMessage, now: Millis): BarryEvent 
       return { type: 'mutedSet', now, muted: msg.muted };
     case 'setBlocklist':
       return { type: 'blocklistSet', now, blocklist: msg.blocklist };
-    // setIcsUrl, refreshSchedule, startPicker, removeTodoSource, setPopupTodos, hideTodo: runtime.
+    case 'setTasks':
+      return { type: 'tasksSet', now, tasks: msg.tasks };
+    case 'startTask':
+      return { type: 'taskStarted', now, id: msg.id };
+    case 'stopTask':
+      return { type: 'taskStopped', now };
+    case 'answerTask':
+      return { type: 'taskAnswered', now, id: msg.id, answer: msg.answer, extendMs: msg.extendMs };
+    // setIcsUrl, refreshSchedule: handled by the runtime.
     default:
       return null;
   }
@@ -64,10 +74,10 @@ const POPUP_TYPES = new Set([
   'setBlocklist',
   'setIcsUrl',
   'refreshSchedule',
-  'startPicker',
-  'removeTodoSource',
-  'setPopupTodos',
-  'hideTodo',
+  'setTasks',
+  'startTask',
+  'stopTask',
+  'answerTask', // also sent by content scripts (the "Done?" bubble); same event either way
   'gotUp', // also sent by content scripts (tired Barry); both map to the same event
   'dev',
 ]);

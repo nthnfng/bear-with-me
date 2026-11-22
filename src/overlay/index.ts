@@ -18,7 +18,14 @@ import type {
 } from '../contracts';
 import manifestJson from '../assets/manifest.json';
 import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
-import { SUGGESTION_MS, formatCountdown, suggestionText } from './hud';
+import {
+  SUGGESTION_MS,
+  formatCountdown,
+  parseMinutes,
+  planLines,
+  suggestionText,
+  taskCheckText,
+} from './hud';
 import { createInputEater } from './input-eater';
 import { createMediaPauser } from './media-pauser';
 import {
@@ -86,6 +93,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       <div class="arm" hidden><div class="armbar"></div><div class="armfist"></div></div>
       <div class="barry corner right">
         <div class="suggest" hidden><span class="suggesttext"></span><button class="x" aria-label="Dismiss">×</button></div>
+        <div class="check" hidden><span class="checktext"></span><div class="checkbtns"><button data-answer="done">Done ✓</button><button data-answer="extend">+15 min</button></div><form class="checkmore"><input type="number" min="1" max="510" placeholder="min" aria-label="More minutes (up to 510)"><button type="submit">+ min</button></form></div>
         <div class="bubble" hidden></div>
         <div class="stage"><div class="sprite"></div><div class="stars" hidden>✦</div></div>
         <button class="btn" hidden>Back to it?</button>
@@ -106,6 +114,54 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   const armFist = q('.armfist');
   const suggestEl = q('.suggest');
   const suggestText = q('.suggesttext');
+  const checkEl = q('.check');
+  const checkText = q('.checktext');
+  // "Done?": hide right after an answer; the next view (without taskCheck) confirms it.
+  let answeredCheck: string | null = null;
+  const checkMore = q<HTMLFormElement>('.checkmore');
+  const checkMinutes = q<HTMLInputElement>('.checkmore input');
+  function answer(ans: 'done' | 'extend', extendMs?: number) {
+    const id = current?.taskCheck?.id;
+    if (!id) return;
+    answeredCheck = id;
+    checkEl.hidden = true;
+    checkMinutes.value = '';
+    send({ type: 'answerTask', id, answer: ans, ...(extendMs ? { extendMs } : {}) });
+  }
+  checkEl.querySelectorAll<HTMLButtonElement>('.checkbtns button').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      answer(b.dataset.answer as 'done' | 'extend');
+    }),
+  );
+  checkMore.addEventListener('submit', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const ms = parseMinutes(checkMinutes.value);
+    if (ms === null) {
+      checkMinutes.focus();
+      return;
+    }
+    answer('extend', ms);
+  });
+  // Typing minutes must not trigger the page's own key shortcuts (YouTube etc.).
+  for (const type of ['keydown', 'keyup', 'keypress'] as const)
+    checkMinutes.addEventListener(type, (e) => e.stopPropagation());
+  function renderCheck(view: TabView) {
+    const tc = view.taskCheck;
+    if (!tc) answeredCheck = null;
+    const show = !!tc && view.visible && !locked && answeredCheck !== tc.id;
+    if (show && checkEl.hidden && !reducedMotion()) {
+      checkEl.classList.remove('popin');
+      void checkEl.offsetWidth;
+      checkEl.classList.add('popin');
+    }
+    checkEl.hidden = !show;
+    if (show) {
+      checkText.textContent = taskCheckText(tc!.title);
+      hideSuggestion();
+    }
+  }
   // One Back to it per Confrontation: the brain takes both of a double click, so hide after the first.
   let backSentSince: number | null = null;
   button.addEventListener('click', () => {
@@ -274,7 +330,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   });
   function showSuggestion(text: string) {
     const view = current;
-    if (!view?.visible || view.pose !== 'chill-mug' || locked) return;
+    if (!view?.visible || view.pose !== 'chill-mug' || locked || !checkEl.hidden) return;
     suggestion = true;
     suggestText.textContent = text;
     suggestEl.hidden = false;
@@ -338,17 +394,26 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   let countEl: HTMLElement | null = null;
   let countdownTimer: ReturnType<typeof setInterval> | undefined;
   let breakEnd: number | null = null;
+  let planEl: HTMLElement | null = null;
+  let planTimer: ReturnType<typeof setInterval> | undefined;
   function renderBubble(view: TabView) {
     const hasCount = view.breakEndsAt !== null;
     breakEnd = view.breakEndsAt;
-    const key = `${view.line ?? ''}|${hasCount}`;
+    const planKey = view.plan ? JSON.stringify(view.plan) : '';
+    const key = `${view.line ?? ''}|${hasCount}|${planKey}`;
     const visibleBubble = view.visible && (view.line !== null || hasCount) && !locked;
     bubble.hidden = !visibleBubble;
     if (key !== bubbleKey) {
       bubbleKey = key;
       bubble.replaceChildren();
       countEl = null;
+      planEl = null;
       if (view.line !== null) bubble.append(view.line);
+      if (view.plan) {
+        planEl = document.createElement('div');
+        planEl.className = 'plan';
+        bubble.append(planEl);
+      }
       if (hasCount) {
         if (view.line !== null) bubble.append(' ');
         const img = document.createElement('img');
@@ -366,6 +431,24 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     }
     if (countdownTimer) clearInterval(countdownTimer);
     countdownTimer = undefined;
+    if (planTimer) clearInterval(planTimer);
+    planTimer = undefined;
+    if (planEl && visibleBubble) {
+      const plan = view.plan;
+      const paint = () => {
+        if (!planEl) return;
+        planEl.replaceChildren(
+          ...planLines(plan, Date.now()).map((text) => {
+            const line = document.createElement('div');
+            line.textContent = text;
+            return line;
+          }),
+        );
+      };
+      paint();
+      // A running Task's "32m left" counts down.
+      if (plan?.task?.timing.kind === 'left') planTimer = setInterval(paint, 15_000);
+    }
     if (countEl && visibleBubble) {
       const tick = () => {
         if (countEl && breakEnd !== null) countEl.textContent = formatCountdown(breakEnd - Date.now());
@@ -577,11 +660,14 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       stopDance();
       cancelSeq();
       hideSuggestion();
+      checkEl.hidden = true;
       locked = false;
       localReach = null;
       syncArm(view);
       if (countdownTimer) clearInterval(countdownTimer);
       countdownTimer = undefined;
+      if (planTimer) clearInterval(planTimer);
+      planTimer = undefined;
       bubbleKey = '';
       poseKey = '';
       if (flipTimer) clearInterval(flipTimer);
@@ -628,6 +714,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     }
     syncFx();
     renderBubble(view);
+    renderCheck(view);
 
     syncArm(view);
     // A suggestion belongs to chill Barry; any other pose drops it.
@@ -684,7 +771,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
           explode();
           break;
         case 'showSuggestion':
-          showSuggestion(suggestionText(effect.freeMinutes, effect.todo.text));
+          showSuggestion(suggestionText(effect.freeMinutes, effect.task.title));
           break;
         case 'setBadge':
           break; // background-only
@@ -693,6 +780,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     destroy() {
       if (rafId) cancelAnimationFrame(rafId);
       if (countdownTimer) clearInterval(countdownTimer);
+      if (planTimer) clearInterval(planTimer);
       if (suggestTimer) clearTimeout(suggestTimer);
       if (flipTimer) clearInterval(flipTimer);
       stopDance();

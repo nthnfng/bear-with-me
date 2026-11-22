@@ -68,6 +68,26 @@ export const CSS = `
   rotate: 45deg; translate: -50% 0; }
 .suggest .x { position: absolute; top: 2px; right: 4px; border: 0; background: transparent;
   font: inherit; font-size: 18px; line-height: 1; cursor: pointer; color: #555; padding: 2px 4px; }
+.bubble .plan { margin-top: 4px; font-size: .8em; font-weight: 600; text-align: left; }
+.bubble .plan div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.check { position: relative; max-width: 300px; background: #fff; color: var(--ink);
+  border: 4px solid var(--ink); padding: 8px 10px; font-size: 14px; font-weight: 600;
+  line-height: 1.3; margin-bottom: 16px; pointer-events: auto; }
+.check::after { content: ""; position: absolute; left: 50%; bottom: -12px; width: 12px; height: 12px;
+  background: #fff; border-right: 4px solid var(--ink); border-bottom: 4px solid var(--ink);
+  rotate: 45deg; translate: -50% 0; }
+.check[hidden] { display: none; }
+.check.popin { animation: pop .3s cubic-bezier(.34,1.56,.64,1); transform-origin: 50% 100%; }
+.checkbtns { display: flex; gap: 6px; margin-top: 8px; }
+.checkbtns button { flex: 1; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700;
+  padding: 4px 6px; border: 3px solid var(--ink); background: #f3ead6; color: var(--ink); }
+.checkbtns button[data-answer="done"] { background: #86b04a; }
+.checkbtns button:hover { filter: brightness(1.08); }
+.checkmore { display: flex; gap: 6px; margin-top: 6px; }
+.checkmore input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 3px 6px;
+  border: 3px solid var(--ink); background: #fff; color: var(--ink); }
+.checkmore button { cursor: pointer; font: inherit; font-size: 13px; font-weight: 700;
+  padding: 4px 8px; border: 3px solid var(--ink); background: #f3ead6; color: var(--ink); }
 .btn { pointer-events: auto; cursor: pointer; margin-top: 10px; font: inherit; font-size: 20px;
   font-weight: 700; padding: 8px 20px; border: 4px solid var(--ink); background: #86b04a; color: var(--ink); }
 .btn:hover { background: #9cc65a; }

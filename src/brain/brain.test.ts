@@ -102,7 +102,8 @@ describe('Confrontation arrival', () => {
       visible: true,
       placement: 'face',
       pose: 'suspicious',
-      line: "You planned ETF prep ,':/",
+      line: "Get back to it ,':/",
+      plan: { task: null, block: { title: 'ETF prep' } },
       showBackToIt: true,
       eatInput: true,
       pauseMedia: true,
@@ -320,7 +321,7 @@ describe('simple events', () => {
       { type: 'pushed', tabId: 1, now: 6 },
       { type: 'reachLanded', tabId: 1, reachStartedAt: 1, now: 7 },
       { type: 'idleChanged', idle: true, now: 8 },
-      { type: 'todosUpdated', todos: [], now: 9 },
+      { type: 'tasksSet', tasks: [], now: 9 },
       { type: 'dev', now: 10, command: { kind: 'triggerFreeGap' } },
     ];
     const r = run(initialState(), ...evs);

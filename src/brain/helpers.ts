@@ -10,9 +10,22 @@ export function currentBlock(state: Pick<BarryState, 'blocks'>, now: Millis): Ca
   return covering[0] ?? null;
 }
 
-export function resolveMode(state: Pick<BarryState, 'modeOverride' | 'blocks'>, now: Millis): Mode {
+/** The started Task while its time runs (before `endsAt`), else null. */
+export function runningTask(
+  state: Pick<BarryState, 'activeTask'>,
+  now: Millis,
+): BarryState['activeTask'] {
+  const a = state.activeTask;
+  return a && now < a.endsAt ? a : null;
+}
+
+/** Override wins; in Auto, Lock In while a calendar block covers now or a started Task runs. */
+export function resolveMode(
+  state: Pick<BarryState, 'modeOverride' | 'blocks' | 'activeTask'>,
+  now: Millis,
+): Mode {
   if (state.modeOverride !== 'auto') return state.modeOverride;
-  return currentBlock(state, now) ? 'lockIn' : 'chill';
+  return currentBlock(state, now) || runningTask(state, now) ? 'lockIn' : 'chill';
 }
 
 /** True if the URL's host equals, or is a subdomain of, an enabled blocklist entry. */

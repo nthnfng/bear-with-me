@@ -30,9 +30,9 @@ For development, `npm run dev` opens Chrome with the extension loaded and hot re
 
 Barry refreshes it every 5 minutes and keeps the last good result if a fetch fails. Only timed events become Calendar blocks. Treat the URL like a password: anyone holding it can read your calendar. To revoke it, reset the secret address in Google Calendar.
 
-## Todos
+## Tasks
 
-In the popup open **Todos** and press **Point Barry at my task list**, then click your todo list on the page. Google Docs checklists and the Brightspace Work To Do widget are supported; Notion is best-effort (selectors may break; if so, the list won't be captured). Barry suggests a todo when there is a free gap, and names the first one during a Confrontation.
+Add Tasks in the popup: a title, optional details, and an estimated time (15m / 30m / 1h / 2h or custom minutes). Drag them by the ⋮⋮ grip to reorder (double-click a title to rename); the top unchecked Task is your priority. Press **▶** when you start one: the mode switches to Lock In for its estimate (❚❚ pauses it, keeping the time left; switching to Auto or Chill asks to pause it first), and back to Auto when it's done. When the time is up Barry asks **"Time's up. Done?"** (Done / +15 min / type your own minutes). When he catches you on a restricted site he shows your Task and, if one is running, your calendar event. Up to 15 unchecked Tasks; past 8 hours of estimates he asks if you're sure. Finished Tasks clear the next day.
 
 ## Permissions
 
@@ -64,7 +64,7 @@ In the service worker console (`chrome://extensions` > Barry > "service worker")
 |---|---|
 | `barry.injectBlock(title?, minutes?)` | Add a fake Calendar block starting now (default "ETF prep", 60 min) |
 | `barry.lockIn()` / `barry.chill()` / `barry.auto()` | Set the mode override |
-| `barry.todos(['Lab report', ...])` | Fake captured todos |
+| `barry.tasks(['Lab report', ...], minutes?)` | Replace the Task list (default 30 min each) |
 | `barry.dev({ kind: 'setTuning', tuning: {...} })` | Send any DevCommand (`injectBlock`, `setTuning`, `setFatness`, `setChudMeter`, `triggerFreeGap`, `reset`) |
 | `await barry.state()` | Read the stored BarryState |
 
@@ -95,7 +95,6 @@ Barry cannot appear on `chrome://` pages, the Chrome Web Store, `file://` pages 
 | `src/runtime/` | C | Background service worker host: state, tabs, timers, effects. |
 | `src/overlay/` | D | Content-script renderer for Barry on pages. |
 | `entrypoints/popup/` | E | React popup. |
-| `src/picker/` | F | Todo list element picker. |
 | `public/assets/` | G | Sprites, explosion GIF, sounds. (`manifest.json` lives in `src/assets/` so JS can import it.) |
 | `src/dev/` | all | Fixture TabViews for building the overlay and popup without the brain. |
 | `entrypoints/` | | WXT entrypoints; keep them thin and delegate to `src/`. |

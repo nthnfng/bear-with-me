@@ -44,13 +44,22 @@ export const DEFAULT_BLOCKLIST: BlocklistEntry[] = [
 
 export const DEFAULT_SETTINGS: Settings = {
   icsUrl: null,
-  todoSources: [],
-  popupTodos: [],
-  hiddenTodos: [],
 };
 
-/** sourceId of the brain Todos that come from todos typed into the popup. */
-export const POPUP_TODO_SOURCE_ID = 'popup';
+/** Most unchecked Tasks the list holds. */
+export const TASK_MAX = 15;
+/** Adding a Task that takes the unchecked total past this asks "Are you sure?". */
+export const TASK_WARN_TOTAL_MS = 8 * 60 * MIN;
+/** Longest a Task's title may be. */
+export const TASK_TITLE_MAX = 50;
+/** Longest estimate (or typed extension) one Task may have: 8h 30m. */
+export const TASK_ESTIMATE_MAX_MS = 8 * 60 * MIN + 30 * MIN;
+/** "+15 min" on the "Done?" check (the default when no time is typed). */
+export const TASK_EXTEND_MS = 15 * MIN;
+/** Longest a typed extension may run. */
+export const TASK_EXTEND_MAX_MS = TASK_ESTIMATE_MAX_MS;
+export const TASK_ESTIMATE_PRESETS_MIN = [15, 30, 60, 120] as const;
+export const TASK_DEFAULT_ESTIMATE_MS = 30 * MIN;
 
 /** How often the background re-fetches the ICS feed. */
 export const ICS_REFRESH_MINUTES = 5;

@@ -35,15 +35,7 @@ import {
 import { ensureOffscreen, playSoundOffscreen, stopChudSongOffscreen } from './offscreen';
 import { explosionSoundDelay } from './explosionSound';
 import { dropStaleEffects, isScriptableUrl, planTabSync, tabSlotFor } from './tabs';
-import {
-  orderTodos,
-  removeSource,
-  replaceSourceTodos,
-  upsertSource,
-  withPopupTodos,
-  withoutHidden,
-  addHidden,
-} from './todos';
+import { migrateLegacyTodos } from './tasks';
 
 const TICK_ALARM = 'barry-tick';
 const ICS_ALARM = 'barry-ics-refresh';
@@ -63,8 +55,10 @@ export function startRuntime(brain: Brain) {
   async function loadState(): Promise<BarryState> {
     // Fill fields added since this state was saved (e.g. arrivedTabs) from the defaults.
     const init = brain.initialState();
-    const saved = await storage.getItem<BarryState>(STORAGE_KEYS.state);
-    return saved ? { ...init, ...saved, tuning: { ...init.tuning, ...saved.tuning } } : init;
+    const saved = await storage.getItem<BarryState & { todos?: unknown }>(STORAGE_KEYS.state);
+    if (!saved) return init;
+    const { todos: _legacy, ...rest } = saved; // pre-Tasks saves carried captured todos
+    return { ...init, ...rest, tuning: { ...init.tuning, ...rest.tuning } };
   }
 
   async function loadSettings(): Promise<Settings> {
@@ -100,7 +94,7 @@ export function startRuntime(brain: Brain) {
       const tab = await browser.tabs.get(tabId);
       if (!isScriptableUrl(tab.url) || tab.discarded || tab.status !== 'complete') return;
       await browser.scripting.executeScript({
-        target: { tabId, allFrames: true },
+        target: { tabId },
         files: [CONTENT_SCRIPT_FILE],
       });
     } catch {
@@ -270,7 +264,7 @@ export function startRuntime(brain: Brain) {
     return refreshing;
   }
 
-  // ---- settings and todos ---------------------------------------------------------------
+  // ---- settings -----------------------------------------------------------------------------
 
   function setIcsUrl(raw: string) {
     return queue
@@ -297,29 +291,6 @@ export function startRuntime(brain: Brain) {
       .then(async (saved) => {
         if (saved) await refreshScheduleNow();
       });
-  }
-
-  /** Recompute the brain's todos from the sources list and a change to one source's items. */
-  function updateTodos(
-    change: (todos: BarryState['todos'], settings: Settings) => BarryState['todos'],
-  ) {
-    return queue.enqueue(async () => {
-      const settings = await loadSettings();
-      const state = await loadState();
-      const todos = withPopupTodos(
-        withoutHidden(
-          orderTodos(change(state.todos, settings), settings.todoSources),
-          settings.hiddenTodos,
-        ),
-        settings.popupTodos,
-      );
-      await handle({ type: 'todosUpdated', now: Date.now(), todos });
-    });
-  }
-
-  async function startPickerInActiveTab() {
-    const tabId = await activeTabOfFocusedWindow();
-    if (tabId !== null) await sendToTab(tabId, { type: 'startPicker' });
   }
 
   // ---- tab tracking ---------------------------------------------------------------------
@@ -364,7 +335,7 @@ export function startRuntime(brain: Brain) {
     for (const tab of await browser.tabs.query({ url: ['http://*/*', 'https://*/*'] })) {
       if (tab.id === undefined || tab.discarded) continue;
       await browser.scripting
-        .executeScript({ target: { tabId: tab.id, allFrames: true }, files: [CONTENT_SCRIPT_FILE] })
+        .executeScript({ target: { tabId: tab.id }, files: [CONTENT_SCRIPT_FILE] })
         .catch(() => {}); // restricted pages (web store etc.)
     }
   }
@@ -447,37 +418,6 @@ export function startRuntime(brain: Brain) {
         case 'refreshSchedule':
           void refreshScheduleNow();
           return;
-        case 'startPicker':
-          void startPickerInActiveTab();
-          return;
-        case 'removeTodoSource':
-          void queue.enqueue(async () => {
-            const settings = await loadSettings();
-            await saveSettings({
-              ...settings,
-              todoSources: removeSource(settings.todoSources, msg.sourceId),
-              hiddenTodos: (settings.hiddenTodos ?? []).filter((h) => h.sourceId !== msg.sourceId),
-            });
-          });
-          void updateTodos((todos) => todos.filter((t) => t.sourceId !== msg.sourceId));
-          return;
-        case 'setPopupTodos':
-          void queue.enqueue(async () => {
-            const settings = await loadSettings();
-            await saveSettings({ ...settings, popupTodos: msg.todos });
-          });
-          void updateTodos((todos) => todos);
-          return;
-        case 'hideTodo':
-          void queue.enqueue(async () => {
-            const settings = await loadSettings();
-            await saveSettings({
-              ...settings,
-              hiddenTodos: addHidden(settings.hiddenTodos, msg),
-            });
-          });
-          void updateTodos((todos) => todos);
-          return;
       }
       const event = popupMessageToEvent(msg, now);
       if (event) dispatch(event);
@@ -499,25 +439,6 @@ export function startRuntime(brain: Brain) {
       });
       return;
     }
-    if (msg.type === 'pickerSaved') {
-      // Saves the source; the content script follows with todosCaptured for it.
-      void queue.enqueue(async () => {
-        const settings = await loadSettings();
-        await saveSettings({
-          ...settings,
-          todoSources: upsertSource(settings.todoSources, msg.source),
-        });
-      });
-      return;
-    }
-    if (msg.type === 'todosCaptured') {
-      void updateTodos((todos, settings) =>
-        settings.todoSources.some((s) => s.id === msg.sourceId)
-          ? replaceSourceTodos(todos, msg.sourceId, msg.items)
-          : todos,
-      );
-      return;
-    }
     const event = contentMessageToEvent(msg, tabId, now);
     if (event) dispatch(event);
   });
@@ -536,6 +457,21 @@ export function startRuntime(brain: Brain) {
     if (alarm.name === TICK_ALARM) dispatch({ type: 'tick', now: Date.now() });
     if (alarm.name === ICS_ALARM) void refreshScheduleNow();
   });
+  // Worker start: todos typed into the old popup list become Tasks (once), and the picker's
+  // settings fields go away.
+  void queue
+    .enqueue(async () => {
+      const stored = await storage.getItem<Settings & Record<string, unknown>>(STORAGE_KEYS.settings);
+      if (!stored) return;
+      const { popupTodos, todoSources: _s, hiddenTodos: _h, ...rest } = stored;
+      if (popupTodos === undefined && _s === undefined && _h === undefined) return;
+      const state = await loadState();
+      const tasks = migrateLegacyTodos(popupTodos, state.tasks, () => crypto.randomUUID());
+      if (tasks !== state.tasks) await handle({ type: 'tasksSet', now: Date.now(), tasks });
+      await saveSettings({ ...DEFAULT_SETTINGS, ...rest } as Settings);
+    })
+    .catch(() => console.error('[barry] task migration failed'));
+
   // Worker start: refresh, unless the last fetch is fresh (then just tell the brain about it).
   void (async () => {
     const [settings, status] = await Promise.all([
@@ -566,12 +502,19 @@ export function startRuntime(brain: Brain) {
     lockIn: () => override('lockIn'),
     chill: () => override('chill'),
     auto: () => override('auto'),
-    /** Dev: fake captured todos, e.g. barry.todos(['Lab report']). */
-    todos: (items: string[]) =>
+    /** Dev: replace the Task list, e.g. barry.tasks(['Lab report'], 1) for 1-minute Tasks. */
+    tasks: (titles: string[], minutes = 30) =>
       dispatch({
-        type: 'todosUpdated',
+        type: 'tasksSet',
         now: Date.now(),
-        todos: items.map((text) => ({ text, sourceId: 'dev' })),
+        tasks: titles.map((title) => ({
+          id: crypto.randomUUID(),
+          title,
+          description: '',
+          estimateMs: minutes * 60_000,
+          done: false,
+          doneAt: null,
+        })),
       }),
   };
 

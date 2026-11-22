@@ -1,6 +1,6 @@
 # Bear With Me
 
-A Chrome extension where Barry the bear compares what the user planned (calendar, todos) with what they're doing in the browser, and nudges them back when the two don't match.
+A Chrome extension where Barry the bear compares what the user planned (Tasks, calendar) with what they're doing in the browser, and nudges them back when the two don't match.
 
 ## Language
 
@@ -18,14 +18,32 @@ _Avoid_: Distracting tab, blocked tab
 The user's list of sites that can be Restricted sites. Each entry can be toggled off, which stops it being restricted until it's toggled back on.
 _Avoid_: Blacklist, deny list
 
+### Tasks
+
+**Task**:
+Something the user plans to do, typed into the popup with a title, an optional description and an estimated time. The list is in priority order; at most 15 are unchecked at once, and adding past 8 hours of unchecked estimates asks "Are you sure?".
+_Avoid_: Todo, item, to-do
+
+**Top Task**:
+The first unchecked Task in the list. Barry names it when nothing is started, and suggests it in a free gap.
+_Avoid_: Current todo, next task
+
+**Start**:
+The user saying "I'm working on this now" by pressing ▶ on a Task. The mode switches to Lock In for the Task's estimate, and back to Auto when its time is up or it's checked off. Picking Auto or Chill mid-Task asks to pause it; a paused Task keeps its time left and ▶ resumes it.
+_Avoid_: Begin, timer, focus session
+
+**Done check**:
+Barry asking "Time's up for X. Done?" when a started Task's estimate runs out. Done checks it off (it stays where it is); +15 min, or minutes the user types, runs it longer. Barry never checks a Task off by himself.
+_Avoid_: Auto-complete, reminder
+
 ### Modes and the Confrontation
 
 **Chill**:
-The mode outside Calendar blocks, in which Barry never steps in.
+The mode when no Task is started and no Calendar block is running, in which Barry never steps in.
 _Avoid_: Chill mode, idle mode, off
 
 **Lock In**:
-The mode during a Calendar block, or when the user forces it on, in which Barry confronts the user on Restricted tabs.
+The mode while a started Task runs, during a Calendar block, or when the user forces it on, in which Barry confronts the user on Restricted tabs.
 _Avoid_: Focus mode, lock mode, strict mode
 
 **Calendar block**:
@@ -33,7 +51,7 @@ A timed event from the user's calendar. Only Calendar blocks (not all-day events
 _Avoid_: Event, time block, session
 
 **Confrontation**:
-Barry in the user's face on a Restricted tab during Lock In, naming the planned task and offering "Back to it?".
+Barry in the user's face on a Restricted tab during Lock In, showing the plan (the Task first, then the Calendar block) and offering "Back to it?".
 _Avoid_: Intervention, popup, nudge
 
 **Eat**:
