@@ -93,7 +93,7 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
         <div class="check" hidden><span class="checktext"></span><div class="checkbtns"><button data-answer="done">Done ✓</button><button data-answer="extend">+15 min</button></div><form class="checkmore"><input type="number" min="1" max="510" placeholder="min" aria-label="More minutes (up to 510)"><button type="submit">+ min</button></form></div>
         <div class="bubble" hidden></div>
         <div class="stage"><div class="sprite"></div><div class="stars" hidden>✦</div></div>
-        <button class="btn" hidden>Back to it?</button>
+        <button class="btn" hidden>Take it away, Barry</button>
       </div>
     </div>
     <div class="fx"></div>`;

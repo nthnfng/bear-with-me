@@ -41,7 +41,7 @@ The build is split into **5 phases**. Each phase has **3 workstreams, one per pe
 
 ## Phase 1: The demo core
 
-**Goal:** with a fake Calendar block, opening YouTube makes Barry burst in. He eats clicks with a chomp and grows each time. "Back to it?" makes the tab explode and close.
+**Goal:** with a fake Calendar block, opening YouTube makes Barry burst in. He eats clicks with a chomp and grows each time. "Take it away, Barry" makes the tab explode and close.
 
 ### A: Brain, Confrontation
 
@@ -49,7 +49,7 @@ Write the test first for each item:
 
 - [ ] `initialState`; mode resolution (auto vs. override, whether a Calendar block covers now, all-day events ignored).
 - [ ] Restricted-site matching: subdomains, and entries that are toggled off.
-- [ ] Clear → Confronting when a Restricted tab becomes active in Lock In. Its view shows Barry in your face with "You planned {title} ,':/", "Back to it?", eaten input, and paused media. Arriving plays the `burst` sound.
+- [ ] Clear → Confronting when a Restricted tab becomes active in Lock In. Its view shows Barry in your face with "You planned {title} ,':/", "Take it away, Barry", eaten input, and paused media. Arriving plays the `burst` sound.
 - [ ] `eaten`: Fatness goes up, the view's scale grows (capped), and a `chomp` plays.
 - [ ] Fatness is kept when switching between Restricted tabs, and resets only when no Restricted tab is open anywhere.
 - [ ] `backToIt`: `explodeAndClose` on that tab, with no Fatness added.
@@ -74,7 +74,7 @@ Use a stub brain at first (any Restricted tab shows the `confrontation` fixture)
 Build against `src/dev/harness.html`: a test page with a `<video>`, scrolling content and buttons, plus a picker that feeds it the example screens.
 
 - [ ] Placeholder sprites (labelled boxes) for every pose, and `public/assets/manifest.json` following `src/contracts/assets.ts`. Move `assets/barry-home.png` into `public/assets/`.
-- [ ] Shadow-root host and sprite renderer: pose, scale, corner position (left/middle/right), speech bubble, and the "Back to it?" button. The corner sprite never blocks clicks.
+- [ ] Shadow-root host and sprite renderer: pose, scale, corner position (left/middle/right), speech bubble, and the "Take it away, Barry" button. The corner sprite never blocks clicks.
 - [ ] Input eater, used when the view says to eat input: clicks, pointer, wheel and touch events, plus keys like space and arrows caught before the page sees them. Report each one, while Barry's own button stays clickable.
 - [ ] Media pause: every `video` and `audio` element, including ones added later, re-paused if they start playing, each restart reported as an eaten unpause.
 - [ ] Effects: explosion GIF, `chomp` and `burst` sounds.
@@ -87,7 +87,7 @@ The demo core works end to end with no fakes:
 1. Inject a block from the console.
 2. Open YouTube: Barry bursts in and the video pauses.
 3. Clicks chomp and Barry grows.
-4. "Back to it?" makes the tab explode and close.
+4. "Take it away, Barry" makes the tab explode and close.
 5. Barry is studious in the corner.
 
 From here on, keep this path working.
@@ -179,7 +179,7 @@ From here on, keep this path working.
 
 - [ ] Playtest and tune the numbers in `src/contracts/config.ts`: Fatness growth, Reach length, warning length, Chud fill rate.
 - [ ] Brain edge cases found in the bug bash, each with a test.
-- [ ] Demo script: calendar block → YouTube burst → chomps and growth → "Back to it?" explosion → Slack pass → Arm fight → 5 Pushes → Snooze → chud song.
+- [ ] Demo script: calendar block → YouTube burst → chomps and growth → "Take it away, Barry" explosion → Slack pass → Arm fight → 5 Pushes → Snooze → chud song.
 
 ### B: Real-world hardening and docs
 

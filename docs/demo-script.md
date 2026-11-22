@@ -1,6 +1,6 @@
 # Stage demo script (about 3 to 4 minutes)
 
-Flow: calendar block, YouTube burst, chomps and growth through the sprite tiers, "Back to it?" explosion, Slack pass, Arm fight, 5 Pushes, the Snooze sequence (knocked down, getting up, "ow", tired), Get up, max chud dance and song.
+Flow: calendar block, YouTube burst, chomps and growth through the sprite tiers, "Take it away, Barry" explosion, Slack pass, Arm fight, 5 Pushes, the Snooze sequence (knocked down, getting up, "ow", tired), Get up, max chud dance and song.
 
 Timings assume the demo tuning (popup Dev panel "Demo speed" button, or `barry.dev({kind:'setTuning', tuning:{snoozeMs:20000, chudFullMs:60000, lockBackInMs:60000, idleAfterSec:15}})`). Warning is 15 s and a Reach 8 s at normal speed, unless you shorten them (see "Optional stage tuning").
 
@@ -28,7 +28,7 @@ Note: an injected block survives the 5 minute calendar refresh. Inject it with a
 
 ### 2. YouTube burst (about 5 s)
 - Presenter: switch to the YouTube tab.
-- Barry: bursts onto the page in your face (`suspicious` pose, 0 eats), line `You planned ETF prep ,':/`, a "Back to it?" button, media paused, Chud meter bar only if it is above 0.
+- Barry: bursts onto the page in your face (`suspicious` pose, 0 eats), line `You planned ETF prep ,':/`, a "Take it away, Barry" button, media paused, Chud meter bar only if it is above 0.
 - Sound: `burst` once. (If the Chud meter is already full, the chud song starts here too, so keep it under 1 until beat 8.)
 
 ### 3. Chomps and growth (about 20 s)
@@ -37,8 +37,8 @@ Note: an injected block survives the 5 minute calendar refresh. Inject it with a
 - Sound: `chomp` on each eaten interaction.
 - Say: "Nothing reaches the page."
 
-### 4. "Back to it?" explosion (about 5 s)
-- Presenter: click **Back to it?**.
+### 4. "Take it away, Barry" explosion (about 5 s)
+- Presenter: click **Take it away, Barry**.
 - Barry: explosion on the YouTube tab, tab closes. Barry returns to studious in the corner on the next tab.
 - Barry: reaches for the tab (`close-tab` pose, fast Arm), the tab explodes and closes.
 - Sound: `explosion` (runtime plays it with the explosion).

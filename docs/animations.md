@@ -12,7 +12,7 @@ This folder is the **animation layer only**. It is not a working extension yet.
 
 ### ✅ Built
 - **Sprites:** every PNG in `public/assets/sprites/`, rebuildable from `source/` with `tools/build_sprites.py`. (`source/` and `tools/` live with the art team, outside this repo.)
-- **Animation sequences:** each trigger function in `demo/barry/triggers.js` plays its whole sequence. For example, `gotOwned()` runs fall → get up → "ow" → "my arm hurts" → sit tired. `burstIn()` pops Barry in with the bubble + "Back to it?" button.
+- **Animation sequences:** each trigger function in `demo/barry/triggers.js` plays its whole sequence. For example, `gotOwned()` runs fall → get up → "ow" → "my arm hurts" → sit tired. `burstIn()` pops Barry in with the bubble + "Take it away, Barry" button.
 - **In-page reactions:** eating clicks/scrolls/keys (`chomp`), punching the arm (`punch`), clicking tired Barry to get up (`getUp`), and the chud meter filling (`setChud`) all work, because the page itself detects them.
 
 ### ❌ Not built yet
@@ -75,7 +75,7 @@ lock-in on task (calendar block, normal site)                  lockInOnTask()
 burst in (lock-in + blocklisted site)                          burstIn()
 1. pauses media
 2. barry-suspicious pops up in the middle + pop sound
-3. bubble: "You planned ETF prep ,':/" + "Back to it?" button
+3. bubble: "You planned ETF prep ,':/" + "Take it away, Barry" button
 4. works even if Barry is in his cave
 
 chomp (during burst in: click / scroll / arrow keys / space / j / k)   chomp(e)
@@ -286,7 +286,7 @@ getUpBtn.onclick = () => chrome.runtime.sendMessage({ type: "getUp" });
 ```
 
 ### 4. Page reports back
-Only the page knows some things: the arm reached the ✕, 5 punches landed, "Back to it?" was clicked. Clicks, chomps and the arm fight stay inside the page; only the **result** goes to the worker.
+Only the page knows some things: the arm reached the ✕, 5 punches landed, "Take it away, Barry" was clicked. Clicks, chomps and the arm fight stay inside the page; only the **result** goes to the worker.
 ```js
 // in triggers.js, replace the demo's closeTab()
 function closeTab() { chrome.runtime.sendMessage({ type: "armReachedTab" }); }

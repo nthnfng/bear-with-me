@@ -9,7 +9,7 @@ Barry the bear lives in your browser. He reads your Google Calendar, notices whe
 
 ## What Barry does
 
-Outside Calendar blocks Barry stays out of the way (Chill). During a Calendar block, or when you force Lock In from the popup, opening a Restricted site (YouTube, Reddit, X, ...) gets you a Confrontation: Barry fills the tab, names the task you planned, eats your clicks, blocks keys, and asks "Back to it?". Take a Slack pass if you really need a break; when it ends Barry's arm reaches for your Restricted tabs, and you can Push it back five times to win a Snooze (which fills the Chud meter).
+Outside Calendar blocks Barry stays out of the way (Chill). During a Calendar block, or when you force Lock In from the popup, opening a Restricted site (YouTube, Reddit, X, ...) gets you a Confrontation: Barry fills the tab, names the task you planned, eats your clicks, blocks keys, and offers a "Take it away, Barry" button. Take a Slack pass if you really need a break; when it ends Barry's arm reaches for your Restricted tabs, and you can Push it back five times to win a Snooze (which fills the Chud meter).
 
 ## Install
 

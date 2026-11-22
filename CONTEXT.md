@@ -51,7 +51,7 @@ A timed event from the user's calendar. Only Calendar blocks (not all-day events
 _Avoid_: Event, time block, session
 
 **Confrontation**:
-Barry in the user's face on a Restricted tab during Lock In, showing the plan (the Task first, then the Calendar block) and offering "Back to it?".
+Barry in the user's face on a Restricted tab during Lock In, showing the plan (the Task first, then the Calendar block) and offering "Take it away, Barry".
 _Avoid_: Intervention, popup, nudge
 
 **Eat**:

@@ -40,14 +40,14 @@ function lockInOnTask() {
   say(""); corner();
 }
 
-// burst in: pause media, pop up in their face, frown + "Back to it?"
+// burst in: pause media, pop up in their face, frown + "Take it away, Barry"
 function burstIn() {
   stopEverything(); state.mode = "burst"; reopenTab();
   $("video").textContent = "⏸ paused by Barry";
   barry.classList.remove("hidden");               // even if he's in his cave
   moveTo(browser.clientWidth / 2 - 40); sfx("pop");
   setSprite(body, state.size === "chud" ? "barry-chud" : state.size === "fat" ? "barry-fat-" + state.chomps : "barry-suspicious", { anim: "pop" });
-  say(`You planned ETF prep ,':/ <button onclick="backToIt()">Back to it?</button>`);
+  say(`You planned ETF prep ,':/ <button onclick="backToIt()">Take it away, Barry</button>`);
 }
 
 // chomp: any click / scroll / key on the page while Barry is in your face

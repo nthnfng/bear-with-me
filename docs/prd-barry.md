@@ -24,7 +24,7 @@ Barry is a bear who lives in the browser. He reads the user's schedule from thei
 Barry has two modes:
 
 - **Chill mode** (outside scheduled blocks): Barry sits in a bottom corner eating popcorn and never steps in. When a free gap in the calendar opens up, he suggests an untimed todo to fill it.
-- **Lock In mode** (during a scheduled calendar block, or forced on from the popup): while the user is on task, Barry sits in his corner looking studious, with glasses. Opening a blocklisted site makes him burst onto the page, right in the user's face: "You planned ETF prep ,':/" with a **Back to it?** button. He pauses any playing media. Every interaction with the page other than closing it gets *eaten* (with a chomp), and Barry gets fatter and more annoying with each one. Clicking "Back to it?" makes Barry stretch his arm, close the tab, and the tab explodes.
+- **Lock In mode** (during a scheduled calendar block, or forced on from the popup): while the user is on task, Barry sits in his corner looking studious, with glasses. Opening a blocklisted site makes him burst onto the page, right in the user's face: "You planned ETF prep ,':/" with a **Take it away, Barry** button. He pauses any playing media. Every interaction with the page other than closing it gets *eaten* (with a chomp), and Barry gets fatter and more annoying with each one. Clicking "Take it away, Barry" makes Barry stretch his arm, close the tab, and the tab explodes.
 
 When the user wants a guilt-free break, they turn on a **slack pass** in the popup (e.g. 15 minutes). When it runs out, Barry warns them and then slowly reaches his arm across the screen: "Closing restricted tabs 💣". The user can punch his arm or body to push it back, up to 5 times. If the arm gets there, every open restricted tab closes, each with its own explosion. After the 5th push Barry is knocked down, gets up, says "ow" and "my arm hurts i guess ill leave u alone", and sits tired while an automatic 5-minute **extended slack pass** (the Snooze) runs; the user can click tired Barry to end it early (Get up). Afterwards his arm comes back, and the fight can repeat.
 
@@ -81,9 +81,9 @@ Users who don't want Barry on screen can send him to his **cave** (the extension
 
 26. As a user in Lock In, I want Barry to burst onto the page the moment I land on a blocklisted site, so that I notice immediately, not an hour later.
 27. As a user in Lock In, I want any playing video or audio paused when Barry appears, so that passive watching doesn't continue behind him.
-28. As a user in Lock In, I want Barry to name my planned task ("You planned ETF prep ,':/") with a "Back to it?" button, so that the nudge is specific and meaningful.
-29. As a user, I want one click on "Back to it?" to close the distracting tab, so that getting back on track is effortless.
-30. As a user, I want Barry to stretch his arm to the tab's close button, close the tab, and show an explosion when I click "Back to it?", so that giving up the distraction feels satisfying.
+28. As a user in Lock In, I want Barry to name my planned task ("You planned ETF prep ,':/") with a "Take it away, Barry" button, so that the nudge is specific and meaningful.
+29. As a user, I want one click on "Take it away, Barry" to close the distracting tab, so that getting back on track is effortless.
+30. As a user, I want Barry to stretch his arm to the tab's close button, close the tab, and show an explosion when I click "Take it away, Barry", so that giving up the distraction feels satisfying.
 31. As a user, I want the length of Barry's arm stretch to depend on his current size (a bigger Barry is closer to the close button, so his arm reaches less far), so that the animation looks physically right.
 32. As a user in Lock In, I want my clicks on the page eaten, with a chomp sound for each, while Barry is there, so that I can't keep browsing around him.
 33. As a user in Lock In, I want scrolling on the page eaten too, so that scroll-only feeds (Reddit, X, Shorts) don't slip past Barry.
@@ -146,7 +146,7 @@ Users who don't want Barry on screen can send him to his **cave** (the extension
 ### Module: Barry Brain (core, pure, test seam #1)
 All behavior rules live in one pure module with no Chrome APIs, DOM, or real clock. It takes the current **state** and an **event**, and returns the **new state** and a list of **commands**. The service worker feeds it events and executes the returned commands. Every other module is a thin adapter around it.
 
-- **Events in:** clock tick (current time); schedule updated (calendar blocks); todos updated (untimed items); active tab changed (URL, title, tab id); tab opened / navigated / closed (so the brain knows every open restricted tab); interaction eaten (click / scroll / unpause); "Back to it?" clicked; slack pass started (duration); Barry pushed (arm or body); arm reached target; mode override set (auto / chill / lockIn); blocklist entry added / removed / toggled; position set; cave toggled; dev commands.
+- **Events in:** clock tick (current time); schedule updated (calendar blocks); todos updated (untimed items); active tab changed (URL, title, tab id); tab opened / navigated / closed (so the brain knows every open restricted tab); interaction eaten (click / scroll / unpause); "Take it away, Barry" clicked; slack pass started (duration); Barry pushed (arm or body); arm reached target; mode override set (auto / chill / lockIn); blocklist entry added / removed / toggled; position set; cave toggled; dev commands.
 - **State:** mode override; effective mode; blocklist entries (domain plus an enabled flag); cached blocks and todos; the set of open restricted tab ids; Lock In phase (below); fatness (a number) and its derived tier; slack pass (kind: chosen or extended, and end time); arm reach start time; pushes used in the current fight; chud meter (a number) and whether it's maxed; last free gap suggested; corner position; cave flag.
 - **Commands out:** show Barry on a tab (pose, fatness tier, speech line, slack time left; the chud meter shows only in the popup); return Barry to corner or cave; pause media on a tab; play sound (chomp / punch / chud song); sync arm reach on a tab (start time, duration); close a set of tabs, each with an explosion; show free-gap suggestion; update toolbar icon/badge.
 - **Mode resolution:** override chill/lockIn → that mode; auto → Lock In if a non-all-day calendar block covers now, otherwise Chill. Dev-injected fake blocks count as normal blocks. Slack passes don't change the mode; they change the Lock In phase.
@@ -154,8 +154,8 @@ All behavior rules live in one pure module with no Chrome APIs, DOM, or real clo
 
 #### Lock In phases
 - **Focused:** the active tab isn't restricted and there's no slack pass. Barry is studious in his corner (or hibernating in the cave).
-- **Confronting:** the active tab is restricted and there's no slack pass. Pause media, show Barry in-your-face with "You planned {block title} ,':/" and the "Back to it?" button. Each eaten interaction adds fatness and plays a chomp. Switching between restricted tabs keeps the same fatness.
-  - "Back to it?" closes the current tab with an explosion and isn't counted as an eaten interaction.
+- **Confronting:** the active tab is restricted and there's no slack pass. Pause media, show Barry in-your-face with "You planned {block title} ,':/" and the "Take it away, Barry" button. Each eaten interaction adds fatness and plays a chomp. Switching between restricted tabs keeps the same fatness.
+  - "Take it away, Barry" closes the current tab with an explosion and isn't counted as an eaten interaction.
   - Closing the restricted tab, by Barry or by hand, resets fatness to normal and returns to Focused.
 - **Slacking:** a chosen slack pass is running. Starting one while Confronting shows "Okay... -_-", resets fatness, and sends Barry to his corner. On restricted tabs Barry stays in the corner showing the chud meter and time left, and no interactions are eaten.
 - **Warning:** a slack pass has expired. This is a short heads-up (configurable, default 15s).
@@ -221,7 +221,7 @@ All behavior rules live in one pure module with no Chrome APIs, DOM, or real clo
   - The same scenario outside any block, so Barry stays in Chill and there's no intervention.
   - A toggled-off blocklist entry means no intervention, and it stays off across blocks until toggled on.
   - Subdomains on the blocklist are matched.
-  - N eaten clicks raise the fatness tier and each one emits a chomp. "Back to it?" doesn't add fatness.
+  - N eaten clicks raise the fatness tier and each one emits a chomp. "Take it away, Barry" doesn't add fatness.
   - Switching between two restricted tabs keeps fatness. Closing the restricted tab resets fatness and returns Barry to the studious corner.
   - Override Chill during a block means no intervention. Override back to Auto means the intervention resumes.
   - Starting a slack pass while Confronting gives "Okay... -_-", resets fatness, and sends Barry to the corner. There's no intervention during the pass, and the chud meter doesn't grow.
