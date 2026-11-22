@@ -78,6 +78,8 @@ const BACK_TO_IT_ARM_MS = 350;
 /** After the Back to it explosion, the tab should close within this; if not, Barry comes back. */
 const CLOSE_GRACE_MS = 1500;
 const EXPLOSION_COLORS = ['#f6d04d', '#e8742f', '#c43c2c', '#1e1a16', '#ffffff'];
+/** The explosion fades the whole screen to this and holds it until the tab closes. */
+const EXPLOSION_FILL = '232, 116, 47';
 
 export function mountOverlay(opts: OverlayOptions): Overlay {
   const manifest = opts.manifest ?? (manifestJson as unknown as AssetManifest);
@@ -542,16 +544,27 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     fx.appendChild(backdrop);
     const calm = reducedMotion();
     const unit = S_CORNER;
-    for (let i = 0; i < 36; i++) {
+    // translucent blast tint over the page, a hot flash that then thickens into a solid fill
+    // and holds there until the tab closes
+    backdrop.animate(
+      [
+        { background: 'rgba(255, 246, 176, 0.55)' },
+        { background: 'rgba(246, 208, 77, 0.45)', offset: 0.15 },
+        { background: `rgba(${EXPLOSION_FILL}, 0.3)`, offset: 0.4 },
+        { background: `rgba(${EXPLOSION_FILL}, 0.45)` },
+      ],
+      { duration: ms, easing: 'ease-in', fill: 'forwards' },
+    );
+    for (let i = 0; i < 90; i++) {
       const p = document.createElement('div');
       p.className = 'particle';
-      const size = (i % 5 === 0 ? 4 : i % 3 === 0 ? 3 : 2) * unit;
+      const size = (i % 5 === 0 ? 7 : i % 3 === 0 ? 5 : 3) * unit;
       p.style.cssText = `left:${x - size / 2}px;top:${y - size / 2}px;width:${size}px;height:${size}px;background:${EXPLOSION_COLORS[i % EXPLOSION_COLORS.length]}`;
       fx.appendChild(p);
       const ang = Math.random() * Math.PI * 2;
-      const dist = 50 + Math.random() * 130;
+      const dist = 120 + Math.random() * 320;
       const dx = calm ? 0 : Math.cos(ang) * dist;
-      const dy = calm ? 0 : Math.sin(ang) * dist + 40;
+      const dy = calm ? 0 : Math.sin(ang) * dist + 80;
       const dur = ms * (0.55 + Math.random() * 0.4);
       const delay = Math.random() * ms * 0.15;
       p.animate(
@@ -564,8 +577,10 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       );
     }
     setTimeout(() => {
-      backdrop.remove();
-      fx.replaceChildren();
+      for (const el of [...fx.children]) if (el !== backdrop) el.remove();
+      // The solid fill stays up until the runtime closes the tab. If it doesn't close
+      // (harness, or the close failed), lift it. A plain timer so cancelSeq can't strand it.
+      setTimeout(() => backdrop.remove(), CLOSE_GRACE_MS);
       // Back to it: hold close-tab Barry until the runtime closes the tab, which lands just
       // after this. Handing back now would flash the Confrontation before the tab goes.
       if (locked) later(unlockIfStillOpen, CLOSE_GRACE_MS);

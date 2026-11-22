@@ -81,6 +81,9 @@
 
 /* explosion particles */
 .boom { position:absolute; width:12px; height:12px; z-index:9; transition: transform .6s ease-out, opacity .6s; }
+.boomtint { position:absolute; inset:0; z-index:10; pointer-events:none; animation: boomtint .6s ease-in forwards; }
+@keyframes boomtint { 0% { background:rgba(255,246,176,.55); } 15% { background:rgba(246,208,77,.45); }
+  40% { background:rgba(232,116,47,.3); } 100% { background:rgba(232,116,47,.45); } }
 
 /* hop = bounce while walking (steps keeps it pixel-snappy) */
 .hop { animation: hop .3s steps(2) infinite; }

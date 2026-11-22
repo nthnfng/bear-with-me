@@ -212,15 +212,19 @@ function explode() {
   const x = $("tabX").getBoundingClientRect(), b = browser.getBoundingClientRect();
   const cx = x.left - b.left, cy = x.top - b.top;
   const colors = ["#f6d04d", "#e8742f", "#c43c2c", "#1e1a16", "#fff"];
-  for (let i = 0; i < 18; i++) {
+  // translucent blast tint that thickens into a solid fill, held until the tab closes
+  const tint = document.createElement("div"); tint.className = "boomtint";
+  browser.appendChild(tint);
+  for (let i = 0; i < 45; i++) {
     const p = document.createElement("div"); p.className = "boom";
     p.style.left = cx + "px"; p.style.top = cy + "px"; p.style.background = colors[i % colors.length];
     browser.appendChild(p);
-    const ang = Math.random() * Math.PI * 2, d = 40 + Math.random() * 70;
+    const ang = Math.random() * Math.PI * 2, d = 100 + Math.random() * 180;
+    const sz = i % 5 === 0 ? 28 : i % 3 === 0 ? 20 : 12; p.style.width = p.style.height = sz + "px";
     requestAnimationFrame(() => { p.style.transform = `translate(${Math.cos(ang) * d}px, ${Math.sin(ang) * d}px)`; p.style.opacity = 0; });
     setTimeout(() => p.remove(), 650);
   }
-  return wait(550);
+  return wait(700).then(() => tint.remove());   // closeTab() runs right after
 }
 function closeTab() { $("closedMsg").style.display = "grid"; $("tabTitle").textContent = "New Tab"; }   // extension: chrome.tabs.remove(tabId)
 function reopenTab() { $("closedMsg").style.display = "none"; $("tabTitle").textContent = "YouTube"; }
