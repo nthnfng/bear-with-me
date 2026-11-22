@@ -717,3 +717,40 @@ export function eventTaskState(tasks: Task[], title: string): 'none' | 'added' |
   if (matching.some((t) => !t.done)) return 'added';
   return matching.length > 0 ? 'done' : 'none';
 }
+
+// ---- time slots for the task list ----------------------------------------------------------
+
+export interface TaskSlot {
+  start: Millis;
+  end: Millis;
+  /** True for the running task (its real end); false for projected ones. */
+  live: boolean;
+}
+
+/**
+ * When each unchecked task would happen if you work down the list: the running task keeps its
+ * real end, and each task after it starts when the one above ends (paused ones use the time they
+ * have left). Projected starts begin at `now` rounded down to the minute, so they move forward
+ * until you start. A task waiting on "Done?" gets no slot. Checked tasks get none either.
+ */
+export function taskSlots(
+  tasks: Task[],
+  active: { id: string; startedAt: Millis; endsAt: Millis } | null,
+  waitingId: string | null,
+  now: Millis,
+): Map<string, TaskSlot> {
+  const slots = new Map<string, TaskSlot>();
+  const running = active && now < active.endsAt ? active : null;
+  let cursor = Math.floor(now / 60_000) * 60_000;
+  if (running) {
+    slots.set(running.id, { start: running.startedAt, end: running.endsAt, live: true });
+    cursor = Math.max(cursor, running.endsAt);
+  }
+  for (const t of tasks) {
+    if (t.done || t.id === running?.id || t.id === waitingId) continue;
+    const length = t.leftMs != null && t.leftMs > 0 ? t.leftMs : t.estimateMs;
+    slots.set(t.id, { start: cursor, end: cursor + length, live: false });
+    cursor += length;
+  }
+  return slots;
+}

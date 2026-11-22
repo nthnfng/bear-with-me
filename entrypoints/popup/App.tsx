@@ -28,6 +28,9 @@ import {
   minutesField,
   popupView,
   removeTask,
+  formatClock,
+  formatRange,
+  taskSlots,
   renameTask,
   taskFromEvent,
   todayEvents,
@@ -471,6 +474,8 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
   const open = openTasks(tasks);
   const top = open[0];
   const running = state.activeTask;
+  // Each task's slot if you work down the list (moves with reordering, pausing, the clock).
+  const slots = taskSlots(tasks, running, state.taskCheck?.id ?? null, now);
   // While a Task runs the order is locked (it stays on top as the one being worked on).
   const reorderLocked = !!running && now < running.endsAt;
   const check = state.taskCheck
@@ -751,17 +756,31 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
                     setEditing({ id: t.id, title: t.title, description: t.description })
                   }
                 >
-                  {t.title}
+                  {t.title}{' '}
+                  {t.done && t.doneAt !== null && (
+                    <span className="planned done-at" title="When you checked it off">
+                      Done {formatClock(t.doneAt)}
+                    </span>
+                  )}
+                  {slots.get(t.id) && (
+                    <span
+                      className={slots.get(t.id)!.live ? 'planned live' : 'planned'}
+                      title={`Planned ${formatEstimate(t.estimateMs)}${slots.get(t.id)!.live ? '' : ' · moves with the list order'}`}
+                    >
+                      {formatRange(slots.get(t.id)!.start, slots.get(t.id)!.end)}
+                    </span>
+                  )}
                   {t.description && <small>{t.description}</small>}
                 </span>
               )}
-              <span className="est">
-                {isRunning
-                  ? formatCountdown(running!.endsAt - now)
-                  : t.leftMs
-                    ? `${state.taskOnBreak === t.id ? '☕' : '❚❚'} ${formatCountdown(t.leftMs)}`
-                    : formatEstimate(t.estimateMs)}
-              </span>
+              {/* The live timer: counting down while running, frozen while paused. */}
+              {(isRunning || !!t.leftMs) && (
+                <span className="est" title="Time left">
+                  {isRunning
+                    ? formatCountdown(running!.endsAt - now)
+                    : `${state.taskOnBreak === t.id ? '☕' : '❚❚'} ${formatCountdown(t.leftMs!)}`}
+                </span>
+              )}
               {isRunning ? (
                 <button
                   className="mini"

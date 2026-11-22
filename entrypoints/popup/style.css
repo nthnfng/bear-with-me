@@ -1168,3 +1168,26 @@ button:disabled {
   font-weight: 700;
   color: #357a44;
 }
+.todo-list .planned {
+  display: inline-block;
+  margin-left: 2px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  vertical-align: 2px;
+  color: var(--ink-soft);
+  background: rgba(141, 90, 59, 0.12);
+  text-decoration: none;
+}
+.todo-list .planned.live {
+  color: #fff;
+  background: #357a44;
+}
+.todo-list .text.done .planned {
+  text-decoration: none;
+}
+.todo-list .planned.done-at {
+  color: #357a44;
+  background: rgba(53, 122, 68, 0.12);
+}
