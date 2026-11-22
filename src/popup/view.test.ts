@@ -427,4 +427,30 @@ describe('pixel popup helpers', () => {
     // Checked off: the event reads as done, and "+ task" doesn't come back.
     expect(v.eventTaskState(v.toggleTask(tasks, '1', 5), 'ETF')).toBe('done');
   });
+
+  it("works out each task's time slot from the list order", async () => {
+    const v = await import('./view');
+    const MIN = 60_000;
+    const now = new Date(2026, 10, 21, 9, 30, 20).getTime();
+    const at = (h: number, m: number) => new Date(2026, 10, 21, h, m).getTime();
+    const base = { description: '', done: false, doneAt: null };
+    const tasks = [
+      { ...base, id: 'a', title: 'a', estimateMs: 30 * MIN },
+      { ...base, id: 'x', title: 'x', estimateMs: 10 * MIN, done: true, doneAt: 1 },
+      { ...base, id: 'b', title: 'b', estimateMs: 60 * MIN },
+      { ...base, id: 'c', title: 'c', estimateMs: 60 * MIN, leftMs: 20 * MIN },
+    ];
+    // Nothing running: starts at now (to the minute), one after another; checked ones skipped.
+    const idle = v.taskSlots(tasks, null, null, now);
+    expect(idle.get('a')).toEqual({ start: at(9, 30), end: at(10, 0), live: false });
+    expect(idle.get('b')).toEqual({ start: at(10, 0), end: at(11, 0), live: false });
+    expect(idle.get('c')).toEqual({ start: at(11, 0), end: at(11, 20), live: false }); // paused: time left
+    expect(idle.has('x')).toBe(false);
+    // Running: its real slot, the rest follow its end.
+    const run = v.taskSlots(tasks, { id: 'a', startedAt: at(9, 20), endsAt: at(9, 50) }, null, now);
+    expect(run.get('a')).toEqual({ start: at(9, 20), end: at(9, 50), live: true });
+    expect(run.get('b')).toEqual({ start: at(9, 50), end: at(10, 50), live: false });
+    // Waiting on "Done?": no slot for it.
+    expect(v.taskSlots(tasks, null, 'a', now).has('a')).toBe(false);
+  });
 });

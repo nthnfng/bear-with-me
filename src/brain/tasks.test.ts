@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BarryEvent, BarryState, CalendarBlock, Task } from '../contracts';
 import { TASK_EXTEND_MS } from '../contracts';
-import { brain, initialState, planFor } from '.';
+import { brain, confrontSubline, initialState } from '.';
 import { resolveMode } from './helpers';
 
 const YT = 'https://www.youtube.com/watch?v=1';
@@ -140,8 +140,8 @@ describe('"Done?" answers', () => {
   });
 });
 
-describe('the plan under the Confrontation line', () => {
-  it('shows the running Task first and the calendar block under it', () => {
+describe('what Barry says when he catches you', () => {
+  it('names the task being played, never the calendar event', () => {
     const s = run(
       withTasks(),
       { type: 'scheduleUpdated', blocks: [block('ETF prep', T0 - MIN, T0 + 60 * MIN)], now: T0 },
@@ -151,40 +151,34 @@ describe('the plan under the Confrontation line', () => {
     ).state;
     const v = brain.viewFor(s, 1, T0);
     expect(v.placement).toBe('face');
-    // The original line, naming the task (it comes before the calendar event).
-    expect(v.line).toBe("You planned Task b ,':/");
-    expect(v.plan).toEqual({
-      task: { title: 'Task b', timing: { kind: 'left', endsAt: T0 + 30 * MIN } },
-      block: { title: 'ETF prep', endsAt: T0 + 60 * MIN },
-    });
+    expect(v.line).toBe("Shouldn't you be locked in right now?");
+    expect(v.subline).toBe("You're currently working on Task b.");
   });
 
-  it('a started Task alone puts Barry in your face', () => {
-    const s = run(withTasks(), start('a'), nav(1, YT), act(1)).state;
-    expect(brain.viewFor(s, 1, T0).plan).toEqual({
-      task: { title: 'Task a', timing: { kind: 'left', endsAt: T0 + 30 * MIN } },
-      block: null,
+  it('with no task playing, only asks the one line', () => {
+    // Forced Lock In with tasks but none started, and during a calendar event: same nudge.
+    const forced = run(
+      withTasks(),
+      { type: 'modeOverrideSet', override: 'lockIn', now: T0 },
+      nav(1, YT),
+      act(1),
+    ).state;
+    expect(brain.viewFor(forced, 1, T0)).toMatchObject({
+      line: "Shouldn't you be locked in right now?",
+      subline: null,
     });
+    const event = run(
+      initialState(),
+      { type: 'scheduleUpdated', blocks: [block('Lecture', T0 - MIN, T0 + 60 * MIN)], now: T0 },
+      nav(1, YT),
+      act(1),
+    ).state;
+    expect(brain.viewFor(event, 1, T0).subline).toBeNull();
   });
 
-  it('forced Lock In with nothing started shows the top Task and its estimate', () => {
-    const s = run(withTasks(), { type: 'modeOverrideSet', override: 'lockIn', now: T0 }).state;
-    expect(planFor(s, T0)).toEqual({
-      task: { title: 'Task a', timing: { kind: 'estimate', ms: 30 * MIN } },
-      block: null,
-    });
-  });
-
-  it('a Task waiting for "Done?" says time\'s up', () => {
-    const s = run(withTasks(), start('b'), tick(T0 + 30 * MIN)).state;
-    expect(planFor(s, T0 + 30 * MIN)?.task).toEqual({
-      title: 'Task b',
-      timing: { kind: 'timesUp' },
-    });
-  });
-
-  it('is null with no Tasks and no block', () => {
-    expect(planFor(initialState(), T0)).toBeNull();
+  it('a paused task is not "currently working on"', () => {
+    const s = run(withTasks(), start('a'), { type: 'taskStopped', now: T0 + MIN }).state;
+    expect(confrontSubline(s, T0 + MIN)).toBeNull();
   });
 });
 
@@ -325,4 +319,3 @@ describe('▶ works in any state', () => {
     expect(s.activeTask?.id).toBe('c');
   });
 });
-

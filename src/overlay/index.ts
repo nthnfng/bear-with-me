@@ -18,14 +18,7 @@ import type {
 } from '../contracts';
 import manifestJson from '../assets/manifest.json';
 import { anchorToViewport, armVector, createLandingGate, reachProgress, reachTarget } from './arm';
-import {
-  SUGGESTION_MS,
-  formatCountdown,
-  parseMinutes,
-  planLines,
-  suggestionText,
-  taskCheckText,
-} from './hud';
+import { SUGGESTION_MS, formatCountdown, parseMinutes, suggestionText, taskCheckText } from './hud';
 import { createInputEater } from './input-eater';
 import { createMediaPauser } from './media-pauser';
 import {
@@ -396,26 +389,23 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
   let countEl: HTMLElement | null = null;
   let countdownTimer: ReturnType<typeof setInterval> | undefined;
   let breakEnd: number | null = null;
-  let planEl: HTMLElement | null = null;
-  let planTimer: ReturnType<typeof setInterval> | undefined;
   function renderBubble(view: TabView) {
     const hasCount = view.breakEndsAt !== null;
     breakEnd = view.breakEndsAt;
-    const planKey = view.plan ? JSON.stringify(view.plan) : '';
-    const key = `${view.line ?? ''}|${hasCount}|${planKey}`;
+    const key = `${view.line ?? ''}|${hasCount}|${view.subline ?? ''}`;
     const visibleBubble = view.visible && (view.line !== null || hasCount) && !locked;
     bubble.hidden = !visibleBubble;
     if (key !== bubbleKey) {
       bubbleKey = key;
       bubble.replaceChildren();
       countEl = null;
-      planEl = null;
       if (view.line !== null) bubble.append(view.line);
-      bubble.classList.toggle('has-plan', !!view.plan);
-      if (view.plan) {
-        planEl = document.createElement('div');
-        planEl.className = 'plan';
-        bubble.append(planEl);
+      bubble.classList.toggle('has-sub', view.subline !== null);
+      if (view.subline !== null) {
+        const sub = document.createElement('div');
+        sub.className = 'sub';
+        sub.textContent = view.subline;
+        bubble.append(sub);
       }
       if (hasCount) {
         if (view.line !== null) bubble.append(' ');
@@ -434,25 +424,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     }
     if (countdownTimer) clearInterval(countdownTimer);
     countdownTimer = undefined;
-    if (planTimer) clearInterval(planTimer);
-    planTimer = undefined;
-    if (planEl && visibleBubble) {
-      const plan = view.plan;
-      const paint = () => {
-        if (!planEl) return;
-        planEl.replaceChildren(
-          ...planLines(plan, Date.now()).map((text) => {
-            const line = document.createElement('div');
-            line.textContent = text;
-            return line;
-          }),
-        );
-      };
-      paint();
-      // A running Task's "32m left" counts down.
-      // Running task and calendar event times count down.
-      if (plan?.task?.timing.kind === 'left' || plan?.block) planTimer = setInterval(paint, 15_000);
-    }
     if (countEl && visibleBubble) {
       const tick = () => {
         if (countEl && breakEnd !== null)
@@ -703,8 +674,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
       syncArm(view);
       if (countdownTimer) clearInterval(countdownTimer);
       countdownTimer = undefined;
-      if (planTimer) clearInterval(planTimer);
-      planTimer = undefined;
       bubbleKey = '';
       poseKey = '';
       if (flipTimer) clearInterval(flipTimer);
@@ -819,7 +788,6 @@ export function mountOverlay(opts: OverlayOptions): Overlay {
     destroy() {
       if (rafId) cancelAnimationFrame(rafId);
       if (countdownTimer) clearInterval(countdownTimer);
-      if (planTimer) clearInterval(planTimer);
       if (suggestTimer) clearTimeout(suggestTimer);
       if (flipTimer) clearInterval(flipTimer);
       stopDance();
