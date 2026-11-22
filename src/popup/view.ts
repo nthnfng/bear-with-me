@@ -619,7 +619,7 @@ export interface TodayEvent {
    * with `range` as its full span: "Nov 20, 12:00 PM – Nov 22, 5:00 PM" or "Nov 20 – Nov 22".
    */
   long: boolean;
-  /** 0 multi-day (top), 1 today's timed events, 2 one-day all-day events (bottom). */
+  /** 0 today's timed events (top), 1 multi-day events, 2 one-day all-day events (bottom). */
   group: 0 | 1 | 2;
 }
 
@@ -627,10 +627,10 @@ const dayKey = (ms: Millis) => new Date(ms).toDateString();
 const shortDate = (ms: Millis) =>
   new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-/** Where an event goes in Today's Events: multi-day on top, timed in the middle, all-day last. */
+/** Where an event goes in Today's Events: today's timed on top, multi-day next, all-day last. */
 function eventGroup(b: Pick<CalendarBlock, 'start' | 'end' | 'allDay'>): 0 | 1 | 2 {
-  if (!isLongEvent(b)) return 1;
-  return b.allDay && formatSpan(b) === 'All day' ? 2 : 0;
+  if (!isLongEvent(b)) return 0;
+  return b.allDay && formatSpan(b) === 'All day' ? 2 : 1;
 }
 
 /** True for all-day events and ones that run across midnight. */
@@ -663,8 +663,8 @@ export function formatRange(start: Millis, end: Millis): string {
 }
 
 /**
- * Everything on today's calendar (local day): multi-day events first, then today's timed events
- * in time order (including ones already over), then one-day all-day events.
+ * Everything on today's calendar (local day): today's timed events first, in time order
+ * (including ones already over), then multi-day events, then one-day all-day events.
  */
 export function todayEvents(blocks: CalendarBlock[], now: Millis): TodayEvent[] {
   const start = new Date(now);

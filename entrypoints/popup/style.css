@@ -1080,3 +1080,66 @@ button:disabled {
   min-height: 26px;
   padding: 0;
 }
+
+/* ---- Slack popup ------------------------------------------------------------------------ */
+
+.slack-open {
+  flex: none;
+}
+.popup.home {
+  position: relative;
+}
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(31, 20, 16, 0.55);
+}
+.modal {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow:
+    0 -3px 0 0 var(--ink),
+    0 3px 0 0 var(--ink),
+    -3px 0 0 0 var(--ink),
+    3px 0 0 0 var(--ink),
+    inset 0 -3px 0 0 #e6d2ad;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.modal-x {
+  border: 0;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink-soft);
+  padding: 0 4px;
+}
+.modal-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+.modal .chips {
+  flex: none;
+}
+.modal .dirt-hint {
+  color: var(--ink-soft);
+}

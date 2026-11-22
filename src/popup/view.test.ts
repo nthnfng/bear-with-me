@@ -395,22 +395,22 @@ describe('pixel popup helpers', () => {
       ],
       now,
     );
-    // Multi-day first, then today's timed events, then one-day all-day; tomorrow left out.
+    // Today's timed events first, then multi-day, then one-day all-day; tomorrow left out.
     expect(list.map((e) => [e.block.id, e.when, e.status, e.group])).toEqual([
-      ['hack', '● now', 'now', 0],
-      ['done', 'done', 'past', 1],
-      ['etf', '● now', 'now', 1],
-      ['gym', 'in 4h', 'later', 1],
+      ['done', 'done', 'past', 0],
+      ['etf', '● now', 'now', 0],
+      ['gym', 'in 4h', 'later', 0],
+      ['hack', '● now', 'now', 1],
       ['holiday', '', 'allDay', 2],
     ]);
-    // A multi-date all-day event counts as multi-day (top).
+    // A multi-date all-day event counts as multi-day (middle).
     expect(
       v.todayEvents([ev('trip', at(0, 0, 20), at(0, 0, 23), true)], now).map((e) => e.group),
-    ).toEqual([0]);
+    ).toEqual([1]);
     // Spans: one all-day date, several all-day dates (end is exclusive), timed across days.
     expect(list[4]!.range).toBe('All day');
     expect(v.formatSpan(ev('trip', at(0, 0, 20), at(0, 0, 23), true))).toBe('Nov 20 – Nov 22');
-    expect(list[0]!.range).toMatch(/^Nov 20, 12:00\sPM – Nov 23, 5:00\sPM$/);
+    expect(list[3]!.range).toMatch(/^Nov 20, 12:00\sPM – Nov 23, 5:00\sPM$/);
     expect(v.isLongEvent(ev('late', at(23), at(1, 0, 22)))).toBe(true);
     expect(v.isLongEvent(ev('to-midnight', at(22), at(0, 0, 22)))).toBe(false);
     expect(v.formatRange(at(14), at(16))).toMatch(/^2:00\s?–4:00\sPM$/);

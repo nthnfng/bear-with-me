@@ -126,11 +126,26 @@ function Home({
   useEffect(() => {
     if (!onSlackPass) setPendingMin(null);
   }, [onSlackPass]);
+  // Slack lives in a popup window so it never pushes the cards around.
+  const [slackOpen, setSlackOpen] = useState(false);
+  const closeSlack = () => {
+    setSlackOpen(false);
+    setPendingMin(null);
+  };
   const onChip = (min: number) => {
     if (!v) return;
-    if (!v.onSlackPass) send({ type: 'startSlackPass', durationMs: min * 60_000 });
-    else if (min !== v.slackCurrentMin) setPendingMin(min);
+    if (!v.onSlackPass) {
+      send({ type: 'startSlackPass', durationMs: min * 60_000 });
+      closeSlack();
+    } else if (min !== v.slackCurrentMin) setPendingMin(min);
   };
+  // The bottom button: what's going on (break, warning, Reach, Snooze), or just "Slack".
+  const canSlack = v.slackAllowed && (state.phase === 'clear' || state.phase === 'confronting');
+  const slackLabel = v.onSlackPass
+    ? `☕ Slacking · ${v.countdown ? formatCountdown(v.countdown.target - now) : ''} left`
+    : v.countdown
+      ? `${v.countdown.label} ${formatCountdown(v.countdown.target - now)}`
+      : '☕ Slack';
 
   return (
     <main className="popup home">
@@ -193,14 +208,35 @@ function Home({
         <EventsCard state={state} now={now} />
         <TaskCard state={state} now={now} />
 
-        {v.countdown && !v.onSlackPass && (
-          <p className="break-timer">
-            {v.countdown.label} <b>{formatCountdown(v.countdown.target - now)}</b>
-          </p>
-        )}
-        <div className="slack-row">
-          <span className="dirt-label">Slack:</span>
-          {v.slackAllowed ? (
+        <button
+          className={v.onSlackPass ? 'stone on wide slack-open' : 'stone wide slack-open'}
+          disabled={!v.onSlackPass && !canSlack}
+          title={!v.slackAllowed ? (v.slackHint ?? undefined) : undefined}
+          onClick={() => setSlackOpen(true)}
+        >
+          {slackLabel}
+        </button>
+      </div>
+
+      {slackOpen && (
+        <div className="modal-backdrop" onClick={closeSlack}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-label="Slack"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <h2>{v.onSlackPass ? 'Slacking' : 'Take a slack break'}</h2>
+              <button className="modal-x" aria-label="Close" onClick={closeSlack}>
+                ×
+              </button>
+            </div>
+            <p className="modal-sub">
+              {v.onSlackPass
+                ? `${v.countdown ? formatCountdown(v.countdown.target - now) : ''} left. Barry leaves you alone until then; your task timer is paused.`
+                : 'Barry leaves you alone for a while. Your task timer pauses and picks up after.'}
+            </p>
             <div className="chips">
               {SLACK_PRESETS_MIN.map((min) => {
                 const current = v.slackCurrentMin === min;
@@ -218,43 +254,40 @@ function Home({
                 );
               })}
             </div>
-          ) : (
-            <span className="dirt-hint">{v.slackHint}</span>
-          )}
-        </div>
-        {v.onSlackPass && pendingMin !== null && (
-          <div className="slack-confirm" role="alertdialog" aria-label="Change slack time">
-            <p>Are you sure you want to change your slack time?</p>
-            <p className="dirt-hint">{slackChangePreview(state, pendingMin, now)}</p>
-            <div className="chips two">
+            {v.onSlackPass && pendingMin !== null && (
+              <div className="slack-confirm" role="alertdialog" aria-label="Change slack time">
+                <p>Change your slack time to {pendingMin}m?</p>
+                <p className="dirt-hint">{slackChangePreview(state, pendingMin, now)}</p>
+                <div className="chips two">
+                  <button
+                    className="stone on"
+                    onClick={() => {
+                      send({ type: 'changeSlackPass', durationMs: pendingMin * 60_000 });
+                      closeSlack();
+                    }}
+                  >
+                    Yes, {pendingMin}m
+                  </button>
+                  <button className="stone" onClick={() => setPendingMin(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {v.onSlackPass && pendingMin === null && (
               <button
-                className="stone on"
+                className="stone danger wide"
                 onClick={() => {
-                  send({ type: 'changeSlackPass', durationMs: pendingMin * 60_000 });
-                  setPendingMin(null);
+                  send({ type: 'stopSlackPass' });
+                  closeSlack();
                 }}
               >
-                Yes, {pendingMin}m
+                Stop Slacking
               </button>
-              <button className="stone" onClick={() => setPendingMin(null)}>
-                Cancel
-              </button>
-            </div>
+            )}
           </div>
-        )}
-        {v.onSlackPass && (
-          <button
-            className="stone danger wide"
-            onClick={() => {
-              setPendingMin(null);
-              send({ type: 'stopSlackPass' });
-            }}
-          >
-            Stop Slacking
-            {v.countdown && ` · ${formatCountdown(v.countdown.target - now)} left`}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -442,9 +475,6 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
           {open.length}/{TASK_MAX} tasks{open.length > 0 && ` · ${formatEstimate(total)}`}
         </span>
       </div>
-      {state.taskOnBreak && (
-        <p className="note lock-note">On a break: task paused. ▶ to resume now.</p>
-      )}
       {reorderLocked && (
         <p className="note lock-note">Order locked while a task runs. ❚❚ to reorder.</p>
       )}
