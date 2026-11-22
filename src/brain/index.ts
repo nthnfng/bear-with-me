@@ -84,9 +84,13 @@ function apply(
       return { state };
     case 'tasksSet':
       return { state: setTasks(state, event.tasks) };
-    case 'taskStarted':
-      // During a break the Task is paused again right away and resumes when the break ends.
-      return { state: startTask({ ...state, taskOnBreak: null }, event.id, event.now) };
+    case 'taskStarted': {
+      // ▶ always means "I'm working now": it ends a Slack pass or Snooze first, so the Task
+      // runs whatever state Barry was in.
+      if (!state.tasks.some((t) => t.id === event.id && !t.done)) return { state };
+      const base = isBreak(state.phase) ? toClear(state) : state;
+      return { state: startTask({ ...base, taskOnBreak: null }, event.id, event.now) };
+    }
     case 'taskStopped':
       return { state: pauseTask({ ...state, taskOnBreak: null }, event.now, 'auto') };
     case 'taskAnswered':

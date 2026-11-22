@@ -299,3 +299,29 @@ describe('breaks pause the Task timer', () => {
     expect(s.taskOnBreak).toBeNull();
   });
 });
+
+describe('▶ works in any state', () => {
+  it('starting a Task during a Slack pass ends the break and runs the Task', () => {
+    const s = run(
+      withTasks(),
+      { type: 'modeOverrideSet', override: 'lockIn', now: T0 },
+      { type: 'slackPassStarted', durationMs: 5 * MIN, now: T0 },
+      start('b', T0 + MIN),
+    ).state;
+    expect(s.phase).not.toBe('slackPass');
+    expect(s.slackPassEndsAt).toBeNull();
+    expect(s.activeTask).toEqual({ id: 'b', startedAt: T0 + MIN, endsAt: T0 + 31 * MIN });
+    expect(s.taskOnBreak).toBeNull();
+    expect(s.modeOverride).toBe('lockIn');
+  });
+
+  it('starting a Task while already in Lock In runs it', () => {
+    const s = run(
+      withTasks(),
+      { type: 'modeOverrideSet', override: 'lockIn', now: T0 },
+      start('c', T0 + MIN),
+    ).state;
+    expect(s.activeTask?.id).toBe('c');
+  });
+});
+

@@ -1,25 +1,24 @@
 // Popup: draws src/popup/view.ts and sends PopupMessages. No behaviour here (ADR 0001).
 // Two screens: home (sky, cave, Current Block, Tasks, mode and Slack pass) and Settings.
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import {
+  DEFAULT_SETTINGS,
+  STORAGE_KEYS,
   TASK_DEFAULT_ESTIMATE_MS,
   TASK_ESTIMATE_PRESETS_MIN,
   TASK_ESTIMATE_MAX_MS,
   TASK_MAX,
   TASK_TITLE_MAX,
 } from '@/src/contracts';
-import type { BarryState, ModeOverride, Task } from '@/src/contracts';
+import type { BarryState, ModeOverride, Settings as SettingsData, Task } from '@/src/contracts';
 import {
   SLACK_PRESETS_MIN,
   addTask,
   atTaskLimit,
-  blockCardTimer,
   dropStaleDone,
   formatCountdown,
   formatEstimate,
-  formatTimeLeft,
-  formatWhen,
   hasOpenTaskTitled,
   moveTask,
   moveTaskTo,
@@ -29,16 +28,15 @@ import {
   minutesField,
   popupView,
   removeTask,
+  renameTask,
   taskFromEvent,
   todayEvents,
-  renameTask,
   slackChangePreview,
   toggleTask,
   totalEstimateMs,
   wouldExceedTotal,
 } from '@/src/popup/view';
-import type { PopupView } from '@/src/popup/view';
-import { send, useBarryState, useNow } from './hooks';
+import { send, useBarryState, useNow, useStored } from './hooks';
 import { Icons, Paper, assetUrl } from './Pixel';
 import { SettingsScreen } from './Settings';
 import { SkyHeader } from './Sky';
@@ -192,9 +190,14 @@ function Home({
           </div>
         )}
 
-        <BlockCard v={v} now={now} />
+        <EventsCard state={state} now={now} />
         <TaskCard state={state} now={now} />
 
+        {v.countdown && !v.onSlackPass && (
+          <p className="break-timer">
+            {v.countdown.label} <b>{formatCountdown(v.countdown.target - now)}</b>
+          </p>
+        )}
         <div className="slack-row">
           <span className="dirt-label">Slack:</span>
           {v.slackAllowed ? (
@@ -248,6 +251,7 @@ function Home({
             }}
           >
             Stop Slacking
+            {v.countdown && ` · ${formatCountdown(v.countdown.target - now)} left`}
           </button>
         )}
       </div>
@@ -255,36 +259,101 @@ function Home({
   );
 }
 
-function BlockCard({ v, now }: { v: PopupView; now: number }) {
-  const timer = blockCardTimer(v);
-  const cur = v.currentBlock;
-  const task = v.currentTask;
-  const next = v.nextBlock;
-  // One line: a started Task leads, else the calendar block, else what's next.
-  const label = task ? 'Task' : cur ? 'Now' : 'Next';
-  const title = task
-    ? `★ ${task.task.title}`
-    : cur
-      ? cur.title
-      : next
-        ? `${next.title} · ${formatWhen(next.start, now)}`
-        : 'Nothing scheduled';
-  // The rest goes in the tooltip so nothing is lost.
-  const detail = [
-    task && cur && `📅 ${cur.title} until ${formatWhen(cur.end, now)}`,
-    !task && cur && `until ${formatWhen(cur.end, now)}`,
-    (task || cur) && next && `Next: ${next.title} ${formatWhen(next.start, now)}`,
-    timer?.label,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+/**
+ * Today's Events: only what's on today's calendar. Fixed height, scrolls when there's a lot.
+ * "+ task" copies a short event (8h 30m or less, not over yet) into the task list.
+ */
+function EventsCard({ state, now }: { state: BarryState; now: number }) {
+  const settings = useStored<SettingsData>(STORAGE_KEYS.settings, DEFAULT_SETTINGS);
+  // "+ task" that would take the unchecked total past 8 hours waits on "Are you sure?".
+  const [pending, setPending] = useState<{ title: string; estimateMs: number } | null>(null);
+  const events = todayEvents(state.blocks, now);
+  const full = atTaskLimit(state.tasks);
+  const addFromEvent = (t: { title: string; estimateMs: number }, force = false) => {
+    if (full) return;
+    if (!force && wouldExceedTotal(state.tasks, t.estimateMs)) return setPending(t);
+    send({ type: 'setTasks', tasks: addTask(state.tasks, t, crypto.randomUUID()) });
+    setPending(null);
+  };
+
   return (
-    <Paper seed={11} label="Current block" className="block-card">
-      <div className="block-line" title={detail || undefined}>
-        <span className="label">{label}</span>
-        <p className="title">{title}</p>
-        {timer && <span className="time">{formatTimeLeft(timer.target - now)}</span>}
+    <Paper seed={11} label="Today's events" className="events-card">
+      <div className="card-head rule">
+        {Icons.calendar}
+        <h2>Today's Events</h2>
+        {events.length > 0 && (
+          <span className="dim">
+            {events.length} {events.length === 1 ? 'event' : 'events'}
+          </span>
+        )}
       </div>
+      <p className="events-sub">Pulled from your Google Calendar</p>
+      <ul className="today">
+        {!settings.icsUrl && events.length === 0 ? (
+          <li className="empty">No calendar connected. Add one in Settings (⚙).</li>
+        ) : events.length === 0 ? (
+          <li className="empty">Nothing on your calendar today.</li>
+        ) : (
+          events.map((e, i) => {
+            const asTask = e.status === 'past' ? null : taskFromEvent(e.block);
+            const added = hasOpenTaskTitled(state.tasks, e.block.title);
+            // A line between groups: multi-day / today's events / all-day.
+            const divider = i > 0 && events[i - 1]!.group !== e.group;
+            const action = asTask && (
+              <button
+                className="link"
+                disabled={added || full}
+                title={added ? 'Already in your tasks' : 'Add to your tasks'}
+                onClick={() => addFromEvent(asTask)}
+              >
+                {added ? 'added' : '+ task'}
+              </button>
+            );
+            return (
+              <Fragment key={`${e.block.id}-${e.block.start}`}>
+                {divider && <li className="divider" aria-hidden="true" />}
+                {e.long ? (
+                  <li className={`long ${e.status}`}>
+                    <span className="long-text">
+                      <span className="ev-title" title={e.block.title}>
+                        {e.block.title}
+                      </span>
+                      <span className="range">{e.range}</span>
+                    </span>
+                    {e.when && <span className="when">{e.when}</span>}
+                    {action}
+                  </li>
+                ) : (
+                  <li className={e.status}>
+                    <span className="range">{e.range}</span>
+                    <span className="ev-title" title={e.block.title}>
+                      {e.block.title}
+                    </span>
+                    {e.when && <span className="when">{e.when}</span>}
+                    {action}
+                  </li>
+                )}
+              </Fragment>
+            );
+          })
+        )}
+      </ul>
+      {pending && (
+        <div className="slack-confirm" role="alertdialog" aria-label="Lots of tasks">
+          <p>
+            Your tasks add up to {formatEstimate(totalEstimateMs(state.tasks) + pending.estimateMs)}
+            . Are you sure you want to add more?
+          </p>
+          <div className="chips two">
+            <button className="stone on" onClick={() => addFromEvent(pending, true)}>
+              Add anyway
+            </button>
+            <button className="stone" onClick={() => setPending(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </Paper>
   );
 }
@@ -300,14 +369,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
   // Custom time: hours (0-8) and minutes (0-59) boxes.
   const [customH, setCustomH] = useState('');
   const [customM, setCustomM] = useState('');
-  // A Task waiting on "Your tasks add up to ... Are you sure?" (from the form or "+ task").
-  const [pendingAdd, setPendingAdd] = useState<{
-    title: string;
-    description: string;
-    estimateMs: number;
-    fromForm: boolean;
-  } | null>(null);
-  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [confirmOver, setConfirmOver] = useState(false);
   // "Keep going" time on the Done? check.
   const [moreH, setMoreH] = useState('');
   const [moreM, setMoreM] = useState('');
@@ -346,34 +408,20 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
     setEstimateMs(TASK_DEFAULT_ESTIMATE_MS);
     setCustomH('');
     setCustomM('');
-    setPendingAdd(null);
+    setConfirmOver(false);
   };
   const custom = hoursMinutesMs(customH, customM);
   const usingCustom = customH !== '' || customM !== '';
   const more = hoursMinutesMs(moreH, moreM);
-  /** Adds a Task, asking first if it takes the unchecked total past 8 hours. */
-  const tryAdd = (
-    p: { title: string; description: string; estimateMs: number; fromForm: boolean },
-    force = false,
-  ) => {
-    if (full) return;
-    if (!force && wouldExceedTotal(tasks, p.estimateMs)) return setPendingAdd(p);
-    commit(addTask(tasks, p, crypto.randomUUID()));
-    if (p.fromForm) reset();
-    setPendingAdd(null);
+  const add = (force = false) => {
+    if (!draft.trim() || full || (usingCustom && custom.ms === null)) return;
+    const ms = usingCustom ? custom.ms! : estimateMs;
+    if (!force && wouldExceedTotal(tasks, ms)) return setConfirmOver(true);
+    commit(
+      addTask(tasks, { title: draft, description: details, estimateMs: ms }, crypto.randomUUID()),
+    );
+    reset();
   };
-  const add = () => {
-    if (!draft.trim() || (usingCustom && custom.ms === null)) return;
-    tryAdd({
-      title: draft,
-      description: details,
-      estimateMs: usingCustom ? custom.ms! : estimateMs,
-      fromForm: true,
-    });
-  };
-  const events = todayEvents(state.blocks, now);
-  const EVENTS_SHOWN = 3;
-  const shownEvents = showAllEvents ? events : events.slice(0, EVENTS_SHOWN);
 
   const open = openTasks(tasks);
   const top = open[0];
@@ -395,50 +443,10 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
         </span>
       </div>
       {state.taskOnBreak && (
-        <p className="note lock-note">
-          On a break: the task timer is paused and picks up again when the break ends.
-        </p>
+        <p className="note lock-note">On a break: task paused. ▶ to resume now.</p>
       )}
       {reorderLocked && (
-        <p className="note lock-note">
-          Reordering is locked while a task is running. Pause it (❚❚) to drag tasks again.
-        </p>
-      )}
-
-      {events.length > 0 && (
-        <div className="today" aria-label="Today's calendar">
-          <span className="today-head">📅 Today</span>
-          <ul>
-            {shownEvents.map((e) => {
-              const added = hasOpenTaskTitled(tasks, e.block.title);
-              const asTask = taskFromEvent(e.block);
-              return (
-                <li key={`${e.block.id}-${e.block.start}`} className={e.isNow ? 'now' : undefined}>
-                  <span className="range">{e.range}</span>
-                  <span className="ev-title" title={e.block.title}>
-                    {e.block.title}
-                  </span>
-                  <span className="when">{e.isNow ? '● now' : e.when}</span>
-                  {asTask ? (
-                    <button
-                      className="link"
-                      disabled={added || full}
-                      title={added ? 'Already in your tasks' : 'Add to your tasks'}
-                      onClick={() => tryAdd({ ...asTask, description: '', fromForm: false })}
-                    >
-                      {added ? 'added' : '+ task'}
-                    </button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-          {events.length > EVENTS_SHOWN && (
-            <button className="link" onClick={() => setShowAllEvents(!showAllEvents)}>
-              {showAllEvents ? 'show less' : `+${events.length - EVENTS_SHOWN} more today`}
-            </button>
-          )}
-        </div>
+        <p className="note lock-note">Order locked while a task runs. ❚❚ to reorder.</p>
       )}
 
       {check && (
@@ -498,7 +506,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
           autoComplete="off"
           onChange={(e) => {
             setDraft(e.target.value);
-            setPendingAdd(null);
+            setConfirmOver(false);
           }}
         />
         <button type="submit" className="blue icon" aria-label="Add task" disabled={full}>
@@ -521,7 +529,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
                   setCustomH('');
                   setCustomM('');
                   setEstimateMs(min * 60_000);
-                  setPendingAdd(null);
+                  setConfirmOver(false);
                 }}
               >
                 {formatEstimate(min * 60_000)}
@@ -535,11 +543,11 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
               m={customM}
               onH={(h) => {
                 setCustomH(h);
-                setPendingAdd(null);
+                setConfirmOver(false);
               }}
               onM={(m) => {
                 setCustomM(m);
-                setPendingAdd(null);
+                setConfirmOver(false);
               }}
               label="Custom time"
             />
@@ -573,17 +581,18 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
         </div>
       )}
 
-      {pendingAdd && (
+      {confirmOver && (
         <div className="slack-confirm" role="alertdialog" aria-label="Lots of tasks">
           <p>
-            Your tasks add up to {formatEstimate(total + pendingAdd.estimateMs)}. Are you sure you
-            want to add more?
+            Your tasks add up to{' '}
+            {formatEstimate(total + (usingCustom ? (custom.ms ?? 0) : estimateMs))}. Are you sure
+            you want to add more?
           </p>
           <div className="chips two">
-            <button className="stone on" onClick={() => tryAdd(pendingAdd, true)}>
+            <button className="stone on" onClick={() => add(true)}>
               Add anyway
             </button>
-            <button className="stone" onClick={() => setPendingAdd(null)}>
+            <button className="stone" onClick={() => setConfirmOver(false)}>
               Cancel
             </button>
           </div>
@@ -714,7 +723,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
                 >
                   ❚❚
                 </button>
-              ) : isTop && state.taskOnBreak !== t.id ? (
+              ) : isTop ? (
                 <button
                   className="mini go"
                   aria-label={`${t.leftMs ? 'Resume' : 'Start'} ${t.title}`}

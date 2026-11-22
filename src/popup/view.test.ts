@@ -372,7 +372,7 @@ describe('pixel popup helpers', () => {
     expect(v.renameTask(list, 'nope', 'x', '')).toBe(list);
   });
 
-  it("lists today's remaining timed events, in order, for the Tasks card", async () => {
+  it("lists everything on today's calendar, in order, with + task only for short events", async () => {
     const v = await import('./view');
     const at = (h: number, m = 0, day = 21) => new Date(2026, 10, day, h, m).getTime();
     const ev = (id: string, s: number, e: number, allDay = false) => ({
@@ -391,21 +391,35 @@ describe('pixel popup helpers', () => {
         ev('etf', at(14), at(16)),
         ev('holiday', at(0), at(0, 0, 22), true),
         ev('tomorrow', at(9, 0, 22), at(10, 0, 22)),
+        ev('hack', at(12, 0, 20), at(17, 0, 23)),
       ],
       now,
     );
-    expect(list.map((e) => [e.block.id, e.when, e.isNow])).toEqual([
-      ['etf', 'now', true],
-      ['gym', 'in 4h', false],
+    // Multi-day first, then today's timed events, then one-day all-day; tomorrow left out.
+    expect(list.map((e) => [e.block.id, e.when, e.status, e.group])).toEqual([
+      ['hack', '● now', 'now', 0],
+      ['done', 'done', 'past', 1],
+      ['etf', '● now', 'now', 1],
+      ['gym', 'in 4h', 'later', 1],
+      ['holiday', '', 'allDay', 2],
     ]);
+    // A multi-date all-day event counts as multi-day (top).
+    expect(
+      v.todayEvents([ev('trip', at(0, 0, 20), at(0, 0, 23), true)], now).map((e) => e.group),
+    ).toEqual([0]);
+    // Spans: one all-day date, several all-day dates (end is exclusive), timed across days.
+    expect(list[4]!.range).toBe('All day');
+    expect(v.formatSpan(ev('trip', at(0, 0, 20), at(0, 0, 23), true))).toBe('Nov 20 – Nov 22');
+    expect(list[0]!.range).toMatch(/^Nov 20, 12:00\sPM – Nov 23, 5:00\sPM$/);
+    expect(v.isLongEvent(ev('late', at(23), at(1, 0, 22)))).toBe(true);
+    expect(v.isLongEvent(ev('to-midnight', at(22), at(0, 0, 22)))).toBe(false);
     expect(v.formatRange(at(14), at(16))).toMatch(/^2:00\s?–4:00\sPM$/);
     expect(v.taskFromEvent(ev('etf', at(14), at(16)))).toEqual({
       title: 'etf',
       estimateMs: 2 * 3_600_000,
     });
-    // Longer than 8h 30m (e.g. a multi-day event): can't be added as a task.
-    expect(v.taskFromEvent(ev('x', at(0), at(12)))).toBeNull();
-    expect(v.taskFromEvent(ev('trip', at(9), at(9, 0, 24)))).toBeNull();
+    expect(v.taskFromEvent(ev('hack', at(12, 0, 20), at(17, 0, 23)))).toBeNull();
+    expect(v.taskFromEvent(ev('holiday', at(0), at(0, 0, 22), true))).toBeNull();
     expect(v.taskFromEvent(ev('long', at(9), at(17, 30)))?.estimateMs).toBe(8.5 * 3_600_000);
     const tasks = v.addTask([], { title: 'ETF' }, '1');
     expect(v.hasOpenTaskTitled(tasks, 'etf')).toBe(true);

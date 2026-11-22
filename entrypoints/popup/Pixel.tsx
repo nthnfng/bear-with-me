@@ -38,7 +38,10 @@ export function Sprite({
   return (
     <div
       className={`sprite ${className ?? ''}`}
-      style={{ backgroundImage: `url(${assetUrl(sprite.file)})`, ...spriteBox(sprite, scale, frame) }}
+      style={{
+        backgroundImage: `url(${assetUrl(sprite.file)})`,
+        ...spriteBox(sprite, scale, frame),
+      }}
     />
   );
 }
@@ -156,9 +159,16 @@ export const Icons = {
   ),
   back: <PixelIcon w={6} h={5} paths={[[INK, 'M2 0.5h1M1 1.5h1M0 2.5h6M1 3.5h1M2 4.5h1']]} />,
   plus: (
-    <PixelIcon w={5} h={5} scale={3} paths={[['#ffffff', 'M2 0.5h1M2 1.5h1M0 2.5h5M2 3.5h1M2 4.5h1']]} />
+    <PixelIcon
+      w={5}
+      h={5}
+      scale={3}
+      paths={[['#ffffff', 'M2 0.5h1M2 1.5h1M0 2.5h5M2 3.5h1M2 4.5h1']]}
+    />
   ),
-  check: <PixelIcon w={6} h={5} paths={[['#ffffff', 'M5 0.5h1M4 1.5h1M0 2.5h1M3 2.5h1M1 3.5h2']]} />,
+  check: (
+    <PixelIcon w={6} h={5} paths={[['#ffffff', 'M5 0.5h1M4 1.5h1M0 2.5h1M3 2.5h1M1 3.5h2']]} />
+  ),
   trash: (
     <PixelIcon
       w={7}
@@ -168,6 +178,21 @@ export const Icons = {
           '#7d818b',
           'M2 0.5h3M0 1.5h7M1 2.5h5M1 3.5h1M3 3.5h1M5 3.5h1M1 4.5h1M3 4.5h1M5 4.5h1M1 5.5h1M3 5.5h1M5 5.5h1M1 6.5h1M3 6.5h1M5 6.5h1M2 7.5h3',
         ],
+      ]}
+    />
+  ),
+  calendar: (
+    <PixelIcon
+      w={10}
+      h={10}
+      paths={[
+        [
+          INK,
+          'M2 0.5h1M7 0.5h1M0 1.5h10M0 2.5h1M9 2.5h1M0 3.5h10M0 4.5h1M9 4.5h1M0 5.5h1M9 5.5h1M0 6.5h1M9 6.5h1M0 7.5h1M9 7.5h1M0 8.5h1M9 8.5h1M0 9.5h10',
+        ],
+        ['#d9443c', 'M1 2.5h8'],
+        ['#fff7ea', 'M1 4.5h8M1 5.5h8M1 6.5h8M1 7.5h8M1 8.5h8'],
+        ['#3a9ff0', 'M2 5.5h2M6 7.5h2'],
       ]}
     />
   ),
@@ -181,13 +206,20 @@ export const Icons = {
           'M3 0.5h4M1 1.5h3M6 1.5h3M1 2.5h1M8 2.5h1M1 3.5h1M8 3.5h1M1 4.5h1M8 4.5h1M1 5.5h1M8 5.5h1M1 6.5h1M8 6.5h1M1 7.5h1M8 7.5h1M1 8.5h1M8 8.5h1M1 9.5h8M7 5.5h1M3 6.5h1M6 6.5h1M4 7.5h2',
         ],
         ['#f2c14e', 'M4 1.5h2'],
-        ['#fff7ea', 'M2 2.5h6M2 3.5h6M2 4.5h6M2 5.5h5M2 6.5h1M4 6.5h2M7 6.5h1M2 7.5h2M6 7.5h2M2 8.5h6'],
+        [
+          '#fff7ea',
+          'M2 2.5h6M2 3.5h6M2 4.5h6M2 5.5h5M2 6.5h1M4 6.5h2M7 6.5h1M2 7.5h2M6 7.5h2M2 8.5h6',
+        ],
       ]}
     />
   ),
 };
 
-const POSITION_DOT = { left: 'M1 5.5h2M1 6.5h2', middle: 'M5 5.5h2M5 6.5h2', right: 'M9 5.5h2M9 6.5h2' };
+const POSITION_DOT = {
+  left: 'M1 5.5h2M1 6.5h2',
+  middle: 'M5 5.5h2M5 6.5h2',
+  right: 'M9 5.5h2M9 6.5h2',
+};
 
 /** A tiny browser window with Barry's dot in one bottom corner. */
 export function PositionIcon({ position }: { position: keyof typeof POSITION_DOT }) {
@@ -242,7 +274,9 @@ export function Heart({ full }: { full: boolean }) {
     <PixelIcon
       w={7}
       h={6}
-      paths={[[full ? '#d9443c' : '#ddc9a3', 'M1 0.5h2M4 0.5h2M0 1.5h7M0 2.5h7M1 3.5h5M2 4.5h3M3 5.5h1']]}
+      paths={[
+        [full ? '#d9443c' : '#ddc9a3', 'M1 0.5h2M4 0.5h2M0 1.5h7M0 2.5h7M1 3.5h5M2 4.5h3M3 5.5h1'],
+      ]}
     />
   );
 }
@@ -251,7 +285,10 @@ export function Heart({ full }: { full: boolean }) {
 export function ChudSign({ meter }: { meter: number }) {
   const segs = chudSignSegments(meter);
   return (
-    <div className="chud-sign" title="Fills while Barry is snoozed; resets after 10 minutes of studying">
+    <div
+      className="chud-sign"
+      title="Fills while Barry is snoozed; resets after 10 minutes of studying"
+    >
       <div className="board">
         <span>Chud Meter</span>
         <div

@@ -605,15 +605,51 @@ export function dropStaleDone(tasks: Task[], now: Millis): Task[] {
   return keep.length === tasks.length ? tasks : keep;
 }
 
-// ---- today's calendar events in the Tasks card --------------------------------------------
+// ---- Today's Events card (from the calendar) ----------------------------------------------
 
 export interface TodayEvent {
   block: CalendarBlock;
-  /** "2:00–4:00 PM" */
+  /** "2:00–4:00 PM", or "All day". */
   range: string;
-  /** "now", or "in 25m" / "in 3h 10m". */
+  /** "● now", "in 25m", "done", or "" for all-day events. */
   when: string;
-  isNow: boolean;
+  status: 'allDay' | 'past' | 'now' | 'later';
+  /**
+   * All-day, or running across midnight (like a 3-day hackathon). Listed first, above a divider,
+   * with `range` as its full span: "Nov 20, 12:00 PM – Nov 22, 5:00 PM" or "Nov 20 – Nov 22".
+   */
+  long: boolean;
+  /** 0 multi-day (top), 1 today's timed events, 2 one-day all-day events (bottom). */
+  group: 0 | 1 | 2;
+}
+
+const dayKey = (ms: Millis) => new Date(ms).toDateString();
+const shortDate = (ms: Millis) =>
+  new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+/** Where an event goes in Today's Events: multi-day on top, timed in the middle, all-day last. */
+function eventGroup(b: Pick<CalendarBlock, 'start' | 'end' | 'allDay'>): 0 | 1 | 2 {
+  if (!isLongEvent(b)) return 1;
+  return b.allDay && formatSpan(b) === 'All day' ? 2 : 0;
+}
+
+/** True for all-day events and ones that run across midnight. */
+export function isLongEvent(b: Pick<CalendarBlock, 'start' | 'end' | 'allDay'>): boolean {
+  return b.allDay || dayKey(b.start) !== dayKey(Math.max(b.start, b.end - 1));
+}
+
+/**
+ * A long event's span: "All day" (one all-day date), "Nov 20 – Nov 22" (all-day, several dates;
+ * the feed's end is exclusive), or "Nov 20, 12:00 PM – Nov 22, 5:00 PM" (timed).
+ */
+export function formatSpan(b: Pick<CalendarBlock, 'start' | 'end' | 'allDay'>): string {
+  if (b.allDay) {
+    const last = Math.max(b.start, b.end - 1);
+    return dayKey(b.start) === dayKey(last)
+      ? 'All day'
+      : `${shortDate(b.start)} – ${shortDate(last)}`;
+  }
+  return `${shortDate(b.start)}, ${formatClock(b.start)} – ${shortDate(b.end)}, ${formatClock(b.end)}`;
 }
 
 /** "2:00–4:00 PM" when both ends share AM/PM, else "11:30 AM–1:00 PM". */
@@ -627,33 +663,44 @@ export function formatRange(start: Millis, end: Millis): string {
 }
 
 /**
- * Today's timed calendar events that haven't ended, in time order (an event already running
- * counts). All-day events are left out: they never put Barry in Lock In.
+ * Everything on today's calendar (local day): multi-day events first, then today's timed events
+ * in time order (including ones already over), then one-day all-day events.
  */
 export function todayEvents(blocks: CalendarBlock[], now: Millis): TodayEvent[] {
-  const endOfDay = new Date(now);
-  endOfDay.setHours(24, 0, 0, 0);
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  const dayStart = start.getTime();
+  const dayEnd = end.getTime();
   return blocks
-    .filter((b) => !b.allDay && b.end > now && b.start < endOfDay.getTime())
-    .sort((a, b) => a.start - b.start || a.end - b.end)
-    .map((block) => {
-      const isNow = block.start <= now;
+    .filter((b) => b.start < dayEnd && b.end > dayStart)
+    .map((block) => ({ block, group: eventGroup(block) }))
+    .sort((a, b) => a.group - b.group || a.block.start - b.block.start || a.block.end - b.block.end)
+    .map(({ block, group }): TodayEvent => {
+      const long = isLongEvent(block);
+      const range = long ? formatSpan(block) : formatRange(block.start, block.end);
+      if (block.allDay) return { block, range, when: '', status: 'allDay', long, group };
+      if (block.end <= now) return { block, range, when: 'done', status: 'past', long, group };
+      if (block.start <= now) return { block, range, when: '● now', status: 'now', long, group };
       return {
         block,
-        range: formatRange(block.start, block.end),
-        when: isNow ? 'now' : `in ${formatEstimate(Math.max(60_000, block.start - now))}`,
-        isNow,
+        range,
+        when: `in ${formatEstimate(Math.max(60_000, block.start - now))}`,
+        status: 'later',
+        long,
+        group,
       };
     });
 }
 
 /**
- * "+ task" on an event: its title, its length as the estimate. Null for an event longer than a
- * Task may be (8h 30m), e.g. a multi-day event: those can't be added.
+ * "+ task" on an event: its title, its length as the estimate. Null for an all-day event or one
+ * longer than a Task may be (8h 30m), e.g. a multi-day event: those can't be added.
  */
 export function taskFromEvent(block: CalendarBlock): { title: string; estimateMs: number } | null {
   const length = block.end - block.start;
-  if (length > TASK_ESTIMATE_MAX_MS) return null;
+  if (block.allDay || length > TASK_ESTIMATE_MAX_MS) return null;
   return {
     title: clampTitle(block.title) || 'Calendar event',
     estimateMs: Math.max(60_000, length),

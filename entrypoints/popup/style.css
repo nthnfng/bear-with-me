@@ -634,50 +634,87 @@ button:disabled {
   line-height: 1;
 }
 
-/* Task list */
-.today {
+/* Today's Events: laid out like the Task list (same padding, header rule, rows). */
+.events-card {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px 6px 6px;
-  background: rgba(58, 159, 240, 0.1);
-  border-left: 3px solid var(--blue);
 }
-.today-head {
+.events-card .paper-body {
+  gap: 8px;
+}
+.events-card .card-head h2 {
+  flex: 1;
+}
+.events-sub {
+  margin: -2px 0 0;
   font-size: 12px;
-  font-weight: 700;
   color: var(--ink-soft);
 }
-.today ul {
+.today {
+  flex: none;
+  height: 84px; /* about two rows; scrolls past that */
   margin: 0;
   padding: 0;
   list-style: none;
+  overflow-y: auto;
 }
 .today li {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 22px;
-  font-size: 12px;
+  gap: 10px;
+  min-height: 36px;
+  padding: 2px 0;
+  border-bottom: 2px solid var(--row-rule);
+  font-size: 13px;
+}
+.today li.empty {
+  border-bottom: 0;
+  color: var(--ink-soft);
+}
+.today li.divider {
+  min-height: 0;
+  height: 0;
+  padding: 0;
+  margin: 3px 0;
+  border-bottom: 0;
+  border-top: 2px solid var(--rule);
 }
 .today li.now {
   font-weight: 700;
 }
+.today li.past {
+  color: var(--ink-soft);
+}
+.today li.past .ev-title {
+  text-decoration: line-through;
+}
 .today .range {
   flex: none;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
 }
 .today .ev-title {
   flex: 1;
   min-width: 0;
+  font-size: 15px;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.today li.long .long-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.today li.long .ev-title {
+  font-weight: 700;
+}
 .today .when {
   flex: none;
+  font-size: 12px;
   color: var(--ink-soft);
 }
 .today li.now .when {
@@ -685,13 +722,25 @@ button:disabled {
 }
 .today .link {
   flex: none;
-  font-size: 11px;
+  font-size: 12px;
 }
 .today .link:disabled {
   color: var(--ink-soft);
   text-decoration: none;
 }
+.break-timer {
+  flex: none;
+  margin: 0;
+  font-size: 13px;
+  color: var(--cream);
+  text-align: center;
+}
+.break-timer b {
+  font-family: var(--pixel-display);
+  font-size: 12px;
+}
 
+/* Task list */
 .todo-card {
   flex: 1;
   min-height: 0;
