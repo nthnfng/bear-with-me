@@ -19,7 +19,7 @@ import {
   dropStaleDone,
   formatCountdown,
   formatEstimate,
-  hasOpenTaskTitled,
+  eventTaskState,
   moveTask,
   moveTaskTo,
   openTasks,
@@ -329,24 +329,31 @@ function EventsCard({ state, now }: { state: BarryState; now: number }) {
         ) : (
           events.map((e, i) => {
             const asTask = e.status === 'past' ? null : taskFromEvent(e.block);
-            const added = hasOpenTaskTitled(state.tasks, e.block.title);
+            const inTasks = eventTaskState(state.tasks, e.block.title);
+            const added = inTasks === 'added';
+            // Its task was checked off: the event reads as done (crossed out), no "+ task".
+            const finished = inTasks === 'done';
             // A line between groups: multi-day / today's events / all-day.
             const divider = i > 0 && events[i - 1]!.group !== e.group;
-            const action = asTask && (
-              <button
-                className="link"
-                disabled={added || full}
-                title={added ? 'Already in your tasks' : 'Add to your tasks'}
-                onClick={() => addFromEvent(asTask)}
-              >
-                {added ? 'added' : '+ task'}
-              </button>
+            const action = finished ? (
+              <span className="task-done">✓ done</span>
+            ) : (
+              asTask && (
+                <button
+                  className="link"
+                  disabled={added || full}
+                  title={added ? 'Already in your tasks' : 'Add to your tasks'}
+                  onClick={() => addFromEvent(asTask)}
+                >
+                  {added ? 'added' : '+ task'}
+                </button>
+              )
             );
             return (
               <Fragment key={`${e.block.id}-${e.block.start}`}>
                 {divider && <li className="divider" aria-hidden="true" />}
                 {e.long ? (
-                  <li className={`long ${e.status}`}>
+                  <li className={`long ${e.status}${finished ? ' finished' : ''}`}>
                     <span className="long-text">
                       <span className="ev-title" title={e.block.title}>
                         {e.block.title}
@@ -357,7 +364,7 @@ function EventsCard({ state, now }: { state: BarryState; now: number }) {
                     {action}
                   </li>
                 ) : (
-                  <li className={e.status}>
+                  <li className={`${e.status}${finished ? ' finished' : ''}`}>
                     <span className="range">{e.range}</span>
                     <span className="ev-title" title={e.block.title}>
                       {e.block.title}
@@ -581,6 +588,15 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
               }}
               label="Custom time"
             />
+            {!showDetails && (
+              <button
+                type="button"
+                className="link details-link"
+                onClick={() => setShowDetails(true)}
+              >
+                + details
+              </button>
+            )}
           </div>
           {usingCustom ? (
             <p className={custom.error ? 'note error' : 'note'}>
@@ -595,7 +611,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
               {draft.length}/{TASK_TITLE_MAX} characters
             </p>
           )}
-          {showDetails ? (
+          {showDetails && (
             <input
               className="field"
               aria-label="Details"
@@ -603,10 +619,6 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
               value={details}
               onChange={(e) => setDetails(e.target.value)}
             />
-          ) : (
-            <button type="button" className="link" onClick={() => setShowDetails(true)}>
-              + details
-            </button>
           )}
         </div>
       )}

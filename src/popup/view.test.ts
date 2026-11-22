@@ -422,7 +422,9 @@ describe('pixel popup helpers', () => {
     expect(v.taskFromEvent(ev('holiday', at(0), at(0, 0, 22), true))).toBeNull();
     expect(v.taskFromEvent(ev('long', at(9), at(17, 30)))?.estimateMs).toBe(8.5 * 3_600_000);
     const tasks = v.addTask([], { title: 'ETF' }, '1');
-    expect(v.hasOpenTaskTitled(tasks, 'etf')).toBe(true);
-    expect(v.hasOpenTaskTitled(tasks, 'gym')).toBe(false);
+    expect(v.eventTaskState(tasks, 'etf')).toBe('added');
+    expect(v.eventTaskState(tasks, 'gym')).toBe('none');
+    // Checked off: the event reads as done, and "+ task" doesn't come back.
+    expect(v.eventTaskState(v.toggleTask(tasks, '1', 5), 'ETF')).toBe('done');
   });
 });

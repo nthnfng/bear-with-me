@@ -707,6 +707,13 @@ export function taskFromEvent(block: CalendarBlock): { title: string; estimateMs
   };
 }
 
-/** An unchecked Task with this title already exists (so "+ task" shows "added"). */
-export const hasOpenTaskTitled = (tasks: Task[], title: string) =>
-  tasks.some((t) => !t.done && t.title.toLowerCase() === clampTitle(title).toLowerCase());
+/**
+ * Whether an event is already in the task list: 'added' while a matching Task (same title) is
+ * unchecked, 'done' once it's been checked off, else 'none' (so "+ task" shows).
+ */
+export function eventTaskState(tasks: Task[], title: string): 'none' | 'added' | 'done' {
+  const key = clampTitle(title).toLowerCase();
+  const matching = tasks.filter((t) => t.title.toLowerCase() === key);
+  if (matching.some((t) => !t.done)) return 'added';
+  return matching.length > 0 ? 'done' : 'none';
+}
