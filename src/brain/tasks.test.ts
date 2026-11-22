@@ -83,7 +83,9 @@ describe('Start and Lock In', () => {
   it('deleting or checking off the running Task clears it', () => {
     const s = run(withTasks(), start('a')).state;
     expect(run(s, setTasks([task('b')], T0 + MIN)).state.activeTask).toBeNull();
-    expect(run(s, setTasks([task('a', 30, true), task('b')], T0 + MIN)).state.activeTask).toBeNull();
+    expect(
+      run(s, setTasks([task('a', 30, true), task('b')], T0 + MIN)).state.activeTask,
+    ).toBeNull();
     expect(run(s, setTasks([task('a'), task('b')], T0 + MIN)).state.activeTask?.id).toBe('a');
   });
 });
@@ -231,5 +233,69 @@ describe('Tasks drive the mode', () => {
     expect(s.tasks[0]!.leftMs).toBe(25 * MIN);
     const r = run(withTasks(), start('a'), mode('lockIn', T0 + MIN)).state;
     expect(r.activeTask?.id).toBe('a');
+  });
+});
+
+describe('breaks pause the Task timer', () => {
+  const slack = (ms: number, now: number): BarryEvent => ({
+    type: 'slackPassStarted',
+    durationMs: ms,
+    now,
+  });
+
+  it('a Slack pass pauses the Task (Lock In stays) and Stop Slacking resumes it', () => {
+    let s = run(withTasks(), start('a'), slack(5 * MIN, T0 + 10 * MIN)).state;
+    expect(s.phase).toBe('slackPass');
+    expect(s.activeTask).toBeNull();
+    expect(s.taskOnBreak).toBe('a');
+    expect(s.tasks[0]!.leftMs).toBe(20 * MIN);
+    expect(s.modeOverride).toBe('lockIn');
+    // Time on the break doesn't count, and the Task never times out during it.
+    s = run(s, tick(T0 + 14 * MIN)).state;
+    expect(s.taskCheck).toBeNull();
+    s = run(s, { type: 'slackPassStopped', now: T0 + 14 * MIN }).state;
+    expect(s.activeTask).toEqual({ id: 'a', startedAt: T0 + 14 * MIN, endsAt: T0 + 34 * MIN });
+    expect(s.taskOnBreak).toBeNull();
+  });
+
+  it('the Slack pass running out resumes the Task', () => {
+    const s = run(
+      withTasks(),
+      start('a'),
+      slack(5 * MIN, T0 + 10 * MIN),
+      tick(T0 + 15 * MIN),
+    ).state;
+    expect(s.phase).toBe('warning');
+    expect(s.activeTask).toEqual({ id: 'a', startedAt: T0 + 15 * MIN, endsAt: T0 + 35 * MIN });
+  });
+
+  it('leaving Lock In or pausing during a break keeps it paused (no resume)', () => {
+    const onBreak = run(withTasks(), start('a'), slack(5 * MIN, T0 + 10 * MIN)).state;
+    const chill = run(onBreak, {
+      type: 'modeOverrideSet',
+      override: 'chill',
+      now: T0 + 11 * MIN,
+    }).state;
+    expect(chill.taskOnBreak).toBeNull();
+    expect(chill.activeTask).toBeNull();
+    expect(chill.tasks[0]!.leftMs).toBe(20 * MIN);
+    const paused = run(
+      onBreak,
+      { type: 'taskStopped', now: T0 + 11 * MIN },
+      tick(T0 + 20 * MIN),
+    ).state;
+    expect(paused.activeTask).toBeNull();
+    expect(paused.tasks[0]!.leftMs).toBe(20 * MIN);
+  });
+
+  it('finishing the Task during a break means nothing resumes', () => {
+    const onBreak = run(withTasks(), start('a'), slack(5 * MIN, T0 + 10 * MIN)).state;
+    const s = run(
+      onBreak,
+      setTasks([{ ...task('a', 30, true) }, task('b'), task('c')], T0 + 11 * MIN),
+      { type: 'slackPassStopped', now: T0 + 12 * MIN },
+    ).state;
+    expect(s.activeTask).toBeNull();
+    expect(s.taskOnBreak).toBeNull();
   });
 });

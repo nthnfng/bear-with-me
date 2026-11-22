@@ -29,7 +29,7 @@ The first unchecked Task in the list. Barry names it when nothing is started, an
 _Avoid_: Current todo, next task
 
 **Start**:
-The user saying "I'm working on this now" by pressing ▶ on a Task. The mode switches to Lock In for the Task's estimate, and back to Auto when its time is up or it's checked off. Picking Auto or Chill mid-Task asks to pause it; a paused Task keeps its time left and ▶ resumes it.
+The user saying "I'm working on this now" by pressing ▶ on a Task. The mode switches to Lock In for the Task's estimate, and back to Auto when its time is up or it's checked off. Picking Auto or Chill mid-Task asks to pause it; a paused Task keeps its time left and ▶ resumes it. A break (Slack pass or Snooze) pauses the Task timer the same way, and it resumes when the break ends.
 _Avoid_: Begin, timer, focus session
 
 **Done check**:

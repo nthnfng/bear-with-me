@@ -29,6 +29,7 @@ export function initialState(): BarryState {
     tasks: [],
     activeTask: null,
     taskCheck: null,
+    taskOnBreak: null,
     openTabs: {},
     activeTabId: null,
     userIdle: false,
@@ -83,23 +84,11 @@ function apply(
       return { state };
     case 'tasksSet':
       return { state: setTasks(state, event.tasks) };
-    case 'taskStarted': {
-      const task = state.tasks.find((t) => t.id === event.id);
-      if (!task || task.done) return { state };
-      // The started Task becomes the top Task, and Barry locks in for it (resuming a pause).
-      const runMs = task.leftMs != null && task.leftMs > 0 ? task.leftMs : task.estimateMs;
-      return {
-        state: {
-          ...state,
-          tasks: [{ ...task, leftMs: null }, ...state.tasks.filter((t) => t.id !== task.id)],
-          activeTask: { id: task.id, startedAt: event.now, endsAt: event.now + runMs },
-          taskCheck: null,
-          modeOverride: 'lockIn',
-        },
-      };
-    }
+    case 'taskStarted':
+      // During a break the Task is paused again right away and resumes when the break ends.
+      return { state: startTask({ ...state, taskOnBreak: null }, event.id, event.now) };
     case 'taskStopped':
-      return { state: pauseTask(state, event.now, 'auto') };
+      return { state: pauseTask({ ...state, taskOnBreak: null }, event.now, 'auto') };
     case 'taskAnswered':
       return { state: answerTask(state, event.id, event.answer, event.now, event.extendMs) };
     case 'scheduleUpdated':
@@ -147,8 +136,9 @@ function apply(
       return { state };
     case 'modeOverrideSet':
       // Leaving Lock In while a Task runs pauses it (the popup asks first).
-      if (event.override !== 'lockIn' && runningTask(state, event.now)) {
-        return { state: pauseTask(state, event.now, event.override) };
+      // A Task paused by a break stays paused (no resume) once Lock In is left.
+      if (event.override !== 'lockIn') {
+        return { state: pauseTask({ ...state, taskOnBreak: null }, event.now, event.override) };
       }
       return { state: { ...state, modeOverride: event.override } };
     case 'blocklistSet':
@@ -282,12 +272,53 @@ function setTasks(state: BarryState, tasks: Task[]): BarryState {
     tasks,
     activeTask: keepRunning ? state.activeTask : null,
     taskCheck: open(state.taskCheck?.id) ? state.taskCheck : null,
+    taskOnBreak: open(state.taskOnBreak ?? undefined) ? state.taskOnBreak : null,
     // Checking off or deleting the running Task finishes it: back to Auto.
     modeOverride: state.activeTask && !keepRunning ? 'auto' : state.modeOverride,
   };
 }
 
-/** Pauses the running Task (keeping its time left) and sets the override to `mode`. */
+/**
+ * Starts (or resumes) a Task: it becomes the top Task, the mode switches to Lock In, and its
+ * timer runs for its estimate, or for what was left when it was paused. The one way a Task
+ * starts: ▶, and resuming after a break.
+ */
+function startTask(state: BarryState, id: string, now: Millis): BarryState {
+  const task = state.tasks.find((t) => t.id === id);
+  if (!task || task.done) return state;
+  const runMs = task.leftMs != null && task.leftMs > 0 ? task.leftMs : task.estimateMs;
+  return {
+    ...state,
+    tasks: [{ ...task, leftMs: null }, ...state.tasks.filter((t) => t.id !== id)],
+    activeTask: { id, startedAt: now, endsAt: now + runMs },
+    taskCheck: null,
+    modeOverride: 'lockIn',
+  };
+}
+
+/** A break that stops the Task timer: a Slack pass or a Snooze (the user isn't working). */
+const isBreak = (phase: BarryState['phase']) => phase === 'slackPass' || phase === 'snoozing';
+
+/**
+ * Keeps the Task timer in step with breaks: a break starting pauses the running Task (through
+ * pauseTask, Lock In stays on), and the break ending resumes it (through startTask).
+ */
+function syncTaskWithBreak(state: BarryState, now: Millis): BarryState {
+  if (isBreak(state.phase)) {
+    const a = runningTask(state, now);
+    if (!a) return state;
+    return { ...pauseTask(state, now, state.modeOverride), taskOnBreak: a.id };
+  }
+  const id = state.taskOnBreak;
+  if (id === null) return state;
+  const resumed = startTask({ ...state, taskOnBreak: null }, id, now);
+  return resumed;
+}
+
+/**
+ * Pauses the running Task (keeping its time left) and sets the override to `mode`. The one
+ * way a Task pauses: ❚❚, leaving Lock In, and a break starting.
+ */
 function pauseTask(state: BarryState, now: Millis, mode: BarryState['modeOverride']): BarryState {
   const a = state.activeTask;
   if (!a) return { ...state, modeOverride: mode };
@@ -702,6 +733,8 @@ function reduce(prev: BarryState, event: BarryEvent): ReduceResult {
   state = expireTask(state, event.now);
   // Derived: break/fight phases first, then Confrontation, then Fatness lifetime.
   state = advance(state, event.now, effects);
+  // A break pauses the Task timer; the break ending resumes it.
+  state = syncTaskWithBreak(state, event.now);
   if (state.phase === 'clear' || state.phase === 'confronting') {
     const tab = confrontedTab(state, event.now);
     state = { ...state, phase: tab === null ? 'clear' : 'confronting' };

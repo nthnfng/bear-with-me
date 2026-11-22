@@ -394,6 +394,11 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
           {open.length}/{TASK_MAX} tasks{open.length > 0 && ` · ${formatEstimate(total)}`}
         </span>
       </div>
+      {state.taskOnBreak && (
+        <p className="note lock-note">
+          On a break: the task timer is paused and picks up again when the break ends.
+        </p>
+      )}
       {reorderLocked && (
         <p className="note lock-note">
           Reordering is locked while a task is running. Pause it (❚❚) to drag tasks again.
@@ -698,7 +703,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
                 {isRunning
                   ? formatCountdown(running!.endsAt - now)
                   : t.leftMs
-                    ? `❚❚ ${formatCountdown(t.leftMs)}`
+                    ? `${state.taskOnBreak === t.id ? '☕' : '❚❚'} ${formatCountdown(t.leftMs)}`
                     : formatEstimate(t.estimateMs)}
               </span>
               {isRunning ? (
@@ -709,7 +714,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
                 >
                   ❚❚
                 </button>
-              ) : isTop ? (
+              ) : isTop && state.taskOnBreak !== t.id ? (
                 <button
                   className="mini go"
                   aria-label={`${t.leftMs ? 'Resume' : 'Start'} ${t.title}`}

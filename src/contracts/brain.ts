@@ -47,6 +47,11 @@ export interface BarryState {
   activeTask: ActiveTask | null;
   /** A started Task whose time ran out, waiting for the user's answer to "Done?". */
   taskCheck: { id: string; at: Millis } | null;
+  /**
+   * The Task a break (Slack pass or Snooze) paused. Its timer resumes when the break ends.
+   * Cleared if the user pauses it, leaves Lock In, or finishes or deletes it meanwhile.
+   */
+  taskOnBreak: string | null;
   /** Every open tab's current URL, so the brain can find all Restricted tabs. */
   openTabs: Record<TabId, string>;
   activeTabId: TabId | null;
