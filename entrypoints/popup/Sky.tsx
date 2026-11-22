@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { BarryState } from '@/src/contracts';
 import { BUBBLE, headerBarry, popupView, sceneKey, skyBands } from '@/src/popup/view';
-import { send, useActiveTabId } from './hooks';
+import { useActiveTabId } from './hooks';
 import { ChudSign, Cloud, HeaderPose, SpeechTail, Sprite, assetUrl, manifest } from './Pixel';
 
 /** Barry walking into the Cave, or out of it and off to the page. */
@@ -43,7 +43,7 @@ export function SkyHeader({
   const hb = headerBarry(state, now, activeTabId);
   const key = sceneKey(v.mode, state.phase);
   const night = key === 'snoozing';
-  const showBubble = key !== 'confronting' && key !== 'slackPass' && (state.cave || (key !== 'clear' && key !== 'chill'));
+  const showBubble = key !== 'confronting' && key !== 'slackPass' && key !== 'snoozing' && (state.cave || (key !== 'clear' && key !== 'chill'));
 
   return (
     <header className="sky" style={{ background: skyBands(key, 36) }}>
@@ -98,12 +98,6 @@ export function SkyHeader({
             <SpeechTail />
           </span>
         </>
-      )}
-
-      {hb.canGetUp && (
-        <button className="stone getup" onClick={() => send({ type: 'gotUp' })}>
-          Get up
-        </button>
       )}
 
       <ChudSign meter={state.chudMeter} />
