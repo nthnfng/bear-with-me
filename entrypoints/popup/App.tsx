@@ -20,6 +20,7 @@ import {
   formatEstimate,
   formatTimeLeft,
   formatWhen,
+  hasOpenTaskTitled,
   moveTask,
   moveTaskTo,
   openTasks,
@@ -28,6 +29,8 @@ import {
   minutesField,
   popupView,
   removeTask,
+  taskFromEvent,
+  todayEvents,
   renameTask,
   slackChangePreview,
   toggleTask,
@@ -297,7 +300,14 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
   // Custom time: hours (0-8) and minutes (0-59) boxes.
   const [customH, setCustomH] = useState('');
   const [customM, setCustomM] = useState('');
-  const [confirmOver, setConfirmOver] = useState(false);
+  // A Task waiting on "Your tasks add up to ... Are you sure?" (from the form or "+ task").
+  const [pendingAdd, setPendingAdd] = useState<{
+    title: string;
+    description: string;
+    estimateMs: number;
+    fromForm: boolean;
+  } | null>(null);
+  const [showAllEvents, setShowAllEvents] = useState(false);
   // "Keep going" time on the Done? check.
   const [moreH, setMoreH] = useState('');
   const [moreM, setMoreM] = useState('');
@@ -336,20 +346,34 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
     setEstimateMs(TASK_DEFAULT_ESTIMATE_MS);
     setCustomH('');
     setCustomM('');
-    setConfirmOver(false);
+    setPendingAdd(null);
   };
   const custom = hoursMinutesMs(customH, customM);
   const usingCustom = customH !== '' || customM !== '';
   const more = hoursMinutesMs(moreH, moreM);
-  const add = (force = false) => {
-    if (!draft.trim() || full || (usingCustom && custom.ms === null)) return;
-    const ms = usingCustom ? custom.ms! : estimateMs;
-    if (!force && wouldExceedTotal(tasks, ms)) return setConfirmOver(true);
-    commit(
-      addTask(tasks, { title: draft, description: details, estimateMs: ms }, crypto.randomUUID()),
-    );
-    reset();
+  /** Adds a Task, asking first if it takes the unchecked total past 8 hours. */
+  const tryAdd = (
+    p: { title: string; description: string; estimateMs: number; fromForm: boolean },
+    force = false,
+  ) => {
+    if (full) return;
+    if (!force && wouldExceedTotal(tasks, p.estimateMs)) return setPendingAdd(p);
+    commit(addTask(tasks, p, crypto.randomUUID()));
+    if (p.fromForm) reset();
+    setPendingAdd(null);
   };
+  const add = () => {
+    if (!draft.trim() || (usingCustom && custom.ms === null)) return;
+    tryAdd({
+      title: draft,
+      description: details,
+      estimateMs: usingCustom ? custom.ms! : estimateMs,
+      fromForm: true,
+    });
+  };
+  const events = todayEvents(state.blocks, now);
+  const EVENTS_SHOWN = 3;
+  const shownEvents = showAllEvents ? events : events.slice(0, EVENTS_SHOWN);
 
   const open = openTasks(tasks);
   const top = open[0];
@@ -374,6 +398,42 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
         <p className="note lock-note">
           Reordering is locked while a task is running. Pause it (❚❚) to drag tasks again.
         </p>
+      )}
+
+      {events.length > 0 && (
+        <div className="today" aria-label="Today's calendar">
+          <span className="today-head">📅 Today</span>
+          <ul>
+            {shownEvents.map((e) => {
+              const added = hasOpenTaskTitled(tasks, e.block.title);
+              const asTask = taskFromEvent(e.block);
+              return (
+                <li key={`${e.block.id}-${e.block.start}`} className={e.isNow ? 'now' : undefined}>
+                  <span className="range">{e.range}</span>
+                  <span className="ev-title" title={e.block.title}>
+                    {e.block.title}
+                  </span>
+                  <span className="when">{e.isNow ? '● now' : e.when}</span>
+                  {asTask ? (
+                    <button
+                      className="link"
+                      disabled={added || full}
+                      title={added ? 'Already in your tasks' : 'Add to your tasks'}
+                      onClick={() => tryAdd({ ...asTask, description: '', fromForm: false })}
+                    >
+                      {added ? 'added' : '+ task'}
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {events.length > EVENTS_SHOWN && (
+            <button className="link" onClick={() => setShowAllEvents(!showAllEvents)}>
+              {showAllEvents ? 'show less' : `+${events.length - EVENTS_SHOWN} more today`}
+            </button>
+          )}
+        </div>
       )}
 
       {check && (
@@ -433,7 +493,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
           autoComplete="off"
           onChange={(e) => {
             setDraft(e.target.value);
-            setConfirmOver(false);
+            setPendingAdd(null);
           }}
         />
         <button type="submit" className="blue icon" aria-label="Add task" disabled={full}>
@@ -456,7 +516,7 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
                   setCustomH('');
                   setCustomM('');
                   setEstimateMs(min * 60_000);
-                  setConfirmOver(false);
+                  setPendingAdd(null);
                 }}
               >
                 {formatEstimate(min * 60_000)}
@@ -470,11 +530,11 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
               m={customM}
               onH={(h) => {
                 setCustomH(h);
-                setConfirmOver(false);
+                setPendingAdd(null);
               }}
               onM={(m) => {
                 setCustomM(m);
-                setConfirmOver(false);
+                setPendingAdd(null);
               }}
               label="Custom time"
             />
@@ -508,18 +568,17 @@ function TaskCard({ state, now }: { state: BarryState; now: number }) {
         </div>
       )}
 
-      {confirmOver && (
+      {pendingAdd && (
         <div className="slack-confirm" role="alertdialog" aria-label="Lots of tasks">
           <p>
-            Your tasks add up to{' '}
-            {formatEstimate(total + (usingCustom ? (custom.ms ?? 0) : estimateMs))}. Are you sure
-            you want to add more?
+            Your tasks add up to {formatEstimate(total + pendingAdd.estimateMs)}. Are you sure you
+            want to add more?
           </p>
           <div className="chips two">
-            <button className="stone on" onClick={() => add(true)}>
+            <button className="stone on" onClick={() => tryAdd(pendingAdd, true)}>
               Add anyway
             </button>
-            <button className="stone" onClick={() => setConfirmOver(false)}>
+            <button className="stone" onClick={() => setPendingAdd(null)}>
               Cancel
             </button>
           </div>

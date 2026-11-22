@@ -604,3 +604,62 @@ export function dropStaleDone(tasks: Task[], now: Millis): Task[] {
   const keep = tasks.filter((t) => !t.done || (t.doneAt ?? 0) >= midnight.getTime());
   return keep.length === tasks.length ? tasks : keep;
 }
+
+// ---- today's calendar events in the Tasks card --------------------------------------------
+
+export interface TodayEvent {
+  block: CalendarBlock;
+  /** "2:00–4:00 PM" */
+  range: string;
+  /** "now", or "in 25m" / "in 3h 10m". */
+  when: string;
+  isNow: boolean;
+}
+
+/** "2:00–4:00 PM" when both ends share AM/PM, else "11:30 AM–1:00 PM". */
+export function formatRange(start: Millis, end: Millis): string {
+  const a = formatClock(start);
+  const b = formatClock(end);
+  const suffix = /\s?(AM|PM)$/i;
+  const sa = a.match(suffix)?.[1];
+  const sb = b.match(suffix)?.[1];
+  return sa && sa === sb ? `${a.replace(suffix, '')}–${b}` : `${a}–${b}`;
+}
+
+/**
+ * Today's timed calendar events that haven't ended, in time order (an event already running
+ * counts). All-day events are left out: they never put Barry in Lock In.
+ */
+export function todayEvents(blocks: CalendarBlock[], now: Millis): TodayEvent[] {
+  const endOfDay = new Date(now);
+  endOfDay.setHours(24, 0, 0, 0);
+  return blocks
+    .filter((b) => !b.allDay && b.end > now && b.start < endOfDay.getTime())
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+    .map((block) => {
+      const isNow = block.start <= now;
+      return {
+        block,
+        range: formatRange(block.start, block.end),
+        when: isNow ? 'now' : `in ${formatEstimate(Math.max(60_000, block.start - now))}`,
+        isNow,
+      };
+    });
+}
+
+/**
+ * "+ task" on an event: its title, its length as the estimate. Null for an event longer than a
+ * Task may be (8h 30m), e.g. a multi-day event: those can't be added.
+ */
+export function taskFromEvent(block: CalendarBlock): { title: string; estimateMs: number } | null {
+  const length = block.end - block.start;
+  if (length > TASK_ESTIMATE_MAX_MS) return null;
+  return {
+    title: clampTitle(block.title) || 'Calendar event',
+    estimateMs: Math.max(60_000, length),
+  };
+}
+
+/** An unchecked Task with this title already exists (so "+ task" shows "added"). */
+export const hasOpenTaskTitled = (tasks: Task[], title: string) =>
+  tasks.some((t) => !t.done && t.title.toLowerCase() === clampTitle(title).toLowerCase());

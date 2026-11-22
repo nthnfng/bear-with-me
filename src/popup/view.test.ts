@@ -239,7 +239,10 @@ describe('pixel popup helpers', () => {
     const cur = { ...block('a', 0, 5000), end: 5000 };
     const nxt = block('b', 9000, 12000);
     expect(blockCardTimer(base)).toBeNull();
-    expect(blockCardTimer({ ...base, nextBlock: nxt })).toEqual({ label: 'Next block in', target: 9000 });
+    expect(blockCardTimer({ ...base, nextBlock: nxt })).toEqual({
+      label: 'Next block in',
+      target: 9000,
+    });
     expect(blockCardTimer({ ...base, currentBlock: cur, nextBlock: nxt })).toEqual({
       label: 'Time left',
       target: 5000,
@@ -263,7 +266,6 @@ describe('pixel popup helpers', () => {
     expect(chudSignSegments(1).every(Boolean)).toBe(true);
     expect(chudSignSegments(NaN).some(Boolean)).toBe(false);
   });
-
 
   it('Task list: add, tick, reorder, totals and limits', async () => {
     const v = await import('./view');
@@ -322,7 +324,9 @@ describe('pixel popup helpers', () => {
     // Titles are cut to 50 characters, on add and rename.
     const long = 'x'.repeat(80);
     expect(v.addTask([], { title: long }, 'l')[0]!.title).toHaveLength(50);
-    expect(v.renameTask(v.addTask([], { title: 'a' }, 'r'), 'r', long, '')[0]!.title).toHaveLength(50);
+    expect(v.renameTask(v.addTask([], { title: 'a' }, 'r'), 'r', long, '')[0]!.title).toHaveLength(
+      50,
+    );
   });
 
   it('clears Tasks finished before today', async () => {
@@ -366,5 +370,45 @@ describe('pixel popup helpers', () => {
     expect(v.renameTask(list, '1', '  ', '')[0]).toMatchObject({ title: 'Gym', description: '' });
     expect(v.renameTask(list, '1', 'Gym', 'legs')).toBe(list);
     expect(v.renameTask(list, 'nope', 'x', '')).toBe(list);
+  });
+
+  it("lists today's remaining timed events, in order, for the Tasks card", async () => {
+    const v = await import('./view');
+    const at = (h: number, m = 0, day = 21) => new Date(2026, 10, day, h, m).getTime();
+    const ev = (id: string, s: number, e: number, allDay = false) => ({
+      id,
+      title: id,
+      start: s,
+      end: e,
+      allDay,
+      source: 'ics' as const,
+    });
+    const now = at(14, 30);
+    const list = v.todayEvents(
+      [
+        ev('gym', at(18, 30), at(19, 30)),
+        ev('done', at(9), at(10)),
+        ev('etf', at(14), at(16)),
+        ev('holiday', at(0), at(0, 0, 22), true),
+        ev('tomorrow', at(9, 0, 22), at(10, 0, 22)),
+      ],
+      now,
+    );
+    expect(list.map((e) => [e.block.id, e.when, e.isNow])).toEqual([
+      ['etf', 'now', true],
+      ['gym', 'in 4h', false],
+    ]);
+    expect(v.formatRange(at(14), at(16))).toMatch(/^2:00\s?–4:00\sPM$/);
+    expect(v.taskFromEvent(ev('etf', at(14), at(16)))).toEqual({
+      title: 'etf',
+      estimateMs: 2 * 3_600_000,
+    });
+    // Longer than 8h 30m (e.g. a multi-day event): can't be added as a task.
+    expect(v.taskFromEvent(ev('x', at(0), at(12)))).toBeNull();
+    expect(v.taskFromEvent(ev('trip', at(9), at(9, 0, 24)))).toBeNull();
+    expect(v.taskFromEvent(ev('long', at(9), at(17, 30)))?.estimateMs).toBe(8.5 * 3_600_000);
+    const tasks = v.addTask([], { title: 'ETF' }, '1');
+    expect(v.hasOpenTaskTitled(tasks, 'etf')).toBe(true);
+    expect(v.hasOpenTaskTitled(tasks, 'gym')).toBe(false);
   });
 });

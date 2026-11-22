@@ -635,6 +635,63 @@ button:disabled {
 }
 
 /* Task list */
+.today {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px 6px;
+  background: rgba(58, 159, 240, 0.1);
+  border-left: 3px solid var(--blue);
+}
+.today-head {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.today ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.today li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  font-size: 12px;
+}
+.today li.now {
+  font-weight: 700;
+}
+.today .range {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.today .ev-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.today .when {
+  flex: none;
+  color: var(--ink-soft);
+}
+.today li.now .when {
+  color: #357a44;
+}
+.today .link {
+  flex: none;
+  font-size: 11px;
+}
+.today .link:disabled {
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
 .todo-card {
   flex: 1;
   min-height: 0;
