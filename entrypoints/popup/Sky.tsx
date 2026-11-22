@@ -43,6 +43,7 @@ export function SkyHeader({
   const hb = headerBarry(state, now, activeTabId);
   const key = sceneKey(v.mode, state.phase);
   const night = key === 'snoozing';
+  const showBubble = key !== 'confronting' && (state.cave || (key !== 'clear' && key !== 'chill'));
 
   return (
     <header className="sky" style={{ background: skyBands(key, 36) }}>
@@ -80,20 +81,24 @@ export function SkyHeader({
           <HeaderPose pose={hb.pose} poseSince={hb.poseSince} scale={2} />
         </span>
       ) : (
-        state.cave && (
+        state.cave && v.mode === 'chill' && (
           <span className="zzz" aria-label="Barry is asleep in his cave">
             z z Z
           </span>
         )
       )}
 
-      <div className="bubble" role="status">
-        <span>{BUBBLE[key]}</span>
-        {v.countdownHint && <span className="pushes">{v.countdownHint}</span>}
-      </div>
-      <span className="bubble-tail">
-        <SpeechTail />
-      </span>
+      {showBubble && (
+        <>
+          <div className="bubble" role="status">
+            <span>{BUBBLE[key]}</span>
+            {v.countdownHint && <span className="pushes">{v.countdownHint}</span>}
+          </div>
+          <span className="bubble-tail">
+            <SpeechTail />
+          </span>
+        </>
+      )}
 
       {hb.canGetUp && (
         <button className="stone getup" onClick={() => send({ type: 'gotUp' })}>
