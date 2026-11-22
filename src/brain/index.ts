@@ -12,7 +12,6 @@ import {
   type BarryState,
   type Brain,
   type Millis,
-  type PlanView,
   type PoseId,
   type ReduceResult,
   type Task,
@@ -390,26 +389,13 @@ export function topTask(state: Pick<BarryState, 'tasks'>): Task | undefined {
 }
 
 /**
- * What the Confrontation shows under its line. Task first: the running one (time left), else
- * the one waiting for "Done?", else the top unchecked one (its estimate). Then the calendar block.
+ * The Confrontation's second line: the task being played right now, or null when nothing is
+ * playing (then Barry only asks the first line). Calendar events never show here.
  */
-export function planFor(state: BarryState, now: Millis): PlanView | null {
-  const byId = (id: string | undefined) => state.tasks.find((t) => t.id === id && !t.done);
+export function confrontSubline(state: BarryState, now: Millis): string | null {
   const running = runningTask(state, now);
-  const runningT = byId(running?.id);
-  const waiting = byId(state.taskCheck?.id);
-  const top = topTask(state);
-  const task: PlanView['task'] =
-    runningT && running
-      ? { title: runningT.title, timing: { kind: 'left', endsAt: running.endsAt } }
-      : waiting
-        ? { title: waiting.title, timing: { kind: 'timesUp' } }
-        : top
-          ? { title: top.title, timing: { kind: 'estimate', ms: top.leftMs ?? top.estimateMs } }
-          : null;
-  const b = currentBlock(state, now);
-  const block = b ? { title: b.title, endsAt: b.end } : null;
-  return task || block ? { task, block } : null;
+  const task = running ? state.tasks.find((t) => t.id === running.id && !t.done) : undefined;
+  return task ? `You're currently working on ${task.title}.` : null;
 }
 
 /** The Reach lands: explode every Restricted tab, forget them, reset Fatness and Pushes. */
@@ -808,7 +794,6 @@ function baseView(state: BarryState, tabId: TabId, now: Millis): TabView {
   if (!inBreak && confrontedTab(state, now) === tabId) {
     const chud = liveChud(state, now);
     const full = chud >= 1;
-    const plan = planFor(state, now);
     return {
       ...HIDDEN_VIEW,
       visible: true,
@@ -816,12 +801,8 @@ function baseView(state: BarryState, tabId: TabId, now: Millis): TabView {
       position: state.position,
       pose: tierPose(state.fatness, chud),
       poseSince: state.confrontSince ?? 0,
-      line: full
-        ? chudLine
-        : plan
-          ? `You planned ${plan.task?.title ?? plan.block?.title} ,':/`
-          : "You said you'd lock in ,':/",
-      plan,
+      line: full ? chudLine : "Shouldn't you be locked in right now?",
+      subline: confrontSubline(state, now),
       showBackToIt: true,
       eatInput: true,
       pauseMedia: true,

@@ -200,11 +200,8 @@ export interface TabView {
   /** The arm stretching out of corner Barry. Progress = (now - startedAt) / durationMs. Null = no arm. */
   reach: { startedAt: Millis; durationMs: number } | null;
   pushesLeft: number | null;
-  /**
-   * What the user planned, shown under the Confrontation line: the Task first, then the calendar
-   * block. Null outside a Confrontation or when there is neither.
-   */
-  plan: PlanView | null;
+  /** A smaller second line under `line` (the Confrontation's "You're currently working on …"). */
+  subline: string | null;
   /** "Time's up for {title}. Done?" with Done / +15 min / typed minutes. Null when nothing is waiting. */
   taskCheck: { id: string; title: string } | null;
   /**
@@ -212,17 +209,6 @@ export interface TabView {
    * The brain always leaves this null; the runtime fills it in before sending the view.
    */
   tabSlot: TabSlot | null;
-}
-
-/** How a Task line is timed: running (count down to endsAt), not started (its estimate), or time's up. */
-export type TaskTiming =
-  | { kind: 'left'; endsAt: Millis }
-  | { kind: 'estimate'; ms: number }
-  | { kind: 'timesUp' };
-
-export interface PlanView {
-  task: { title: string; timing: TaskTiming } | null;
-  block: { title: string; endsAt: Millis } | null;
 }
 
 /** A tab's place in its window's horizontal tab strip. Pinned tabs sit first and are narrow. */
@@ -249,7 +235,7 @@ export const HIDDEN_VIEW: TabView = {
   breakEndsAt: null,
   reach: null,
   pushesLeft: null,
-  plan: null,
+  subline: null,
   taskCheck: null,
   tabSlot: null,
 };

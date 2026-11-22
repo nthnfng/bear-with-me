@@ -1,6 +1,5 @@
 // Pure text helpers for the small widgets near Barry. DOM-free.
 
-import type { PlanView } from '../contracts';
 
 export function formatCountdown(remainingMs: number): string {
   const total = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -36,49 +35,6 @@ export const PLAN_TITLE_MAX = 32;
 export function truncate(text: string, max = PLAN_TITLE_MAX): string {
   const t = text.trim();
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
-}
-
-/**
- * A readable length, rounded up to the minute, in at most two units: "25 minutes",
- * "5 hours 30 minutes", "2 hours", "1 day 16 hours".
- */
-export function humanDuration(ms: number): string {
-  const total = Math.max(1, Math.ceil(ms / 60_000));
-  const d = Math.floor(total / 1440);
-  const h = Math.floor((total % 1440) / 60);
-  const m = total % 60;
-  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  if (d > 0) return h > 0 ? `${unit(d, 'day')} ${unit(h, 'hour')}` : unit(d, 'day');
-  if (h > 0) return m > 0 ? `${unit(h, 'hour')} ${unit(m, 'minute')}` : unit(h, 'hour');
-  return unit(m, 'minute');
-}
-
-/**
- * The lines under the Confrontation line, task first:
- *   "Task Write essay: ~5 hours 30 minutes left"   (running)
- *   "Task Write essay: ~30 minutes"                 (not started: its estimate)
- *   "Task Write essay: time's up"
- *   "Event Hack Western: ~1 day 16 hours left"
- */
-export function planLines(plan: PlanView | null, now: number): string[] {
-  if (!plan) return [];
-  const out: string[] = [];
-  if (plan.task) {
-    const t = plan.task.timing;
-    const when =
-      t.kind === 'left'
-        ? `~${humanDuration(t.endsAt - now)} left`
-        : t.kind === 'estimate'
-          ? `~${humanDuration(t.ms)}`
-          : "time's up";
-    out.push(`Task ${truncate(plan.task.title)}: ${when}`);
-  }
-  if (plan.block) {
-    out.push(
-      `Event ${truncate(plan.block.title)}: ~${humanDuration(plan.block.endsAt - now)} left`,
-    );
-  }
-  return out;
 }
 
 export function taskCheckText(title: string): string {

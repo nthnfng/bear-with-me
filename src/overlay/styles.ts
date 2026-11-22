@@ -68,12 +68,11 @@ export const CSS = `
   rotate: 45deg; translate: -50% 0; }
 .suggest .x { position: absolute; top: 2px; right: 4px; border: 0; background: transparent;
   font: inherit; font-size: 18px; line-height: 1; cursor: pointer; color: #555; padding: 2px 4px; }
-.bubble .plan { margin-top: 6px; padding-top: 4px; border-top: 2px solid #e6dcc8;
-  font-size: 12px; font-weight: 600; line-height: 1.35; text-align: left; color: #4a3a30; }
-/* With the plan lines the bubble is a fixed width; long lines end in "…". */
-.bubble.has-plan { width: 300px; max-width: 300px; }
-.face .bubble.has-plan { width: 360px; max-width: 360px; }
-.face .bubble .plan { font-size: 13px; }
+.bubble .sub { margin-top: 4px; font-size: 13px; font-weight: 600; line-height: 1.3; color: #4a3a30; }
+/* With the second line the bubble is a fixed width, so a long task name wraps instead of widening it. */
+.bubble.has-sub { width: 300px; max-width: 300px; }
+.face .bubble.has-sub { width: 360px; max-width: 360px; }
+.face .bubble .sub { font-size: 15px; }
 .bubble .plan div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .check { position: relative; max-width: 300px; background: #fff; color: var(--ink);
   border: 4px solid var(--ink); padding: 8px 10px; font-size: 14px; font-weight: 600;
