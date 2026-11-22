@@ -43,7 +43,7 @@ export function SkyHeader({
   const hb = headerBarry(state, now, activeTabId);
   const key = sceneKey(v.mode, state.phase);
   const night = key === 'snoozing';
-  const showBubble = key !== 'confronting' && (state.cave || (key !== 'clear' && key !== 'chill'));
+  const showBubble = key !== 'confronting' && key !== 'slackPass' && (state.cave || (key !== 'clear' && key !== 'chill'));
 
   return (
     <header className="sky" style={{ background: skyBands(key, 36) }}>
